@@ -1,0 +1,3 @@
+[submodule "plutovg"]
+	path = plutovg
+	url = https://github.com/tktkku/plutovg.git
