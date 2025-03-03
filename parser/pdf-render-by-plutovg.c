@@ -262,6 +262,7 @@ void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
 
 void _do_render_operation(pdf_context_t* context, const char* operation)
 {
+    printf("%s\n", operation);
     int count = ARRAY_COUNT(handlers);
     int left = 0;
     int right = count - 1;
@@ -1005,11 +1006,13 @@ void handle_Do(pdf_context_t* context)
         else if (memcmp(xobj->image->data, "\x89\x50\x4E\x47\x0D\x0A\x1A\x0A",
             8) == 0) // png
         {
-
+            s = plutovg_surface_load_from_image_data(xobj->image->data,
+                xobj->image->data_len);
         }
         else if (memcmp(xobj->image->data, "P6", 2) == 0) // ppm
         {
-
+            s = plutovg_surface_load_from_image_data(xobj->image->data,
+                xobj->image->data_len);
         }
         else
         {
@@ -1077,8 +1080,8 @@ void handle_Do(pdf_context_t* context)
             return;
         }
 
-        sprintf(filename, "%s.jpg", buf + 1);
-        plutovg_surface_write_to_jpg(s, filename, 100);
+        sprintf(filename, "%s.png", buf + 1);
+        plutovg_surface_write_to_png(s, filename);
 
         // Scale factors to normalize image dimensions to unit space
         // plutovg_matrix_t m = { xobj->image->width, 0, 0, -xobj->image->height, 0,
@@ -1093,7 +1096,7 @@ void handle_Do(pdf_context_t* context)
                               -scale_y, 0, xobj->image->height * scale_y };
 
         plutovg_canvas_set_texture(context->canvas, s, PLUTOVG_TEXTURE_TYPE_PLAIN,
-            1.f, &m);
+            0.9f, &m);
         plutovg_canvas_paint(context->canvas);
         plutovg_surface_destroy(s);
     }
@@ -1459,7 +1462,6 @@ void handle_Tj(pdf_context_t* context)
             else
                 plutovg_canvas_stroke_text(context->canvas, unicode, unicode_cnt,
                     PLUTOVG_TEXT_ENCODING_UTF16, x, y);
-            ;
         }
         else
             plutovg_canvas_stroke_text1(context->canvas, unicode, unicode_cnt,

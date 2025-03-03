@@ -4,7 +4,7 @@ A simple pdf parser write in C, implemented part of the PDF Specification 1.7. A
 
 ## Build & Run
 ```bash
-git clone https://github.com/tktkku/pdf-renderer.git
+git clone --recurse-submodules https://github.com/tktkku/pdf-renderer.git
 cd pdf-renderer
 cmake -S . -B build
 cmake --build build

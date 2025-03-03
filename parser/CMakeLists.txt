@@ -20,7 +20,6 @@ set(PARSER_SOURCES
 # if(NOT WIN32)
 #     set(PARSER_DEP ${PARSER_DEP} m)
 # endif()
-include_directories(${Cairo_INCLUDE_DIRS})
 add_library(${PROJECT_NAME} ${PARSER_SOURCES})
 target_link_libraries(${PROJECT_NAME} ${PARSER_DEP})
-target_include_directories(${PROJECT_NAME} PRIVATE ../plutovg/include ../plutovg/source ../dither)
+target_include_directories(${PROJECT_NAME} PRIVATE ../plutovg/include ../plutovg/source)

@@ -6,6 +6,8 @@
 #include <zlib.h>
 #include <assert.h>
 #include <stdbool.h>
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "plutovg-stb-image-write.h"
 pdf_page_t* pdf_page_init()
 {
     pdf_page_t* page = (pdf_page_t*)malloc(sizeof(pdf_page_t));
@@ -76,6 +78,22 @@ void pdf_page_get_ext_gstate(pdf_page_t* page, const char* name)
     double ca = pdf_dict_get_number(ext_gstate, "/ca");
     int AIS = pdf_dict_get_bool(ext_gstate, "/AIS");
     int TK = pdf_dict_get_bool(ext_gstate, "/TK");
+}
+void _write_png_callback(void* context, void* data, int size)
+{
+    pdf_image_t* img = (pdf_image_t*)context;
+
+    unsigned char* t = (unsigned char*)realloc(img->data, img->data + size);
+    if (t == NULL)
+    {
+        free(img->data);
+        img->data = NULL;
+        img->data_len = 0;
+        return;
+    }
+    img->data = t;
+    memcpy(img->data + img->data_len, data, size);
+    img->data_len += size;
 }
 pdf_xobject_t* pdf_page_get_xobject(pdf_page_t* page, const char* name)
 {
@@ -203,20 +221,38 @@ pdf_xobject_t* pdf_page_get_xobject(pdf_page_t* page, const char* name)
                     pdf_stream_get_all(smask_obj->stream, &smask, &smask_len);
                     if (smask != NULL)
                     {
-                        // TODO
-                        for (int i = 0; i < height; i++) {
-                            for (int j = 0; j < width; j++) {
-                                int index = (i * width+ j);
-                                int index1 = (i * width+ j) * 3;
-                                unsigned char r = img->data[index1];
-                                unsigned char g = img->data[index1 + 1];
-                                unsigned char b = img->data[index1 + 2];
-                                float alpha = smask[index] / 255.0f;
-                                img->data[index1] = r * alpha + 255 * (1 - alpha);
-                                img->data[index1 + 1] = g * alpha + 255 * (1 - alpha);
-                                img->data[index1 + 2] = b * alpha + 255 * (1 - alpha);
+                        int tmp_len = sizeof(unsigned char) * width * 4 * height;
+                        unsigned char* tmp = (unsigned char*)malloc(tmp_len);
+                        for (int i = 0; i < height; i++)
+                        {
+                            for (int j = 0; j < width; j++)
+                            {
+                                int index = (i * width + j);
+                                int index1 = index * 3;
+                                int index2 = index * 4;
+                                tmp[index2] = img->data[index1];
+                                tmp[index2 + 1] = img->data[index1 + 1];
+                                tmp[index2 + 2] = img->data[index1 + 2];
+                                tmp[index2 + 3] = smask[index];
                             }
                         }
+                        pdf_image_t t = {
+                            .data = NULL,
+                            .data_len = 0
+                        };
+                        int success = stbi_write_png_to_func(_write_png_callback, &t,
+                            width, height, 4, tmp, width * 4);
+                        if (!success || t.data == NULL)
+                        {
+                            free(t.data);
+                        }
+                        else
+                        {
+                            free(img->data);
+                            img->data = t.data;
+                            img->data_len = t.data_len;
+                        }
+                        free(tmp);
                     }
                 }
             }
@@ -303,10 +339,10 @@ uint16_t _hex_str_to_16bit(char hexStr[4])
         }
     }
     return (
-                ((tmp[0] <<  12  ) & 0xF000) 
-            |   ((tmp[1] <<  8   ) & 0x0F00)
-            |   ((tmp[2] <<  4   ) & 0x00F0)
-            |   ((tmp[3]         ) & 0x000F)
+        ((tmp[0] << 12) & 0xF000)
+        | ((tmp[1] << 8) & 0x0F00)
+        | ((tmp[2] << 4) & 0x00F0)
+        | ((tmp[3]) & 0x000F)
         );
 }
 
@@ -329,9 +365,9 @@ uint8_t _hex_str_to_8bit(char hexStr[2])
         }
     }
     return (
-        ((tmp[0] << 4   ) & 0xF0)
+        ((tmp[0] << 4) & 0xF0)
         |
-        ((tmp[1]        ) & 0x0F)
+        ((tmp[1]) & 0x0F)
         );
 }
 
@@ -353,12 +389,12 @@ pdf_font_t* pdf_page_get_font(pdf_page_t* page, const char* name)
 
 
     font->type = pdf_dict_get_name(font_dict, "/Type"); // Font
-    if (!font->type) 
+    if (!font->type)
     {
         pdf_font_free(font);
         return NULL;
     }
-        
+
     // Type0
     // Type1 MMType1
     // Type3
@@ -375,7 +411,7 @@ pdf_font_t* pdf_page_get_font(pdf_page_t* page, const char* name)
         return NULL;
     }
     // pdf_dict_get_name(font_dict, "/Name"); // not used in PDF 1.7
-    font->basefont = pdf_dict_get_name(font_dict, "/BaseFont"); 
+    font->basefont = pdf_dict_get_name(font_dict, "/BaseFont");
     font->encoding = pdf_dict_get_name(font_dict, "/Encoding");
     if (font->encoding != NULL)
     {
@@ -408,8 +444,8 @@ pdf_font_t* pdf_page_get_font(pdf_page_t* page, const char* name)
             .processed = 0
         };
         pdf_parser_t* cmap_parser = pdf_parser_init(page->pdf, BUFFER_READER, &b1);
-        
-        pdf_cmap_t* cmap =pdf_parser_build_cmap(cmap_parser);
+
+        pdf_cmap_t* cmap = pdf_parser_build_cmap(cmap_parser);
         pdf_parser_free(cmap_parser);
         cmap->worldwide = false;
         if (font->cmap == NULL)
@@ -476,7 +512,7 @@ pdf_font_t* pdf_page_get_font(pdf_page_t* page, const char* name)
     font->subtype = pdf_dict_get_name(font->descendant_font_dict, "/Subtype"); // CIDFontType0 CIDFontType2
     // for CIDFontType0, it shall be the value of the CIDFontName entry
     // for CIDFontType2, 
-    font->basefont = pdf_dict_get_name(font->descendant_font_dict, "/BaseFont"); 
+    font->basefont = pdf_dict_get_name(font->descendant_font_dict, "/BaseFont");
     font->cid_system_info_ref = pdf_dict_get_ref(font->descendant_font_dict, "/CIDSystemInfo");
     if (font->cid_system_info_ref != -1)
     {
