@@ -1,3 +1,6 @@
 [submodule "plutovg"]
 	path = plutovg
 	url = https://github.com/tktkku/plutovg.git
+[submodule "zlib"]
+	path = zlib
+	url = git@github.com:tktkku/zlib.git

@@ -7,7 +7,8 @@ set(BUILD_SHARED_LIBS OFF)
 
 add_subdirectory(parser)
 add_subdirectory(plutovg)
-find_package(ZLIB REQUIRED)
+add_subdirectory(zlib)
+
 add_executable(test test.c)
-target_link_libraries(test pdf-parser ${ZLIB_LIBRARIES} plutovg -static)
+target_link_libraries(test pdf-parser zlib plutovg)
 target_include_directories(test PRIVATE ./parser ./plutovg/include ./plutovg/source)
