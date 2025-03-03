@@ -8,7 +8,7 @@ git clone https://github.com/tktkku/pdf-renderer.git
 cd pdf-renderer
 cmake -S . -B build
 cmake --build build
-./build/test test.pdf
+./build/test tiger.pdf
 ```
 ## Valgrind
 valgrind --tool=memcheck --leak-check=full --show-leak-kinds=all --log-file="valgrind.log" --vgdb=yes --vgdb-error=0 -s ./build/test test.pdf

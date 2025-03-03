@@ -187,6 +187,7 @@ void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
     plutovg_surface_write_to_png(surface, filename);
     plutovg_canvas_destroy(canvas);
     plutovg_surface_destroy(surface);
+    free(pixels);
 }
 
 void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
