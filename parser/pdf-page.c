@@ -383,7 +383,6 @@ pdf_font_t* pdf_page_get_font(pdf_page_t* page, const char* name)
         if (font->cmap == NULL)
         {
             font->cmap = cmap;
-            font->num_cmaps = 1;
         }
         else
         {
@@ -393,7 +392,6 @@ pdf_font_t* pdf_page_get_font(pdf_page_t* page, const char* name)
                 t = t->next;
             }
             t->next = cmap;
-            font->num_cmaps += 1;
         }
     }
     int to_unicode_ref = pdf_dict_get_ref(font_dict, "/ToUnicode");
@@ -414,10 +412,9 @@ pdf_font_t* pdf_page_get_font(pdf_page_t* page, const char* name)
         pdf_cmap_t* cmap =pdf_parser_build_cmap(cmap_parser);
         pdf_parser_free(cmap_parser);
         cmap->worldwide = false;
-        if (font->num_cmaps == 0)
+        if (font->cmap == NULL)
         {
             font->cmap = cmap;
-            font->num_cmaps = 1;
         }
         else
         {
@@ -427,7 +424,6 @@ pdf_font_t* pdf_page_get_font(pdf_page_t* page, const char* name)
                 t = t->next;
             }
             t->next = cmap;
-            font->num_cmaps += 1;
         }
     }
     // CIDFonts

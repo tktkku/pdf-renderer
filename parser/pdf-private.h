@@ -256,7 +256,6 @@ struct pdf_font
     int cid_to_gid_map_ref;
     void* font_data;
     unsigned int font_data_length;
-    int num_cmaps;
     pdf_cmap_t* cmap;
     bool load_succeed;
 };
