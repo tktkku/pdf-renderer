@@ -173,12 +173,12 @@ void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
                 continue;
             // printf("%s\n", token);
             _do_render_operation(&context, token);
-            if (strcmp(token, "Tj") == 0)
-            {
-                plutovg_surface_write_to_png(surface, "test.png");
-                printf("Press any key to continue...");
-                getchar();
-            }
+            // if (strcmp(token, "Tj") == 0)
+            // {
+            //     plutovg_surface_write_to_png(surface, "test.png");
+            //     printf("Press any key to continue...");
+            //     getchar();
+            // }
             pdf_parser_token_free(tk);
         }
 
