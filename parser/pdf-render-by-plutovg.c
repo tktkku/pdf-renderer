@@ -1123,7 +1123,7 @@ void handle_BT(pdf_context_t* context)
 {
     // begin text
     plutovg_canvas_save(context->canvas);
-    plutovg_canvas_move_to(context->canvas, 0, 0);
+    //plutovg_canvas_move_to(context->canvas, 0, 0);
     context->fontface = NULL;
     context->font = NULL;
 }
@@ -1457,14 +1457,14 @@ void handle_Tj(pdf_context_t* context)
         if (context->font->load_succeed)
         {
             if (strstr(context->font->encoding, "Identity"))
-                plutovg_canvas_stroke_text1(context->canvas, unicode, unicode_cnt,
+                plutovg_canvas_fill_text1(context->canvas, unicode, unicode_cnt,
                     PLUTOVG_TEXT_ENCODING_UTF16, x, y);
             else
-                plutovg_canvas_stroke_text(context->canvas, unicode, unicode_cnt,
+                plutovg_canvas_fill_text(context->canvas, unicode, unicode_cnt,
                     PLUTOVG_TEXT_ENCODING_UTF16, x, y);
         }
         else
-            plutovg_canvas_stroke_text1(context->canvas, unicode, unicode_cnt,
+            plutovg_canvas_fill_text1(context->canvas, unicode, unicode_cnt,
                 PLUTOVG_TEXT_ENCODING_UTF16, x, y);
         plutovg_canvas_restore(context->canvas);
     }
@@ -1477,10 +1477,8 @@ void handle_apostrophe(pdf_context_t* context)
     // same as
     // T*
     // string Tj
-    char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    handle_T_star(context);
+    handle_Tj(context);
 }
 
 void handle_quotation(pdf_context_t* context)
@@ -1602,16 +1600,16 @@ void handle_TJ(pdf_context_t* context)
                 if (context->font->load_succeed)
                 {
                     if (strstr(context->font->encoding, "Identity"))
-                        plutovg_canvas_stroke_text1(context->canvas, unicode, unicode_cnt,
+                        plutovg_canvas_fill_text1(context->canvas, unicode, unicode_cnt,
                             PLUTOVG_TEXT_ENCODING_UTF16, x, y);
                     else
-                        plutovg_canvas_stroke_text(context->canvas, unicode, unicode_cnt,
+                        plutovg_canvas_fill_text(context->canvas, unicode, unicode_cnt,
                             PLUTOVG_TEXT_ENCODING_UTF16, x, y);
-                    ;
                 }
                 else
-                    plutovg_canvas_stroke_text1(context->canvas, unicode, unicode_cnt,
+                    plutovg_canvas_fill_text1(context->canvas, unicode, unicode_cnt,
                         PLUTOVG_TEXT_ENCODING_UTF16, x, y);
+
                 plutovg_canvas_restore(context->canvas);
             }
         }
