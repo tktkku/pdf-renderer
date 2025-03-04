@@ -130,13 +130,13 @@ void pdf_cmap_free(pdf_cmap_t* cmap);
 
 typedef struct graphics_state
 {
-    char current_color_space[256];
+    char currentColorSpace[256];
 } pdf_graphics_state_t;
 
 typedef struct context
 {
     pdf_stack_t* stack;
-    pdf_graphics_state_t graphics_state;
+    pdf_graphics_state_t graphicsState;
     plutovg_canvas_t* canvas;
     pdf_file_t* pdf;
     pdf_page_t* page;
