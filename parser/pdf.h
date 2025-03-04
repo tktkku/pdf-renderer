@@ -154,6 +154,7 @@ typedef struct context
     plutovg_matrix_t fontMatrixPlutovg;
     plutovg_font_face_t* fontface;
     pdf_font_t* font;
+    float lineWidth;
 } pdf_context_t;
 void render_to_png_by_plutovg(pdf_page_t *page, char *filename);
 void render_to_buffer_by_plutovg(pdf_page_t *page, unsigned char *pixels,

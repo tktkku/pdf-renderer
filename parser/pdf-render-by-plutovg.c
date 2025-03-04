@@ -173,12 +173,12 @@ void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
                 continue;
             // printf("%s\n", token);
             _do_render_operation(&context, token);
-            // if (strcmp(token, "Tj") == 0)
-            // {
-            //     plutovg_surface_write_to_png(surface, "test.png");
-            //     printf("Press any key to continue...");
-            //     getchar();
-            // }
+            if (strcmp(token, "Tj") == 0)
+            {
+                plutovg_surface_write_to_png(surface, "test.png");
+                printf("Press any key to continue...");
+                getchar();
+            }
             pdf_parser_token_free(tk);
         }
 
@@ -1146,6 +1146,7 @@ void handle_BT(pdf_context_t* context)
     //plutovg_canvas_move_to(context->canvas, 0, 0);
     // context->fontface = NULL;
     // context->font = NULL;
+    context->lineWidth = 0;
 }
 
 void handle_ET(pdf_context_t* context)
@@ -1237,7 +1238,7 @@ void handle_Tf(pdf_context_t* context)
         plutovg_canvas_set_font_face(context->canvas, NULL);
         plutovg_font_face_destroy(context->fontface);
     }
-    
+
     // repair font
     // repair_cmap(context->font);
     // set font face
@@ -1346,6 +1347,7 @@ void handle_TD(pdf_context_t* context)
     plutovg_canvas_translate(context->canvas, tx, ty);
     plutovg_canvas_move_to(context->canvas, 0, 0);
     context->textLeading = -ty;
+    context->lineWidth = 0;
     // side effect, set the leading parameter in the text state
     // -ty TL
     // tx ty Td
@@ -1390,6 +1392,7 @@ void handle_T_star(pdf_context_t* context)
     // plutovg_canvas_move_to(context->canvas, x, y);
     plutovg_canvas_translate(context->canvas, 0, -context->textLeading);
     plutovg_canvas_move_to(context->canvas, 0, 0);
+    context->lineWidth = 0;
 }
 
 void handle_Tj(pdf_context_t* context)
@@ -1464,27 +1467,27 @@ void handle_Tj(pdf_context_t* context)
         // 1,  0, 0
         // 0, -1, 0,
         // 0,  0, 1
-        // rotate 180æŽ³
+        // rotate 180æŽ?
         // or scale by 1
         plutovg_canvas_scale(context->canvas, 1, -1);
         plutovg_canvas_set_font_size(context->canvas, context->fontSize);
         plutovg_canvas_set_font_face(context->canvas, context->fontface);
-        plutovg_canvas_set_rgb(context->canvas, 
-            context->fillColor[0], 
-            context->fillColor[1], 
+        plutovg_canvas_set_rgb(context->canvas,
+            context->fillColor[0],
+            context->fillColor[1],
             context->fillColor[2]);
         if (context->font->load_succeed)
         {
             if (strstr(context->font->encoding, "Identity"))
-                plutovg_canvas_fill_text1(context->canvas, unicode, unicode_cnt,
-                    PLUTOVG_TEXT_ENCODING_UTF16, x, y);
+                context->lineWidth += plutovg_canvas_fill_text1(context->canvas, unicode, unicode_cnt,
+                    PLUTOVG_TEXT_ENCODING_UTF16, x + context->lineWidth, y);
             else
-                plutovg_canvas_fill_text(context->canvas, unicode, unicode_cnt,
-                    PLUTOVG_TEXT_ENCODING_UTF16, x, y);
+                context->lineWidth += plutovg_canvas_fill_text(context->canvas, unicode, unicode_cnt,
+                    PLUTOVG_TEXT_ENCODING_UTF16, x + context->lineWidth, y);
         }
         else
-            plutovg_canvas_fill_text1(context->canvas, unicode, unicode_cnt,
-                PLUTOVG_TEXT_ENCODING_UTF16, x, y);
+            context->lineWidth += plutovg_canvas_fill_text1(context->canvas, unicode, unicode_cnt,
+                PLUTOVG_TEXT_ENCODING_UTF16, x + context->lineWidth, y);
         plutovg_canvas_restore(context->canvas);
     }
 }
@@ -1496,6 +1499,7 @@ void handle_apostrophe(pdf_context_t* context)
     // same as
     // T*
     // string Tj
+    context->lineWidth = 0;
     handle_T_star(context);
     handle_Tj(context);
 }
@@ -1512,6 +1516,8 @@ void handle_quotation(pdf_context_t* context)
     pdf_stack_pop(context->stack, &node);
     pdf_stack_pop(context->stack, &node);
     pdf_stack_pop(context->stack, &node);
+    context->lineWidth = 0;
+    // TODO
 }
 
 void handle_TJ(pdf_context_t* context)
@@ -1600,27 +1606,27 @@ void handle_TJ(pdf_context_t* context)
                 // 1,  0, 0
                 // 0, -1, 0,
                 // 0,  0, 1
-                // rotate 180æŽ³
+                // rotate 180æŽ?
                 // or scale by 1
                 plutovg_canvas_scale(context->canvas, 1, -1);
                 plutovg_canvas_set_font_size(context->canvas, context->fontSize);
                 plutovg_canvas_set_font_face(context->canvas, context->fontface);
-                plutovg_canvas_set_rgb(context->canvas, 
-                    context->fillColor[0], 
-                    context->fillColor[1], 
+                plutovg_canvas_set_rgb(context->canvas,
+                    context->fillColor[0],
+                    context->fillColor[1],
                     context->fillColor[2]);
                 if (context->font->load_succeed)
                 {
                     if (strstr(context->font->encoding, "Identity"))
-                        plutovg_canvas_fill_text1(context->canvas, unicode, unicode_cnt,
-                            PLUTOVG_TEXT_ENCODING_UTF16, x, y);
+                        context->lineWidth += plutovg_canvas_fill_text1(context->canvas, unicode, unicode_cnt,
+                            PLUTOVG_TEXT_ENCODING_UTF16, x + context->lineWidth, y);
                     else
-                        plutovg_canvas_fill_text(context->canvas, unicode, unicode_cnt,
-                            PLUTOVG_TEXT_ENCODING_UTF16, x, y);
+                        context->lineWidth += plutovg_canvas_fill_text(context->canvas, unicode, unicode_cnt,
+                            PLUTOVG_TEXT_ENCODING_UTF16, x + context->lineWidth, y);
                 }
                 else
-                    plutovg_canvas_fill_text1(context->canvas, unicode, unicode_cnt,
-                        PLUTOVG_TEXT_ENCODING_UTF16, x, y);
+                    context->lineWidth += plutovg_canvas_fill_text1(context->canvas, unicode, unicode_cnt,
+                        PLUTOVG_TEXT_ENCODING_UTF16, x + context->lineWidth, y);
 
                 plutovg_canvas_restore(context->canvas);
             }
