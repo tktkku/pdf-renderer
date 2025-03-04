@@ -188,6 +188,7 @@ void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
     plutovg_surface_write_to_png(surface, filename);
     if (context.fontface != NULL)
     {
+        plutovg_canvas_set_font_face(context.canvas, context.fontface);
         plutovg_font_face_destroy(context.fontface);
     }
     if (context.font != NULL)
@@ -266,6 +267,15 @@ void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
         pdf_stream_close(stream);
     }
     pdf_stack_free(stack);
+    if (context.fontface != NULL)
+    {
+        plutovg_canvas_set_font_face(context.canvas, context.fontface);
+        plutovg_font_face_destroy(context.fontface);
+    }
+    if (context.font != NULL)
+    {
+        pdf_font_free(context.font);
+    }
     plutovg_canvas_destroy(canvas);
     plutovg_surface_destroy(surface);
 }
@@ -1134,12 +1144,24 @@ void handle_BT(pdf_context_t* context)
     // begin text
     plutovg_canvas_save(context->canvas);
     //plutovg_canvas_move_to(context->canvas, 0, 0);
+    // context->fontface = NULL;
+    // context->font = NULL;
 }
 
 void handle_ET(pdf_context_t* context)
 {
     // end text
     plutovg_canvas_restore(context->canvas);
+    // if (context->fontface)
+    // {
+    //     plutovg_canvas_set_font_face(context->canvas, NULL);
+    //     plutovg_font_face_destroy(context->fontface);
+    // }
+    // if (context->font)
+    // {
+    //     pdf_font_free(context->font);
+    //     context->font = NULL;
+    // }
 }
 
 void handle_Tc(pdf_context_t* context)
@@ -1203,13 +1225,17 @@ void handle_Tf(pdf_context_t* context)
     node.data = buf;
     pdf_stack_pop(context->stack, &node);
     float fontsize = strtof(buf, NULL);
-    context->fontSize = fontsize;
     pdf_stack_pop(context->stack, &node);
     pdf_font_t* font = pdf_page_get_font(context->page, buf);
-    if (font != NULL)
+    context->fontSize = fontsize;
+    if (font == NULL)
+        return;
+    else
     {
         pdf_font_free(context->font);
         context->font = font;
+        plutovg_canvas_set_font_face(context->canvas, NULL);
+        plutovg_font_face_destroy(context->fontface);
     }
     
     // repair font
@@ -1222,8 +1248,6 @@ void handle_Tf(pdf_context_t* context)
     {
 
         // FT_New_Face(context->ft_library, "fonts/SimSun.ttf", 0, &face);
-        if (context->fontface == NULL)
-            plutovg_font_face_destroy(context->fontface);
         context->fontface = plutovg_font_face_load_from_file("fonts/SimSun.ttf", 0);
         font->load_succeed = true;
     }
@@ -1235,8 +1259,6 @@ void handle_Tf(pdf_context_t* context)
             font->font_data, font->font_data_length, 0, NULL, NULL)) == NULL)
         {
             font->load_succeed = false;
-            if (context->fontface == NULL)
-            plutovg_font_face_destroy(context->fontface);
             context->fontface = plutovg_font_face_load_from_data1(
                 font->font_data, font->font_data_length, 0, NULL, NULL);
         }
@@ -1442,9 +1464,11 @@ void handle_Tj(pdf_context_t* context)
         // 1,  0, 0
         // 0, -1, 0,
         // 0,  0, 1
-        // rotate 180°
+        // rotate 180掳
         // or scale by 1
         plutovg_canvas_scale(context->canvas, 1, -1);
+        plutovg_canvas_set_font_size(context->canvas, context->fontSize);
+        plutovg_canvas_set_font_face(context->canvas, context->fontface);
         plutovg_canvas_set_rgb(context->canvas, 
             context->fillColor[0], 
             context->fillColor[1], 
@@ -1576,9 +1600,11 @@ void handle_TJ(pdf_context_t* context)
                 // 1,  0, 0
                 // 0, -1, 0,
                 // 0,  0, 1
-                // rotate 180°
+                // rotate 180掳
                 // or scale by 1
                 plutovg_canvas_scale(context->canvas, 1, -1);
+                plutovg_canvas_set_font_size(context->canvas, context->fontSize);
+                plutovg_canvas_set_font_face(context->canvas, context->fontface);
                 plutovg_canvas_set_rgb(context->canvas, 
                     context->fillColor[0], 
                     context->fillColor[1], 
