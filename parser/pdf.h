@@ -130,34 +130,37 @@ void pdf_cmap_free(pdf_cmap_t* cmap);
 
 typedef struct graphics_state
 {
-    char currentColorSpace[256];
+
 } pdf_graphics_state_t;
 
 typedef struct context
 {
     pdf_stack_t* stack;
-    pdf_graphics_state_t graphicsState;
     plutovg_canvas_t* canvas;
     pdf_file_t* pdf;
     pdf_page_t* page;
-    double fillColor[3];
-    double strokeColor[3];
-    
-    
-    double characterSpacing;
-    double wordSpacing;
-    double horizontalScaling;
-    double textLeading;
-    double fontSize;
-    int textMode;
-    double textRise;
-    plutovg_matrix_t fontMatrixPlutovg;
-    plutovg_font_face_t* fontface;
-    pdf_font_t* font;
-    float lineWidth;
+    struct {
+        char currentColorSpace[256];
+        double fillColor[3];
+        double strokeColor[3];
+    } graphicsState;
+
+    struct {
+        double characterSpacing;
+        double wordSpacing;
+        double horizontalScaling;
+        double textLeading;
+        double fontSize;
+        int textMode;
+        double textRise;
+        plutovg_matrix_t fontMatrixPlutovg;
+        plutovg_font_face_t* fontface;
+        pdf_font_t* font;
+        float lineWidth;
+    } textState;
 } pdf_context_t;
-void render_to_png_by_plutovg(pdf_page_t *page, char *filename);
-void render_to_buffer_by_plutovg(pdf_page_t *page, unsigned char *pixels,
+void render_to_png_by_plutovg(pdf_page_t* page, char* filename);
+void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
     int width, int height, int stride);
 #define DPI (203)
 #ifdef DPI
