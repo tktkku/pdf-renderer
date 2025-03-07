@@ -152,9 +152,9 @@ bool _read_xref_and_trailer(pdf_file_t* pdf)
                 }
                 pdf->xref_table->xrefs = t;
                 memcpy(pdf->xref_table->xrefs + pdf->xref_table->size, table->xrefs, table->size * sizeof(xref_t));
+                pdf->xref_table->size += table->size;
                 free(table->xrefs);
                 free(table);
-                pdf->xref_table->size += table->size;
             }
         }
         // read trailer
@@ -199,9 +199,9 @@ bool _read_xref_and_trailer(pdf_file_t* pdf)
                 }
                 pdf->xref_table->xrefs = t;
                 memcpy(pdf->xref_table->xrefs + pdf->xref_table->size, table->xrefs, table->size * sizeof(xref_t));
+                pdf->xref_table->size += table->size;
                 free(table->xrefs);
                 free(table);
-                pdf->xref_table->size += table->size;
             }
         }
         pdf_dict_free(trailer);
@@ -382,6 +382,49 @@ pdf_file_t* pdf_file_read_file(const char* file_name)
         pdf_file_free(pdf_file);
         return NULL;
     }
+    pdf_dict_t* names_dict = pdf_dict_get_dict(root_obj->value->val.dict, "/Names");
+    if (names_dict != NULL)
+    {
+        // /Dests
+        // /AP
+        // /JavaScript
+        // /Pages
+        // /Templates
+        // /IDS
+        // /URLS
+        // /EmbeddedFiles
+        int embedded_ref = pdf_dict_get_ref(names_dict, "/EmbeddedFiles");
+        if (embedded_ref != -1)
+        {
+            pdf_obj_t* embedded_obj1 = pdf_file_get_obj(pdf_file, embedded_ref);
+            pdf_array_t* names_aar = pdf_dict_get_array(embedded_obj1->value->val.dict, "/Names");
+            if (names_aar != NULL)
+            {
+                for (int i = 0; i < names_aar->num_elements; i++)
+                {
+                    if (names_aar->values[i]->type == INDIRECT)
+                    {
+                        pdf_obj_t* embedded_obj2 = pdf_file_get_obj(pdf_file, names_aar->values[i]->val.indirect);
+                        pdf_dict_t* ef_dict = pdf_dict_get_dict(embedded_obj2->value->val.dict, "/EF");
+                        int ref = pdf_dict_get_ref(ef_dict, "/UF");
+                        pdf_obj_t* embedded_obj = pdf_file_get_obj(pdf_file, ref);
+                        char* embedded_file = NULL;
+                        int embedded_file_len = 0;
+                        pdf_stream_get_all(embedded_obj->stream, &embedded_file, &embedded_file_len);
+                        embedded_file_len += 1;
+                    }
+                }
+                
+            }
+        }
+        // /AlternatePresentations
+        // /Renditions
+    }
+    pdf_dict_t* acroform_dict = pdf_dict_get_dict(root_obj->value->val.dict, "/AcroForm");
+    if (acroform_dict != NULL)
+    {
+
+    }
 
     int ref = pdf_dict_get_ref(root_obj->value->val.dict, "/Pages");
     pdf_obj_t* pages_obj = pdf_file_get_obj(pdf_file, ref);
@@ -440,7 +483,7 @@ pdf_page_t* pdf_file_get_page(pdf_file_t* pdf, int pageNo)
             return NULL;
         }
     }
-
+    pdf_array_t* annots_aar = pdf_dict_get_array(page_obj_dict, "/Annots");
     pdf_array_t* crop_arr = pdf_dict_get_array(page_obj_dict, "/CropBox");
     pdf_array_t* media_arr = pdf_dict_get_array(page_obj_dict, "/MediaBox");
 
@@ -461,6 +504,7 @@ pdf_page_t* pdf_file_get_page(pdf_file_t* pdf, int pageNo)
         tmp_dict = res_obj->value->val.dict;
     }
     pdf_page_t* page = pdf_page_init();
+    page->annots = annots_aar;
     page->pageNo = pageNo;
     if (tmp_dict != NULL)
     {
@@ -591,6 +635,7 @@ pdf_obj_t* _get_obj_from_table(pdf_file_t* pdf, int ref)
         {
             if (pdf->read_objs[i]->seq == ref)
             {
+                pdf->read_objs[i]->pdf = pdf;
                 return pdf->read_objs[i];
             }
         }
@@ -643,6 +688,7 @@ pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, int ref)
                     return NULL;
                 }
                 obj->seq = ref;
+                obj->pdf = pdf;
                 _add_to_obj_table(pdf, obj);
                 pdf_parser_token_free(tk);
                 pdf_parser_free(parser);

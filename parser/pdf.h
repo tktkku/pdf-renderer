@@ -83,9 +83,11 @@ void pdf_page_free(pdf_page_t* page);
 int pdf_page_get_media_width(pdf_page_t* page);
 int pdf_page_get_media_height(pdf_page_t* page);
 pdf_font_t* pdf_page_get_font(pdf_page_t* page, const char* name);
-pdf_xobject_t* pdf_page_get_xobject(pdf_page_t* page, const char* name);
-void pdf_page_xobject_free(pdf_xobject_t* xobject);
+
 void pdf_page_get_ext_gstate(pdf_page_t* page, const char* name);
+
+pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj);
+void pdf_page_xobject_free(pdf_xobject_t* xobject);
 
 int pdf_page_get_streams(pdf_page_t* page);
 pdf_stream_t* pdf_page_get_stream(pdf_page_t* page, int index);
@@ -128,17 +130,13 @@ void pdf_array_free(pdf_array_t* array);
 pdf_cmap_t* pdf_cmap_init();
 void pdf_cmap_free(pdf_cmap_t* cmap);
 
-typedef struct graphics_state
-{
-
-} pdf_graphics_state_t;
-
 typedef struct context
 {
     pdf_stack_t* stack;
     plutovg_canvas_t* canvas;
     pdf_file_t* pdf;
     pdf_page_t* page;
+    pdf_obj_t* current_obj;
     struct {
         char currentColorSpace[256];
         double fillColor[3];
@@ -153,7 +151,6 @@ typedef struct context
         double fontSize;
         int textMode;
         double textRise;
-        plutovg_matrix_t fontMatrixPlutovg;
         plutovg_font_face_t* fontface;
         pdf_font_t* font;
         float lineWidth;

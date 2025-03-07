@@ -95,6 +95,7 @@ struct pdf_obj
     pdf_xobject_t* xobject;
     char* font_data;
     int font_data_len;
+    pdf_file_t* pdf;
 };
 
 struct pdf_dict_pair
@@ -225,6 +226,7 @@ struct pdf_page
     int cur_content_index;
     int rotate;
     pdf_resources_t* resources;
+    pdf_array_t* annots;
 };
 
 
@@ -280,8 +282,6 @@ struct pdf_form
 {
     double matrix[6];
     double bbox[4];
-    unsigned char* data;
-    int data_len;
 };
 
 struct pdf_xobject

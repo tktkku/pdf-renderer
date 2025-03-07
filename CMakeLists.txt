@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 
 project(pdf-renderer VERSION 0.0.1 LANGUAGES C CXX)
-
+add_compile_options(-Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes -pedantic -std=c99)
 set(CMAKE_BUILD_TYPE Debug)
 set(BUILD_SHARED_LIBS OFF)
 

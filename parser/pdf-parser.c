@@ -250,10 +250,10 @@ void pdf_parser_free(pdf_parser_t* parser)
 void _decode_string(char* str, int len, int* out_len)
 {
     char* p = str + 1; // skip '('
-    char* end = str + len - 1; // skip ')'
+    char* end = str + len;
     char* out = (char*)malloc(len);
     int ol = 0;
-    out[ol++] = *p;
+    out[ol++] = *str; //'('
     while (p < end)
     {
         if (*p == '\\')
@@ -315,37 +315,6 @@ void _decode_string(char* str, int len, int* out_len)
         {
             out[ol++] = *p;
         }
-        p++;
-    }
-    memcpy(str, out, ol);
-    str[ol] = '\0';
-    *out_len = ol;
-    free(out);
-}
-
-void _decode_hex_string(char* str, int len, int* out_len)
-{
-    char* p = str; // keep '<'
-    char* end = str + len - 1; // skip '>'
-    char* out = (char*)malloc(len);
-    int ol = 0;
-    out[ol++] = *p;
-    char tmp[2];
-    while (p < end)
-    {
-        tmp[0] = *p;
-        if (p + 1 >= end)
-        {
-            tmp[1] = '0';
-        }
-        else
-        {
-            p++;
-            tmp[1] = *p;
-        }
-        char n = (char)strtol(tmp, NULL, 16);
-        if (!_is_space(n))
-            out[ol++] = n;
         p++;
     }
     memcpy(str, out, ol);
@@ -472,7 +441,7 @@ pdf_parser_token_t* _pdf_parser_next_one_token(const unsigned char* start, const
         tk->token_len--;
         start += len;
         // decode string
-        //_decode_string(tk->token, tk->token_len, &tk->token_len);
+        _decode_string(tk->token, tk->token_len, &tk->token_len);
     }
     else if (c == '[')
     {
