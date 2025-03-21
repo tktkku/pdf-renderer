@@ -709,8 +709,8 @@ void handle_F_f(pdf_context_t* context)
     // fill the path, using the nonzero winding number rule
     // to determine the region to fill
 
-    plutovg_canvas_set_rgb(context->canvas, context->graphicsState.fillColor[0],
-        context->graphicsState.fillColor[1], context->graphicsState.fillColor[2]);
+    // plutovg_canvas_set_rgb(context->canvas, context->graphicsState.fillColor[0],
+    //     context->graphicsState.fillColor[1], context->graphicsState.fillColor[2]);
     plutovg_canvas_fill(context->canvas);
 }
 
@@ -1558,7 +1558,7 @@ void handle_Tj(pdf_context_t* context)
         // 1,  0, 0
         // 0, -1, 0,
         // 0,  0, 1
-        // rotate 180鎺?
+        // rotate 180閹�?
         // or scale by 1
         plutovg_canvas_scale(context->canvas, 1, -1);
         plutovg_canvas_set_font_size(context->canvas, context->textState.fontSize);
@@ -1643,7 +1643,7 @@ void handle_Tj(pdf_context_t* context)
         // 1,  0, 0
         // 0, -1, 0,
         // 0,  0, 1
-        // rotate 180鎺?
+        // rotate 180閹�?
         // or scale by 1
         plutovg_canvas_scale(context->canvas, 1, -1);
         plutovg_canvas_set_font_size(context->canvas, context->textState.fontSize);
@@ -1789,7 +1789,7 @@ void handle_TJ(pdf_context_t* context)
             // 1,  0, 0
             // 0, -1, 0,
             // 0,  0, 1
-            // rotate 180鎺?
+            // rotate 180閹�?
             // or scale by 1
             plutovg_canvas_scale(context->canvas, 1, -1);
             plutovg_canvas_set_font_size(context->canvas, context->textState.fontSize);

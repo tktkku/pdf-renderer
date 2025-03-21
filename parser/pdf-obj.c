@@ -220,12 +220,12 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj)
         xobj->form = (pdf_form_t*)malloc(sizeof(pdf_form_t));
 
         pdf_array_t* ctm_aar = pdf_dict_get_array(img_dict, "/Matrix");
-        for (int i = 0; i < ctm_aar->num_elements; i++)
+        for (int i = 0; ctm_aar && i < ctm_aar->num_elements; i++)
         {
             xobj->form->matrix[i] = ctm_aar->values[i]->val.number;
         }
         pdf_array_t* bbox_aar = pdf_dict_get_array(img_dict, "/BBox");
-        for (int i = 0; i < bbox_aar->num_elements; i++)
+        for (int i = 0; bbox_aar && i < bbox_aar->num_elements; i++)
         {
             xobj->form->bbox[i] = bbox_aar->values[i]->val.number;
         }

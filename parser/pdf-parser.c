@@ -34,7 +34,7 @@ bool _is_hex(char c)
 {
     return
         _is_digit(c)
-        && ((c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'));
+        || ((c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'));
 }
 const char delimiter_tag[] = {
     '(', ')', '<', '>', '[', ']', '{', '}', '/', '%'
@@ -246,7 +246,25 @@ void pdf_parser_free(pdf_parser_t* parser)
     free(parser);
     parser = NULL;
 }
-
+void _decode_hex_string(char* str, int len, int* out_len)
+{
+    char* p = str + 1; // skip '<'
+    char* end = str + len;
+    char* out = (char*)malloc(len);
+    int ol = 0;
+    out[ol++] = *str;
+    while (p < end)
+    {
+        if (_is_hex(*p))
+            out[ol++] = *p;
+        
+        p++;
+    }
+    memcpy(str, out, ol);
+    str[ol] = '\0';
+    *out_len = ol;
+    free(out);
+}
 void _decode_string(char* str, int len, int* out_len)
 {
     char* p = str + 1; // skip '('
@@ -473,11 +491,7 @@ pdf_parser_token_t* _pdf_parser_next_one_token(const unsigned char* start, const
             {
                 p++; len++;
                 char c = *p;
-                if (_is_hex(c))
-                {
-                    continue;
-                }
-                else if (c == '>')
+                if (c == '>')
                 {
                     break;
                 }
@@ -488,7 +502,7 @@ pdf_parser_token_t* _pdf_parser_next_one_token(const unsigned char* start, const
             tk->token_len--;
             start += len;
             // decode hex string
-            //_decode_hex_string(tk->token, tk->token_len, &tk->token_len);
+            _decode_hex_string(tk->token, tk->token_len, &tk->token_len);
         }
     }
     else if (c == '>')
