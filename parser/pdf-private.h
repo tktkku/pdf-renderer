@@ -7,7 +7,7 @@
 #include <zlib.h>
 #define ARRAY_COUNT(a) (sizeof(a) / sizeof(a[0]))
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
-enum pdf_parser_token_type
+typedef enum pdf_parser_token_type
 {
     TOKEN_NULL = 0,
     TOKEN_BOOLEAN_TRUE,
@@ -48,7 +48,7 @@ enum pdf_parser_token_type
     TOKEN_ENDCIDRANGE,
     TOKEN_BEGINBFRANGE,
     TOKEN_ENDBFRANGE,
-};
+} pdf_parser_token_type_t;
 
 struct pdf_parser_token
 {
@@ -93,7 +93,7 @@ struct pdf_obj
     pdf_obj_value_t* value;
     pdf_stream_t* stream;
     pdf_xobject_t* xobject;
-    char* font_data;
+    unsigned char* font_data;
     int font_data_len;
     pdf_file_t* pdf;
 };
@@ -256,10 +256,9 @@ struct pdf_font
     pdf_array_t* w_aar;
     char* cid_to_gid_map;
     int cid_to_gid_map_ref;
-    void* font_data;
-    unsigned int font_data_length;
+    unsigned char* font_data;
+    int font_data_length;
     pdf_cmap_t* cmap;
-    bool load_succeed;
 };
 
 struct pdf_image
@@ -272,11 +271,11 @@ struct pdf_image
     char color_space[128];
 };
 
-enum xobject_type
+typedef enum xobject_type
 {
     XOBJ_IMAGE = 0,
     XOBJ_FORM
-};
+} xobject_type_t;
 
 struct pdf_form
 {
@@ -293,12 +292,19 @@ struct pdf_xobject
         pdf_image_t* image;
     };
 };
-enum pdf_parser_reader_type {
+typedef enum pdf_parser_reader_type {
     BUFFER_READER,
     FILE_READER,
     STREAM_READER
-};
+} pdf_parser_reader_type_t;
 
+/**
+ * buf: start position
+ * size: size of the buffer
+ * user_data: custom param
+ * return: actual size that filled in buf
+ */
+typedef void (*pdf_parser_read_func)(pdf_parser_t* parser, void* source);
 struct pdf_parser
 {
     struct {
@@ -375,4 +381,19 @@ void _pdf_parser_read_stream(pdf_parser_t* parser, void* source);
 uint16_t _hex_str_to_16bit(char hexStr[4]);
 uint8_t _hex_str_to_8bit(char hexStr[2]);
 
+void pdf_parser_token_free(pdf_parser_token_t* token);
+/**
+ * @param pdf
+ * @param type BUFFER_READER, FILE_READER, STREAM_READER
+ * @param source pdf_buffer_t*, FILE*, pdf_stream_t*
+ */
+pdf_parser_t* pdf_parser_init(pdf_file_t* pdf, pdf_parser_reader_type_t type, void* source);
+void pdf_parser_free(pdf_parser_t* parser);
+pdf_parser_token_t* pdf_parser_token_init(const unsigned char* start, pdf_parser_token_type_t type, int len);
+const char* pdf_parser_token_get_token(pdf_parser_token_t* token);
+pdf_parser_token_t* pdf_parser_next_token(pdf_parser_t* parser);
+pdf_obj_t* pdf_parser_build_obj(pdf_parser_t* parser);
+pdf_dict_t* pdf_parser_build_dict(pdf_parser_t* parser);
+pdf_array_t* pdf_parser_build_array(pdf_parser_t* parser);
+pdf_cmap_t* pdf_parser_build_cmap(pdf_parser_t* parser);
 #endif

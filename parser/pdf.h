@@ -3,8 +3,8 @@
 #include "plutovg.h"
 #include <stdbool.h>
 #include <stddef.h>
+#include <map>
 typedef struct pdf_parser_token pdf_parser_token_t;
-typedef enum pdf_parser_token_type pdf_parser_token_type_t;
 
 struct pdf_value;
 typedef struct pdf_value pdf_obj_value_t;
@@ -31,13 +31,11 @@ typedef struct pdf_font pdf_font_t;
 typedef struct pdf_stream pdf_stream_t;
 
 typedef struct pdf_image pdf_image_t;
-typedef enum xobject_type xobject_type_t;
 typedef struct pdf_form pdf_form_t;
 typedef struct pdf_xobject pdf_xobject_t;
 
 struct pdf_parser;
 typedef struct pdf_parser pdf_parser_t;
-typedef enum pdf_parser_reader_type pdf_parser_reader_type_t;
 
 struct pdf_buffer;
 typedef struct pdf_buffer pdf_buffer_t;
@@ -54,29 +52,6 @@ void pdf_stack_push(pdf_stack_t* s, const void* data, size_t size);
 void pdf_stack_pop(pdf_stack_t* s, pdf_stack_node_t* data);
 void pdf_stack_free(pdf_stack_t* s);
 void pdf_stack_show(pdf_stack_t* s);
-
-void pdf_parser_token_free(pdf_parser_token_t* token);
-/**
- * buf: start position
- * size: size of the buffer
- * user_data: custom param
- * return: actual size that filled in buf
- */
-typedef void (*pdf_parser_read_func)(pdf_parser_t* parser, void* source);
-/**
- * @param pdf
- * @param type BUFFER_READER, FILE_READER, STREAM_READER
- * @param source pdf_buffer_t*, FILE*, pdf_stream_t*
- */
-pdf_parser_t* pdf_parser_init(pdf_file_t* pdf, pdf_parser_reader_type_t type, void* source);
-void pdf_parser_free(pdf_parser_t* parser);
-pdf_parser_token_t* pdf_parser_token_init(const unsigned char* start, pdf_parser_token_type_t type, int len);
-const char* pdf_parser_token_get_token(pdf_parser_token_t* token);
-pdf_parser_token_t* pdf_parser_next_token(pdf_parser_t* parser);
-pdf_obj_t* pdf_parser_build_obj(pdf_parser_t* parser);
-pdf_dict_t* pdf_parser_build_dict(pdf_parser_t* parser);
-pdf_array_t* pdf_parser_build_array(pdf_parser_t* parser);
-pdf_cmap_t* pdf_parser_build_cmap(pdf_parser_t* parser);
 
 pdf_page_t* pdf_page_init();
 void pdf_page_free(pdf_page_t* page);
@@ -129,20 +104,19 @@ void pdf_array_free(pdf_array_t* array);
 
 pdf_cmap_t* pdf_cmap_init();
 void pdf_cmap_free(pdf_cmap_t* cmap);
-
-typedef struct context
-{
-    pdf_stack_t* stack;
-    plutovg_canvas_t* canvas;
-    pdf_file_t* pdf;
-    pdf_page_t* page;
-    pdf_obj_t* current_obj;
+typedef struct pdf_graphics_state {
+    char currentColorSpace[256];
+    double fillColor[3];
+    double strokeColor[3];
+    double lineWidth;
+    int lineCap;
+    int lineJoin;
+    double miterLimit;
     struct {
-        char currentColorSpace[256];
-        double fillColor[3];
-        double strokeColor[3];
-    } graphicsState;
-
+        double* dashs;
+        int dash_size;
+        double offset;
+    } dashPattern;
     struct {
         double characterSpacing;
         double wordSpacing;
@@ -152,9 +126,21 @@ typedef struct context
         int textMode;
         double textRise;
         plutovg_font_face_t* fontface;
+        bool font_face_loaded;
         pdf_font_t* font;
-        float lineWidth;
+        double textLineWidth;
     } textState;
+    struct pdf_graphics_state* next;
+} pdf_graphics_state_t;
+typedef struct context
+{
+    pdf_stack_t* stack;
+    plutovg_canvas_t* canvas;
+    pdf_file_t* pdf;
+    pdf_page_t* page;
+    pdf_obj_t* current_obj;
+    pdf_graphics_state_t* state;
+    std::map<int, pdf_font_t*> fontCache;
 } pdf_context_t;
 void render_to_png_by_plutovg(pdf_page_t* page, char* filename);
 void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,

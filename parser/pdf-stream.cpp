@@ -208,7 +208,7 @@ void pdf_stream_get_all(pdf_stream_t* stream, unsigned char** buffer, int* size)
         }
         else
         {
-            unsigned char* p = realloc(start, off + ret);
+            unsigned char* p = (unsigned char*)realloc(start, off + ret);
             if (p == NULL)
             {
                 free(start);

@@ -40,7 +40,7 @@ void _write_png_callback(void* context, void* data, int size)
 {
     pdf_image_t* img = (pdf_image_t*)context;
 
-    unsigned char* t = (unsigned char*)realloc(img->data, img->data + size);
+    unsigned char* t = (unsigned char*)realloc(img->data, img->data_len + size);
     if (t == NULL)
     {
         free(img->data);
@@ -117,7 +117,7 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj)
         }
         if (strcmp(filter, "/FlateDecode") == 0)
         {
-            pdf_image_t* img = calloc(1, sizeof(pdf_image_t));
+            pdf_image_t* img = (pdf_image_t*)calloc(1, sizeof(pdf_image_t));
             img->width = width;
             img->height = height;
             img->bits_per_color = bits_per_component;
@@ -155,10 +155,9 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj)
                                 tmp[index2 + 3] = smask[index];
                             }
                         }
-                        pdf_image_t t = {
-                            .data = NULL,
-                            .data_len = 0
-                        };
+                        pdf_image_t t;
+                        t.data = NULL;
+                        t.data_len = 0;
                         int success = stbi_write_png_to_func(_write_png_callback, &t,
                             width, height, 4, tmp, width * 4);
                         if (!success || t.data == NULL)
@@ -183,11 +182,11 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj)
         }
         else if (strcmp(filter, "/DCTDecode") == 0)
         {
-            pdf_image_t* img = calloc(1, sizeof(pdf_image_t));
+            pdf_image_t* img = (pdf_image_t*)calloc(1, sizeof(pdf_image_t));
             img->width = width;
             img->height = height;
             img->bits_per_color = bits_per_component;
-            img->data = calloc(length, sizeof(char));
+            img->data = (unsigned char*)calloc(length, sizeof(char));
             if (color_space != NULL)
             {
                 strcpy(img->color_space, color_space);

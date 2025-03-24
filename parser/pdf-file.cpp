@@ -408,7 +408,7 @@ pdf_file_t* pdf_file_read_file(const char* file_name)
                         pdf_dict_t* ef_dict = pdf_dict_get_dict(embedded_obj2->value->val.dict, "/EF");
                         int ref = pdf_dict_get_ref(ef_dict, "/UF");
                         pdf_obj_t* embedded_obj = pdf_file_get_obj(pdf_file, ref);
-                        char* embedded_file = NULL;
+                        unsigned char* embedded_file = NULL;
                         int embedded_file_len = 0;
                         pdf_stream_get_all(embedded_obj->stream, &embedded_file, &embedded_file_len);
                         embedded_file_len += 1;
@@ -710,11 +710,10 @@ pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, int ref)
                 unsigned char* start = NULL;
                 int size;
                 pdf_stream_get_all(objs_obj->stream, &start, &size);
-                pdf_buffer_t b1 = {
-                    .buffer = start,
-                    .buffer_size = size,
-                    .processed = 0
-                };
+                pdf_buffer_t b1;
+                b1.buffer = start;
+                b1.buffer_size = size;
+                b1.processed = 0;
                 pdf_parser_t* parser = pdf_parser_init(pdf, BUFFER_READER, &b1);
                 pdf_parser_token_t* tk = NULL;
                 for (int j = 0; j < num_pairs; j++)
@@ -730,11 +729,10 @@ pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, int ref)
                     tk = NULL;
 
                     unsigned char* p1 = start + first_offset + offset;
-                    pdf_buffer_t b2 = {
-                        .buffer = p1,
-                        .buffer_size = size - (first_offset + offset),
-                        .processed = 0
-                    };
+                    pdf_buffer_t b2;
+                    b2.buffer = p1;
+                    b2.buffer_size = size - (first_offset + offset);
+                    b2.processed = 0;
                     pdf_parser_t* val_parser = pdf_parser_init(pdf, BUFFER_READER, &b2);
 
                     pdf_parser_token_t* tk1 = pdf_parser_next_token(val_parser);
@@ -818,7 +816,7 @@ pdf_cmap_t* pdf_file_get_cmap(pdf_file_t* pdf, char* name)
     fseek(f, 0, SEEK_END);
     int filesize = ftell(f);
     rewind(f);
-    char* filedata = (char*)malloc(filesize);
+    unsigned char* filedata = (unsigned char*)malloc(filesize);
     if (filedata == NULL)
     {
         fclose(f);
@@ -826,11 +824,10 @@ pdf_cmap_t* pdf_file_get_cmap(pdf_file_t* pdf, char* name)
     }
     fread(filedata, filesize, 1, f);
     fclose(f);
-    pdf_buffer_t b1 = {
-        .buffer = filedata,
-        .buffer_size = filesize,
-        .processed = 0
-    };
+    pdf_buffer_t b1;
+    b1.buffer = filedata;
+    b1.buffer_size = filesize;
+    b1.processed = 0;
     pdf_parser_t* parser = pdf_parser_init(pdf, BUFFER_READER, &b1);
     pdf_cmap_t *cmap = pdf_parser_build_cmap(parser);
     pdf_parser_free(parser);

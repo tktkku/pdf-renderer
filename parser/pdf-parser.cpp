@@ -5,11 +5,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-#define STRINGFY(x) #x
-#define TO_STR(x) STRINGFY(x)
-#define pdf_parser_error(fmt, ...) printf(TO_STR(__LINE__) ":"fmt"\n", ##__VA_ARGS__)
-
-
 const char space_tag[] = {
     '\0', '\t', '\n', '\r', '\f', ' '
 };
@@ -133,7 +128,7 @@ pdf_parser_token_t* _parse_number(const unsigned char* start, const unsigned cha
                 }
                 else
                 {
-                    pdf_parser_error("error number: %c", c);
+                    printf("error number: %c", c);
                     return NULL;
                 }
             }
@@ -159,7 +154,7 @@ pdf_parser_token_t* _parse_number(const unsigned char* start, const unsigned cha
             }
             else
             {
-                pdf_parser_error("unknown token: %c(%#x)", c, c);
+                printf("unknown token: %c(%#x)", c, c);
                 return NULL;
             }
         }
@@ -170,7 +165,7 @@ pdf_parser_token_t* _parse_number(const unsigned char* start, const unsigned cha
     }
     else
     {
-        pdf_parser_error("unknown token: %c(%#x)", c, c);
+        printf("unknown token: %c(%#x)", c, c);
         return NULL;
     }
 }
@@ -265,25 +260,27 @@ void _decode_hex_string(char* str, int len, int* out_len)
     *out_len = ol;
     free(out);
 }
-void _decode_string(char* str, int len, int* out_len)
+void _decode_string(char** str, int* len)
 {
-    char* p = str + 1; // skip '('
-    char* end = str + len;
-    char* out = (char*)malloc(len);
+    char* p = *str + 1; // skip '('
+    char* end = *str + *len;
+    char* out = (char*)calloc(1, *len * 2);
     int ol = 0;
-    out[ol++] = *str; //'('
+    out[ol++] = **str; //'('
     while (p < end)
     {
         if (*p == '\\')
         {
             if (p + 1 >= end)
             {
+                out[ol++] = 0x0;
                 out[ol++] = *p;
                 break;
             }
             p++;
             if (*p == 'n')
             {
+                out[ol++] = 0x0;
                 out[ol++] = '\n';
             }
             else if (*p == '\n')
@@ -292,22 +289,27 @@ void _decode_string(char* str, int len, int* out_len)
             }
             else if (*p == 'r')
             {
+                out[ol++] = 0x0;
                 out[ol++] = '\r';
             }
             else if (*p == 't')
             {
+                out[ol++] = 0x0;
                 out[ol++] = '\t';
             }
             else if (*p == 'b')
             {
+                out[ol++] = 0x0;
                 out[ol++] = '\b';
             }
             else if (*p == 'f')
             {
+                out[ol++] = 0x0;
                 out[ol++] = '\f';
             }
             else if (*p == '(' || *p == ')' || *p == '\\')
             {
+                out[ol++] = 0x0;
                 out[ol++] = *p;
             }
             else if (_is_digit(*p))
@@ -331,14 +333,14 @@ void _decode_string(char* str, int len, int* out_len)
         }
         else
         {
+            out[ol++] = 0x0;
             out[ol++] = *p;
         }
         p++;
     }
-    memcpy(str, out, ol);
-    str[ol] = '\0';
-    *out_len = ol;
-    free(out);
+    free(*str);
+    *str = out;
+    *len = ol;
 }
 
 pdf_parser_token_t* _pdf_parser_next_one_token(const unsigned char* start, const unsigned char* end)
@@ -449,7 +451,7 @@ pdf_parser_token_t* _pdf_parser_next_one_token(const unsigned char* start, const
             }
             else if (c == -1)
             {
-                pdf_parser_error("unexcepted end of string");
+                printf("unexcepted end of string");
                 return NULL;
             }
         }
@@ -459,7 +461,7 @@ pdf_parser_token_t* _pdf_parser_next_one_token(const unsigned char* start, const
         tk->token_len--;
         start += len;
         // decode string
-        _decode_string(tk->token, tk->token_len, &tk->token_len);
+        _decode_string(&tk->token, &tk->token_len);
     }
     else if (c == '[')
     {
@@ -516,7 +518,7 @@ pdf_parser_token_t* _pdf_parser_next_one_token(const unsigned char* start, const
         }
         else
         {
-            pdf_parser_error("unexcepted tag >");
+            printf("unexcepted tag >");
             return NULL;
         }
     }
@@ -751,7 +753,7 @@ pdf_parser_token_t* _pdf_parser_next_one_token(const unsigned char* start, const
     }
     else
     {
-        pdf_parser_error("unknow token: %c(%#x)", *start, *start);
+        printf("unknow token: %c(%#x)", *start, *start);
         return NULL;
     }
 
@@ -815,7 +817,7 @@ void _pdf_parser_read_file(pdf_parser_t* parser, void* source)
     }
     int off = _pdf_parser_copy_rem(parser);
     int ret = 0;
-    ret = fread(parser->buffer + off, 1, parser->buffer_size - off, parser->pdf->pFile);
+    ret = fread(parser->buffer + off, 1, parser->buffer_size - off, f);
     if (ret < 0)
     {
         return;
