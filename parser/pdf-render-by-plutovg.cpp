@@ -178,12 +178,12 @@ void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
                 continue;
             // printf("%s\n", token);
             _do_render_operation(&context, tk);
-            if (strcmp(token, "Tj") == 0 || strcmp(token, "TJ") == 0)
-            {
-                plutovg_surface_write_to_png(surface, "test.png");
-                printf("Press any key to continue...");
-                getchar();
-            }
+            // if (strcmp(token, "Tj") == 0 || strcmp(token, "TJ") == 0)
+            // {
+            //     plutovg_surface_write_to_png(surface, "test.png");
+            //     printf("Press any key to continue...");
+            //     getchar();
+            // }
             pdf_parser_token_free(tk);
         }
 
@@ -1379,14 +1379,16 @@ void handle_Tf(pdf_context_t* context)
         plutovg_canvas_set_font_face(context->canvas, NULL);
         plutovg_font_face_destroy(context->state->textState.fontface);
     }
-
-    // repair font
-    // repair_cmap(context->font);
-    // set font face
-    // context->fontface = plutovg_font_face_load_from_file("fonts/SimSun.ttf",
-    // 0); FT_Face face;
     context->state->textState.font_face_loaded = false;
-    if (font->font_data == NULL)
+    if (strcmp(font->subtype, "/TrueType") == 0)
+    {
+        if (strcmp(font->basefont, "/SimSun") == 0)
+        {
+            context->state->textState.fontface = plutovg_font_face_load_from_file("fonts/SimSun.ttf", 0);
+            context->state->textState.font_face_loaded = true;
+        }
+    }
+    else if (font->font_data == NULL)
     {
         // FT_New_Face(context->ft_library, "fonts/SimSun.ttf", 0, &face);
         context->state->textState.fontface = plutovg_font_face_load_from_file("fonts/SimSun.ttf", 0);
@@ -1639,7 +1641,7 @@ void handle_Tj(pdf_context_t* context)
     {
         int unicode_cnt = 0;
         uint16_t unicode[1024] = { 0 };
-        if (strstr(context->state->textState.font->encoding, "Identity"))
+        if (strstr(context->state->textState.font->encoding, "Identity") || strcmp(context->state->textState.font->encoding, "/WinAnsiEncoding") == 0)
         {
             for (int i = 1; i < node.size; i += 2)
             {
@@ -1706,7 +1708,7 @@ void handle_Tj(pdf_context_t* context)
             context->state->fillColor[2]);
         if (context->state->textState.font_face_loaded)
         {
-            if (strstr(context->state->textState.font->encoding, "Identity"))
+            if (strstr(context->state->textState.font->encoding, "Identity") || strcmp(context->state->textState.font->encoding, "/WinAnsiEncoding") == 0)
                 context->state->textState.textLineWidth += plutovg_canvas_fill_text1(context->canvas, unicode, unicode_cnt,
                     PLUTOVG_TEXT_ENCODING_UTF16, context->state->textState.textLineWidth, 0);
             else

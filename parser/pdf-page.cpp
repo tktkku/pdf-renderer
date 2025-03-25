@@ -130,46 +130,11 @@ uint8_t _hex_str_to_8bit(char hexStr[2])
         ((tmp[1]) & 0x0F)
         );
 }
-
-pdf_font_t* pdf_page_get_font(pdf_page_t* page, const char* name)
+pdf_font_t* _load_type0_font(pdf_page_t* page, pdf_dict_t* font_dict)
 {
-    if (page == NULL || page->resources == NULL || page->resources->font_dict == NULL || name == NULL)
-        return NULL;
-    int ref = pdf_dict_get_ref(page->resources->font_dict, name);
-    if (ref == -1)
-        return NULL;
-    pdf_obj_t* font_obj = pdf_file_get_obj(page->pdf, ref);
-    if (font_obj == NULL)
-        return NULL;
-
-    pdf_dict_t* font_dict = font_obj->value->val.dict;
     pdf_font_t* font = pdf_font_init();
     if (font == NULL)
         return NULL;
-
-
-    font->type = (char*)pdf_dict_get_name(font_dict, "/Type"); // Font
-    if (!font->type)
-    {
-        pdf_font_free(font);
-        return NULL;
-    }
-
-    // Type0
-    // Type1 MMType1
-    // Type3
-    font->subtype = (char*)pdf_dict_get_name(font_dict, "/Subtype");
-    if (!font->subtype)
-    {
-        pdf_font_free(font);
-        return NULL;
-    }
-    // only support Type0
-    if (strcmp(font->subtype, "/Type0"))
-    {
-        pdf_font_free(font);
-        return NULL;
-    }
     // pdf_dict_get_name(font_dict, "/Name"); // not used in PDF 1.7
     font->basefont = (char*)pdf_dict_get_name(font_dict, "/BaseFont");
     font->encoding = (char*)pdf_dict_get_name(font_dict, "/Encoding");
@@ -361,6 +326,97 @@ pdf_font_t* pdf_page_get_font(pdf_page_t* page, const char* name)
 
     return font;
 }
+pdf_font_t* _load_truetype_font(pdf_page_t* page, pdf_dict_t* font_dict)
+{
+    pdf_font_t* font = pdf_font_init();
+    if (font == NULL)
+        return NULL;
+    font->type = (char*)pdf_dict_get_name(font_dict, "/Type"); // Font
+    font->subtype = (char*)pdf_dict_get_name(font_dict, "/Subtype");
+    font->basefont = (char*)pdf_dict_get_name(font_dict, "/BaseFont");
+    font->first_char = pdf_dict_get_number(font_dict, "/FirstChar");
+    font->last_char = pdf_dict_get_number(font_dict, "/LastChar");
+    font->widths = pdf_dict_get_array(font_dict, "/Widths");
+    font->encoding = (char*)pdf_dict_get_name(font_dict, "/Encoding");// MacRomanEncoding MacExpertEncoding WinAnsiEncoding
+    int to_unicode_ref = pdf_dict_get_ref(font_dict, "/ToUnicode");
+    if (to_unicode_ref != -1)
+    {
+        // PDF Specification 1.7, 9.10.3 ToUnicode CMaps
+        pdf_obj_t* obj = pdf_file_get_obj(page->pdf, to_unicode_ref);
+        unsigned char* data = NULL;
+        int len;
+        pdf_stream_get_all(obj->stream, &data, &len);
+        pdf_buffer_t b1;
+        b1.buffer = data;
+        b1.buffer_size = len;
+        b1.processed = 0;
+        pdf_parser_t* cmap_parser = pdf_parser_init(page->pdf, BUFFER_READER, &b1);
+
+        pdf_cmap_t* cmap = pdf_parser_build_cmap(cmap_parser);
+        pdf_parser_free(cmap_parser);
+        cmap->worldwide = false;
+        font->to_unicode_map = cmap;
+    }
+    int font_descriptor_ref = pdf_dict_get_ref(font_dict, "/FontDescriptor");
+    if (font_descriptor_ref != -1)
+    {
+        pdf_obj_t* obj = pdf_file_get_obj(page->pdf, font_descriptor_ref);
+        font->font_descriptor = obj->value->val.dict;
+        font->stemv = pdf_dict_get_number(font->font_descriptor, "/StemV");
+        font->flags = pdf_dict_get_number(font->font_descriptor, "/Flags");
+        font->italic_angle = pdf_dict_get_number(font->font_descriptor, "/ItalicAngle");
+        font->font_bbox = pdf_dict_get_array(font->font_descriptor, "/FontBBox");
+        font->ascent = pdf_dict_get_number(font->font_descriptor, "/Ascent");
+        font->descent = pdf_dict_get_number(font->font_descriptor, "/Descent");
+        font->cap_height = pdf_dict_get_number(font->font_descriptor, "/CapHeight");
+    }
+    
+    return font;
+}
+pdf_font_t* pdf_page_get_font(pdf_page_t* page, const char* name)
+{
+    if (page == NULL || page->resources == NULL || page->resources->font_dict == NULL || name == NULL)
+        return NULL;
+    int ref = pdf_dict_get_ref(page->resources->font_dict, name);
+    if (ref == -1)
+        return NULL;
+    pdf_obj_t* font_obj = pdf_file_get_obj(page->pdf, ref);
+    if (font_obj == NULL)
+        return NULL;
+
+    pdf_dict_t* font_dict = font_obj->value->val.dict;
+
+    char* type = (char*)pdf_dict_get_name(font_dict, "/Type"); // Font
+    if (!type)
+    {
+        return NULL;
+    }
+
+    // Type0
+    // Type1 MMType1
+    // Type3
+    char* subtype = (char*)pdf_dict_get_name(font_dict, "/Subtype");
+    if (!subtype)
+    {
+        return NULL;
+    }
+
+    if (!strcmp(subtype, "/TrueType"))
+    {
+        return _load_truetype_font(page, font_dict);
+    }
+    else if (!strcmp(subtype, "/Type1"))
+    {
+        return NULL;
+    }
+    else if (!strcmp(subtype, "/Type0"))
+    {
+        return _load_type0_font(page, font_dict);
+    }
+
+    return NULL;
+}
+
 void pdf_page_xobject_free(pdf_xobject_t* xobject)
 {
     if (xobject == NULL)
