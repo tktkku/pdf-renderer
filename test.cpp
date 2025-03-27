@@ -23,7 +23,7 @@ int main(int argc, char* argv[])
     start = clock();
     pdf_file_t* pdf = pdf_file_read_file(argv[1]);
     int num_pages = pdf_file_get_pages(pdf);
-    for (int i = 0; i < 1; i++)
+    for (int i = 0; i < num_pages; i++)
     {
         pdf_page_t* page = pdf_file_get_page(pdf, i);
         if (page == NULL)

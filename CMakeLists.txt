@@ -10,5 +10,5 @@ add_subdirectory(plutovg)
 add_subdirectory(zlib)
 
 add_executable(test test.cpp)
-target_link_libraries(test pdf-parser zlib plutovg)
+target_link_libraries(test pdf-parser zlibstatic plutovg)
 target_include_directories(test PRIVATE ./parser ./plutovg/include ./plutovg/source)

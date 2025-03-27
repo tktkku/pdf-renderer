@@ -121,7 +121,7 @@ void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
     int stride = width * 4;
     unsigned char* pixels = (unsigned char*)malloc(stride * height);
     memset(pixels, 0xFF, stride * height);
-    pdf_stack_t* stack = pdf_stack_init();
+    //pdf_stack_t* stack = pdf_stack_init();
 
     pdf_context_t context;
 
@@ -142,7 +142,7 @@ void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
     plutovg_canvas_translate(canvas, 0, height);
     plutovg_canvas_scale(canvas, PIXELS_PER_POINT, -PIXELS_PER_POINT);
     context.canvas = canvas;
-    context.stack = stack;
+    //context.stack = stack;
     context.pdf = page->pdf;
     context.page = page;
     context.state = (pdf_graphics_state_t*)malloc(sizeof(pdf_graphics_state_t));
@@ -162,6 +162,7 @@ void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
     context.state->textState.textLeading = 0;
     context.state->textState.font = NULL;
     context.state->textState.fontface = NULL;
+    context.current_obj = NULL;
     int numStreams = pdf_page_get_streams(page);
     for (int j = 0; j < numStreams; j++)
     {
@@ -245,7 +246,7 @@ void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
             pdf_dict_get_dict(anno_obj->value->val.dict, "/OC");
         }
     }
-    pdf_stack_free(stack);
+    //pdf_stack_free(stack);
     plutovg_surface_write_to_png(surface, filename);
     if (context.state->textState.fontface != NULL)
     {
@@ -273,7 +274,7 @@ void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
 void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
     int width, int height, int stride)
 {
-    pdf_stack_t* stack = pdf_stack_init();
+    //pdf_stack_t* stack = pdf_stack_init();
 
     pdf_context_t context;
 
@@ -294,7 +295,7 @@ void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
     plutovg_canvas_translate(canvas, 0, height);
     plutovg_canvas_scale(canvas, PIXELS_PER_POINT, -PIXELS_PER_POINT);
     context.canvas = canvas;
-    context.stack = stack;
+    //context.stack = stack;
     context.pdf = page->pdf;
     context.page = page;
     context.state = (pdf_graphics_state_t*)malloc(sizeof(pdf_graphics_state_t));
@@ -314,6 +315,7 @@ void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
     context.state->textState.textLeading = 0;
     context.state->textState.font = NULL;
     context.state->textState.fontface = NULL;
+    context.current_obj = NULL;
     int numStreams = pdf_page_get_streams(page);
     for (int j = 0; j < numStreams; j++)
     {
@@ -341,7 +343,7 @@ void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
 
         pdf_stream_close(stream);
     }
-    pdf_stack_free(stack);
+    //pdf_stack_free(stack);
     if (context.state->textState.fontface != NULL)
     {
         plutovg_canvas_set_font_face(context.canvas, context.state->textState.fontface);
@@ -400,7 +402,10 @@ void _do_render_operation(pdf_context_t* context, pdf_parser_token_t* tk)
 
     // did not match any operation
     // push data to stack
-    pdf_stack_push(context->stack, tk->token, tk->token_len);
+    //pdf_stack_push(context->stack, tk->token, tk->token_len);
+    std::vector<char> v;
+    v.insert(v.end(), tk->token, tk->token + tk->token_len);
+    context->stack.push(v);
 }
 void stroke(pdf_context_t* context)
 {
@@ -445,19 +450,43 @@ void handle_cm(pdf_context_t* context)
     // change matrix CTM
     // a b c d e f
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    //pdf_stack_node_t node;
+    //node.data = buf;
+    //pdf_stack_pop(context->stack, &node);
+    auto vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     float f = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    //pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     float e = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    //pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     float d = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    //pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     float c = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    //pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     float b = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    //pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     float a = strtof(buf, NULL);
 
     plutovg_matrix_t ctm;
@@ -470,9 +499,12 @@ void handle_w(pdf_context_t* context)
     // set line width
     // lineWidth
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_node_t node;
+    // node.data = buf;
+    // pdf_stack_pop(context->stack, &node);
+    auto vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
     float w = strtof(buf, NULL);
     plutovg_canvas_set_line_width(context->canvas, w);
     context->state->lineWidth = w;
@@ -482,10 +514,13 @@ void handle_J(pdf_context_t* context)
 {
     // set cap style
     // lineCap
-    pdf_stack_node_t node;
+    // pdf_stack_node_t node;
     char buf[1024] = { 0 };
-    node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    // node.data = buf;
+    // pdf_stack_pop(context->stack, &node);
+    auto vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
     int c = atoi(buf);
 
     plutovg_canvas_set_line_cap(context->canvas, (plutovg_line_cap_t)c);
@@ -498,9 +533,12 @@ void handle_j(pdf_context_t* context)
     // lineJoin
 
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_node_t node;
+    // node.data = buf;
+    // pdf_stack_pop(context->stack, &node);
+    auto vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
     int j = atoi(buf);
 
     plutovg_canvas_set_line_join(context->canvas, (plutovg_line_join_t)j);
@@ -512,9 +550,12 @@ void handle_M(pdf_context_t* context)
     // set miter limit
     // miterLimit
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_node_t node;
+    // node.data = buf;
+    // pdf_stack_pop(context->stack, &node);
+    auto vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
     float m = strtof(buf, NULL);
     plutovg_canvas_set_miter_limit(context->canvas, m);
     context->state->miterLimit = m;
@@ -525,21 +566,29 @@ void handle_d(pdf_context_t* context)
     // set line dash pattern
     // dashArray dashPhase
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_node_t node;
+    // node.data = buf;
+    // pdf_stack_pop(context->stack, &node);
+    auto vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     float offset = strtof(buf, NULL);
 
     int index = 2;
     float dashs[2] = { 0 };
     while (true)
     {
-        pdf_stack_pop(context->stack, &node);
-        if (!strcmp(node.data, "]"))
+        //pdf_stack_pop(context->stack, &node);
+        vec = context->stack.top();
+        context->stack.pop();
+        memcpy(buf, vec.data(), vec.size());
+        assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
+        if (!strcmp(buf, "]"))
         {
             // ignore
         }
-        else if (!strcmp(node.data, "["))
+        else if (!strcmp(buf, "["))
         {
             break;
         }
@@ -560,9 +609,12 @@ void handle_ri(pdf_context_t* context)
     // set color rendering intent
     // intent
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_node_t node;
+    // node.data = buf;
+    // pdf_stack_pop(context->stack, &node);
+    auto vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
 }
 
 void handle_i(pdf_context_t* context)
@@ -570,9 +622,12 @@ void handle_i(pdf_context_t* context)
     // set flatness tolerance
     // flatness
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_node_t node;
+    // node.data = buf;
+    // pdf_stack_pop(context->stack, &node);
+    auto vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
     float i = strtof(buf, NULL);
     // context->graphics_state.flatness = i;
 }
@@ -585,9 +640,12 @@ void handle_gs(pdf_context_t* context)
     // in the ExtGState subdictionary of the current resource dictionary
     // dictName
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_node_t node;
+    // node.data = buf;
+    // pdf_stack_pop(context->stack, &node);
+    auto vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
     pdf_page_get_ext_gstate(context->page, buf);
 }
 
@@ -596,11 +654,19 @@ void handle_m(pdf_context_t* context)
     // begin a new subpath by moving the current point to (x,y)
     // x y
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_node_t node;
+    // node.data = buf;
+    // pdf_stack_pop(context->stack, &node);
+    auto vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     float y = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    //pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     float x = strtof(buf, NULL);
     plutovg_canvas_move_to(context->canvas, x, y);
 }
@@ -610,11 +676,19 @@ void handle_l(pdf_context_t* context)
     // append a straight line segment from the current point to (x, y)
     // x y
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_node_t node;
+    // node.data = buf;
+    // pdf_stack_pop(context->stack, &node);
+    auto vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     float y = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    //pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     float x = strtof(buf, NULL);
     plutovg_canvas_line_to(context->canvas, x, y);
 }
@@ -626,19 +700,43 @@ void handle_c(pdf_context_t* context)
     // using (x1, y1) and (x2 ,y2) as the Bezier control points
     // x1 y1 x2 y2 x3 y3
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_node_t node;
+    // node.data = buf;
+    // pdf_stack_pop(context->stack, &node);
+    auto vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     float y3 = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    //pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     float x3 = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    //pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     float y2 = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    //pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     float x2 = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    //pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     float y1 = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    //pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     float x1 = strtof(buf, NULL);
 
     plutovg_canvas_cubic_to(context->canvas, x1, y1, x2, y2, x3, y3);
@@ -652,16 +750,32 @@ void handle_v(pdf_context_t* context)
     // x1 y1 same as current point
     // x2 y2 x3 y3
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
+    // pdf_stack_node_t node;
+    // node.data = buf;
     float x1, y1, x2, y2, x3, y3;
-    pdf_stack_pop(context->stack, &node);
+    //pdf_stack_pop(context->stack, &node);
+    auto vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     y3 = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    //pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     x3 = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    //pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     y2 = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    //pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     x2 = strtof(buf, NULL);
 
     plutovg_canvas_get_current_point(context->canvas, &x1, &y1);
@@ -676,15 +790,31 @@ void handle_y(pdf_context_t* context)
     // x2 y2 same as x3 y3
     // x1 y1 x3 y3
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_node_t node;
+    // node.data = buf;
+    // pdf_stack_pop(context->stack, &node);
+    auto vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     float y3 = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    //pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     float x3 = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    //pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     float y1 = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    //pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     float x1 = strtof(buf, NULL);
 
     plutovg_canvas_cubic_to(context->canvas, x1, y1, x3, y3, x3, y3);
@@ -717,15 +847,31 @@ void handle_re(pdf_context_t* context)
     */
 
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_node_t node;
+    // node.data = buf;
+    // pdf_stack_pop(context->stack, &node);
+    auto vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     float height = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    //pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     float width = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    //pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     float y = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    //pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     float x = strtof(buf, NULL);
 
     plutovg_canvas_rect(context->canvas, x, y, width, height);
@@ -837,10 +983,12 @@ void handle_CS(pdf_context_t* context)
     // initialize the corresponding current color of cyan magenta yellow to 0.0
     // and the black to 1.0
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
-    pdf_stack_pop(context->stack, &node);
-    memcpy(context->state->currentColorSpace, buf, strlen(buf) + 1);
+    // pdf_stack_node_t node;
+    // node.data = buf;
+    // pdf_stack_pop(context->stack, &node);
+    auto vec = context->stack.top();
+    context->stack.pop();
+    memcpy(context->state->currentColorSpace, vec.data(), vec.size());
 }
 
 void handle_SC(pdf_context_t* context)
@@ -848,13 +996,16 @@ void handle_SC(pdf_context_t* context)
     // set gray level, 0.0 to balck 1.0 to white
 
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
+    // pdf_stack_node_t node;
+    // node.data = buf;
 
     if (!strcmp(context->state->currentColorSpace, "/DeviceGray"))
     {
         // gray
-        pdf_stack_pop(context->stack, &node);
+        // pdf_stack_pop(context->stack, &node);
+        auto vec = context->stack.top();
+        context->stack.pop();
+        memcpy(buf, vec.data(), vec.size());
         float g = strtof(buf, NULL);
         // plutovg_canvas_set_rgb(context->canvas, g, g, g);
         context->state->strokeColor[0] = g;
@@ -866,11 +1017,23 @@ void handle_SC(pdf_context_t* context)
     {
         // red green blue
 
-        pdf_stack_pop(context->stack, &node);
+        // pdf_stack_pop(context->stack, &node);
+        auto vec = context->stack.top();
+        context->stack.pop();
+        memcpy(buf, vec.data(), vec.size());
+        assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
         float b = strtof(buf, NULL);
-        pdf_stack_pop(context->stack, &node);
+        // pdf_stack_pop(context->stack, &node);
+        vec = context->stack.top();
+        context->stack.pop();
+        memcpy(buf, vec.data(), vec.size());
+        assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
         float g = strtof(buf, NULL);
-        pdf_stack_pop(context->stack, &node);
+        // pdf_stack_pop(context->stack, &node);
+        vec = context->stack.top();
+        context->stack.pop();
+        memcpy(buf, vec.data(), vec.size());
+        assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
         float r = strtof(buf, NULL);
         // plutovg_canvas_set_rgb(context->canvas, r, g, b);
         context->state->strokeColor[0] = r;
@@ -881,13 +1044,29 @@ void handle_SC(pdf_context_t* context)
         "/DeviceCMYK"))
     {
         // cyan magenta yellow black
-        pdf_stack_pop(context->stack, &node);
+        // pdf_stack_pop(context->stack, &node);
+        auto vec = context->stack.top();
+        context->stack.pop();
+        memcpy(buf, vec.data(), vec.size());
+        assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
         float k = strtof(buf, NULL);
-        pdf_stack_pop(context->stack, &node);
+        // pdf_stack_pop(context->stack, &node);
+        vec = context->stack.top();
+        context->stack.pop();
+        memcpy(buf, vec.data(), vec.size());
+        assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
         float y = strtof(buf, NULL);
-        pdf_stack_pop(context->stack, &node);
+        // pdf_stack_pop(context->stack, &node);
+        vec = context->stack.top();
+        context->stack.pop();
+        memcpy(buf, vec.data(), vec.size());
+        assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
         float m = strtof(buf, NULL);
-        pdf_stack_pop(context->stack, &node);
+        // pdf_stack_pop(context->stack, &node);
+        vec = context->stack.top();
+        context->stack.pop();
+        memcpy(buf, vec.data(), vec.size());
+        assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
         float c = strtof(buf, NULL);
 
         float r = (1.0 - c) * (1.0 - k);
@@ -905,9 +1084,12 @@ void handle_G(pdf_context_t* context)
     // set both in one operation
     // gray
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_node_t node;
+    // node.data = buf;
+    // pdf_stack_pop(context->stack, &node);
+    auto vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
     float g = strtof(buf, NULL);
     context->state->strokeColor[0] = g;
     context->state->strokeColor[1] = g;
@@ -940,9 +1122,12 @@ void handle_g(pdf_context_t* context)
 {
     // for nonstroking
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_node_t node;
+    // node.data = buf;
+    // pdf_stack_pop(context->stack, &node);
+    auto vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
     float g = strtof(buf, NULL);
     // handle_G(context);
     plutovg_canvas_set_rgb(context->canvas, g, g, g);
@@ -955,13 +1140,25 @@ void handle_RG(pdf_context_t* context)
 {
     // combine CS and SC for DeviceRGB
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_node_t node;
+    // node.data = buf;
+    // pdf_stack_pop(context->stack, &node);
+    auto vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     float b = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     float g = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     float r = strtof(buf, NULL);
     context->state->strokeColor[0] = r;
     context->state->strokeColor[1] = g;
@@ -974,13 +1171,25 @@ void handle_rg(pdf_context_t* context)
 {
     // for nonstroking
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_node_t node;
+    // node.data = buf;
+    // pdf_stack_pop(context->stack, &node);
+    auto vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     float b = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     float g = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     float r = strtof(buf, NULL);
     plutovg_canvas_set_rgb(context->canvas, r, g, b);
     context->state->fillColor[0] = r;
@@ -993,15 +1202,31 @@ void handle_K(pdf_context_t* context)
 {
     // combine CS and SC for DeviceCMYK
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_node_t node;
+    // node.data = buf;
+    // pdf_stack_pop(context->stack, &node);
+    auto vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     float k = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     float y = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     float m = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     float c = strtof(buf, NULL);
     context->state->strokeColor[0] = (1.0 - c) * (1.0 - k);
     context->state->strokeColor[1] = (1.0 - m) * (1.0 - k);
@@ -1013,15 +1238,31 @@ void handle_k(pdf_context_t* context)
 {
     // for nonstroking
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_node_t node;
+    // node.data = buf;
+    // pdf_stack_pop(context->stack, &node);
+    auto vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     float k = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     float y = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     float m = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     float c = strtof(buf, NULL);
     // handle_K(context);
     float r = (1.0 - c) * (1.0 - k);
@@ -1036,30 +1277,57 @@ void handle_k(pdf_context_t* context)
 void handle_SCN(pdf_context_t* context)
 {
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
-    pdf_stack_pop(context->stack, &node);
-    pdf_stack_pop(context->stack, &node);
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_node_t node;
+    // node.data = buf;
+    // pdf_stack_pop(context->stack, &node);
+    // pdf_stack_pop(context->stack, &node);
+    // pdf_stack_pop(context->stack, &node);
+    auto vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
 }
 
 void handle_scn(pdf_context_t* context)
 {
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
-    pdf_stack_pop(context->stack, &node);
-    pdf_stack_pop(context->stack, &node);
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_node_t node;
+    // node.data = buf;
+    // pdf_stack_pop(context->stack, &node);
+    // pdf_stack_pop(context->stack, &node);
+    // pdf_stack_pop(context->stack, &node);
+    auto vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
 }
 
 void handle_sh(pdf_context_t* context)
 {
     // name
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_node_t node;
+    // node.data = buf;
+    // pdf_stack_pop(context->stack, &node);
+    auto vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
 }
 
 void handle_Do(pdf_context_t* context)
@@ -1067,10 +1335,12 @@ void handle_Do(pdf_context_t* context)
     // paint a specified XObject
     // name
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
-    pdf_stack_pop(context->stack, &node);
-
+    // pdf_stack_node_t node;
+    // node.data = buf;
+    // pdf_stack_pop(context->stack, &node);
+    auto vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
     pdf_obj_t* tmp_obj = NULL;
     pdf_xobject_t* xobj = NULL;
     if (context->current_obj != NULL)
@@ -1304,9 +1574,12 @@ void handle_Tc(pdf_context_t* context)
     // used by Tj TJ '
     // charSpace initial value=0
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_node_t node;
+    // node.data = buf;
+    // pdf_stack_pop(context->stack, &node);
+    auto vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
     float c = strtof(buf, NULL);
     context->state->textState.characterSpacing = c;
 }
@@ -1317,9 +1590,12 @@ void handle_Tw(pdf_context_t* context)
     // used by Tj TJ '
     // wordSpace initial value=0
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_node_t node;
+    // node.data = buf;
+    // pdf_stack_pop(context->stack, &node);
+    auto vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
     float w = strtof(buf, NULL);
     context->state->textState.wordSpacing = w;
 }
@@ -1329,9 +1605,12 @@ void handle_Tz(pdf_context_t* context)
     // horizontal scaling
     // scale initial value=100
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_node_t node;
+    // node.data = buf;
+    // pdf_stack_pop(context->stack, &node);
+    auto vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
     float h = strtof(buf, NULL);
     plutovg_canvas_scale(context->canvas, h / 100.0, 1.0);
     context->state->textState.horizontalScaling = h;
@@ -1343,9 +1622,12 @@ void handle_TL(pdf_context_t* context)
     // used by T* ' "
     // leading initial value = 0
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_node_t node;
+    // node.data = buf;
+    // pdf_stack_pop(context->stack, &node);
+    auto vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
     float t = strtof(buf, NULL);
     context->state->textState.textLeading = t;
 }
@@ -1355,12 +1637,20 @@ void handle_Tf(pdf_context_t* context)
     // set font and font size to use
     // fontname fontsize
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_node_t node;
+    // node.data = buf;
+    // pdf_stack_pop(context->stack, &node);
+    auto vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     float fontsize = strtof(buf, NULL);
     context->state->textState.fontSize = fontsize;
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     int ref = pdf_dict_get_ref(context->page->resources->font_dict, buf);
     if (ref == -1)
         return;
@@ -1422,9 +1712,12 @@ void handle_Tr(pdf_context_t* context)
     // set text rendering mode
     // mode initial value =0
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_node_t node;
+    // node.data = buf;
+    // pdf_stack_pop(context->stack, &node);
+    auto vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
     int v = strtof(buf, NULL);
     // STROKE FILL BOTH CLIP
 
@@ -1449,9 +1742,12 @@ void handle_Ts(pdf_context_t* context)
     // set text rise
     // rise initial value=0
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_node_t node;
+    // node.data = buf;
+    // pdf_stack_pop(context->stack, &node);
+    auto vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
     float r = strtof(buf, NULL);
 
     context->state->textState.textRise = r;
@@ -1462,11 +1758,19 @@ void handle_Td(pdf_context_t* context)
     // set start position on the page
     // tx ty
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_node_t node;
+    // node.data = buf;
+    // pdf_stack_pop(context->stack, &node);
+    auto vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     float ty = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     float tx = strtof(buf, NULL);
 
     plutovg_canvas_translate(context->canvas, tx, ty);
@@ -1480,11 +1784,19 @@ void handle_TD(pdf_context_t* context)
     // offset form the start of the current line
     // tx ty
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_node_t node;
+    // node.data = buf;
+    // pdf_stack_pop(context->stack, &node);
+    auto vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     float ty = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     float tx = strtof(buf, NULL);
 
     plutovg_canvas_translate(context->canvas, tx, ty);
@@ -1501,20 +1813,44 @@ void handle_Tm(pdf_context_t* context)
     // set the text matrix, and the text line matrix
     // a b c d e f
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
+    // pdf_stack_node_t node;
+    // node.data = buf;
     float a, b, c, d, e, f;
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_pop(context->stack, &node);
+    auto vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     f = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     e = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     d = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     c = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     b = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     a = strtof(buf, NULL);
 
     plutovg_matrix_t m;
@@ -1544,9 +1880,12 @@ void handle_Tj(pdf_context_t* context)
     // show / paint the glyphs for a string
     // string
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_node_t node;
+    // node.data = buf;
+    // pdf_stack_pop(context->stack, &node);
+    auto vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
     if (context->state->textState.font == NULL)
         return;
 
@@ -1643,14 +1982,14 @@ void handle_Tj(pdf_context_t* context)
         uint16_t unicode[1024] = { 0 };
         if (strstr(context->state->textState.font->encoding, "Identity") || strcmp(context->state->textState.font->encoding, "/WinAnsiEncoding") == 0)
         {
-            for (int i = 1; i < node.size; i += 2)
+            for (int i = 1; i < vec.size(); i += 2)
             {
                 unicode[unicode_cnt++] = ((buf[i] << 8) & 0xFF00) | (buf[i + 1] & 0x00FF);
             }
         }
         else
         {
-            for (int i = 1; i < node.size; i += 2)
+            for (int i = 1; i < vec.size(); i += 2)
             {
                 uint16_t t = ((buf[i] << 8) & 0xFF00) | (buf[i + 1] & 0x00FF);
                 bool found = false;
@@ -1741,11 +2080,23 @@ void handle_quotation(pdf_context_t* context)
     // ac as the character spacing
     // aw ac string
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
-    pdf_stack_pop(context->stack, &node);
-    pdf_stack_pop(context->stack, &node);
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_node_t node;
+    // node.data = buf;
+    // pdf_stack_pop(context->stack, &node);
+    // pdf_stack_pop(context->stack, &node);
+    // pdf_stack_pop(context->stack, &node);
+    auto vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
     context->state->textState.textLineWidth = 0;
     // TODO
 }
@@ -1757,29 +2108,39 @@ void handle_TJ(pdf_context_t* context)
     // if the element is a string , show the string
     // if the element is a number, adjust the position
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
-    pdf_stack_t* tmp_stack = pdf_stack_init();
+    // pdf_stack_node_t node;
+    // node.data = buf;
+    //pdf_stack_t* tmp_stack = pdf_stack_init();
+    std::stack<std::vector<char>> tmp_stack;
     while (true)
     {
-        pdf_stack_pop(context->stack, &node);
-        if (!strcmp(node.data, "]"))
+        auto vec = context->stack.top();
+        context->stack.pop();
+        memcpy(buf, vec.data(), vec.size());
+        assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
+        // pdf_stack_pop(context->stack, &node);
+        if (!strcmp(buf, "]"))
         {
             // ignore
         }
-        else if (!strcmp(node.data, "["))
+        else if (!strcmp(buf, "["))
         {
             break;
         }
         else
         {
-            pdf_stack_push(tmp_stack, node.data, node.size);
+            // pdf_stack_push(tmp_stack, buf, vec.size());
+            tmp_stack.push(vec);
         }
     }
-    memset(buf, 0, sizeof(buf));
-    while (tmp_stack->top != NULL)
+    // memset(buf, 0, sizeof(buf));
+    while (!tmp_stack.empty())
     {
-        pdf_stack_pop(tmp_stack, &node);
+        // pdf_stack_pop(tmp_stack, &node);
+        auto vec = tmp_stack.top();
+        tmp_stack.pop();
+        memcpy(buf, vec.data(), vec.size());
+        assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
         if (buf[0] == '<' && context->state->textState.font)
         {
             float x, y;
@@ -1873,14 +2234,14 @@ void handle_TJ(pdf_context_t* context)
             uint16_t unicode[1024] = { 0 };
             if (strstr(context->state->textState.font->encoding, "Identity"))
             {
-                for (int i = 1; i < node.size; i += 2)
+                for (int i = 1; i < vec.size(); i += 2)
                 {
                     unicode[unicode_cnt++] = ((buf[i] << 8) & 0xFF00) | (buf[i + 1] & 0x00FF);
                 }
             }
             else
             {
-                for (int i = 1; i < node.size; i += 2)
+                for (int i = 1; i < vec.size(); i += 2)
                 {
                     uint16_t t = ((buf[i] << 8) & 0xFF00) | (buf[i + 1] & 0x00FF);
                     bool found = false;
@@ -1958,65 +2319,116 @@ void handle_TJ(pdf_context_t* context)
             context->state->textState.textLineWidth -= (a * (context->state->textState.fontSize / 1000.0));
         }
     }
-    pdf_stack_free(tmp_stack);
+    // pdf_stack_free(tmp_stack);
 }
 
 void handle_d0(pdf_context_t* context)
 {
+    char buf[1024] = {0};
     // wx wy
-    char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
-    pdf_stack_pop(context->stack, &node);
-    pdf_stack_pop(context->stack, &node);
+    auto vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
+    // pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
 }
 
 void handle_d1(pdf_context_t* context)
 {
     // wx wy llx lly urx ury
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
-    pdf_stack_pop(context->stack, &node);
-    pdf_stack_pop(context->stack, &node);
-    pdf_stack_pop(context->stack, &node);
-    pdf_stack_pop(context->stack, &node);
-    pdf_stack_pop(context->stack, &node);
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_node_t node;
+    // node.data = buf;
+    // pdf_stack_pop(context->stack, &node);
+    auto vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
+    // pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
+    // pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
+    // pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
+    // pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
+    // pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
 }
 
 void handle_BDC(pdf_context_t* context)
 {
     // tag properties
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
-    pdf_stack_pop(context->stack, &node);
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_node_t node;
+    // node.data = buf;
+    // pdf_stack_pop(context->stack, &node);
+    auto vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
+    // pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
 }
 void handle_BMC(pdf_context_t* context)
 {
     // tag
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_node_t node;
+    // node.data = buf;
+    // pdf_stack_pop(context->stack, &node);
+    auto vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
 }
 void handle_DP(pdf_context_t* context)
 {
     // tag properties
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
-    pdf_stack_pop(context->stack, &node);
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_node_t node;
+    // node.data = buf;
+    // pdf_stack_pop(context->stack, &node);
+    auto vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
+    // pdf_stack_pop(context->stack, &node);
+    vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
+    assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
 }
 void handle_EMC(pdf_context_t* context) {}
 void handle_MP(pdf_context_t* context)
 {
     // tag
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    // pdf_stack_node_t node;
+    // node.data = buf;
+    // pdf_stack_pop(context->stack, &node);
+    auto vec = context->stack.top();
+    context->stack.pop();
+    memcpy(buf, vec.data(), vec.size());
 }

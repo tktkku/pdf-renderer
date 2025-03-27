@@ -4,6 +4,9 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <map>
+#include <stack>
+#include <vector>
+
 typedef struct pdf_parser_token pdf_parser_token_t;
 
 struct pdf_value;
@@ -134,13 +137,14 @@ typedef struct pdf_graphics_state {
 } pdf_graphics_state_t;
 typedef struct context
 {
-    pdf_stack_t* stack;
+    //pdf_stack_t* stack;
     plutovg_canvas_t* canvas;
     pdf_file_t* pdf;
     pdf_page_t* page;
     pdf_obj_t* current_obj;
     pdf_graphics_state_t* state;
     std::map<int, pdf_font_t*> fontCache;
+    std::stack<std::vector<char>> stack;
 } pdf_context_t;
 void render_to_png_by_plutovg(pdf_page_t* page, char* filename);
 void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
