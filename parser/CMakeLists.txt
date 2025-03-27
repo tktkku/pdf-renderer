@@ -11,7 +11,6 @@ set(PARSER_SOURCES
     pdf-render-by-plutovg.cpp
     pdf-page.cpp
     pdf-parser.cpp
-    pdf-stack.cpp
     pdf-stream.cpp
     pdf-private.h
     pdf.h

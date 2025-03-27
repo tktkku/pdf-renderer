@@ -60,7 +60,7 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj)
     if (obj->xobject != NULL)
         return obj->xobject;
     // unsigned char* input = img_obj->stream;
-    pdf_dict_t* img_dict = obj->value->val.dict;
+    PdfDict* img_dict = obj->value->val.dict;
     const char* type = pdf_dict_get_name(img_dict, "/Type"); // XObject
     if (strcmp(type, "/XObject") != 0)
     {
@@ -78,7 +78,7 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj)
         // if ImageMask is true, this entry is optional, but if specified, its value shall be 1
         int bits_per_component = pdf_dict_get_number(img_dict, "/BitsPerComponent");
         const char* filter = pdf_dict_get_name(img_dict, "/Filter");
-        pdf_array_t* filter_arr = NULL;
+        PdfArray* filter_arr = NULL;
         if (filter == NULL)
         {
             filter_arr = pdf_dict_get_array(img_dict, "/Filter");
@@ -87,9 +87,9 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj)
                 return NULL;
             }
 
-            if (filter_arr->num_elements == 1)
+            if (filter_arr->size() == 1)
             {
-                filter = filter_arr->values[0]->val.name;
+                filter = (*filter_arr)[0]->val.name;
             }
         }
         int width = pdf_dict_get_number(img_dict, "/Width");
@@ -97,15 +97,15 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj)
         int length = pdf_dict_get_number(img_dict, "/Length");
         const char* color_space = pdf_dict_get_name(img_dict, "/ColorSpace");
         const char* name = pdf_dict_get_name(img_dict, "/Intent");
-        pdf_array_t* mask_arr = pdf_dict_get_array(img_dict, "/Mask");
-        pdf_array_t* decode_aar = pdf_dict_get_array(img_dict, "/Decode");
+        PdfArray* mask_arr = pdf_dict_get_array(img_dict, "/Mask");
+        PdfArray* decode_aar = pdf_dict_get_array(img_dict, "/Decode");
         int interpolate = pdf_dict_get_bool(img_dict, "/Interpolate");
-        pdf_array_t* alter_aar = pdf_dict_get_array(img_dict, "/Alternates");
+        PdfArray* alter_aar = pdf_dict_get_array(img_dict, "/Alternates");
         int smask_ref = pdf_dict_get_ref(img_dict, "/SMask");
         int smask_in_data = pdf_dict_get_number(img_dict, "/SMaskInData");
         const char* metadata = pdf_dict_get_name(img_dict, "/Metadata");
-        pdf_dict_t* oc_dict = pdf_dict_get_dict(img_dict, "/OC");
-        pdf_array_t* color_space_aar = NULL;
+        PdfDict* oc_dict = pdf_dict_get_dict(img_dict, "/OC");
+        PdfArray* color_space_aar = NULL;
         if (color_space == NULL)
         {
             color_space_aar = pdf_dict_get_array(img_dict, "/ColorSpace");
@@ -218,15 +218,15 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj)
         xobj->type = XOBJ_FORM;
         xobj->form = (pdf_form_t*)malloc(sizeof(pdf_form_t));
 
-        pdf_array_t* ctm_aar = pdf_dict_get_array(img_dict, "/Matrix");
-        for (int i = 0; ctm_aar && i < ctm_aar->num_elements; i++)
+        PdfArray* ctm_aar = pdf_dict_get_array(img_dict, "/Matrix");
+        for (int i = 0; ctm_aar && i < ctm_aar->size(); i++)
         {
-            xobj->form->matrix[i] = ctm_aar->values[i]->val.number;
+            xobj->form->matrix[i] = (*ctm_aar)[i]->val.number;
         }
-        pdf_array_t* bbox_aar = pdf_dict_get_array(img_dict, "/BBox");
-        for (int i = 0; bbox_aar && i < bbox_aar->num_elements; i++)
+        PdfArray* bbox_aar = pdf_dict_get_array(img_dict, "/BBox");
+        for (int i = 0; bbox_aar && i < bbox_aar->size(); i++)
         {
-            xobj->form->bbox[i] = bbox_aar->values[i]->val.number;
+            xobj->form->bbox[i] = (*bbox_aar)[i]->val.number;
         }
         obj->xobject = xobj;
         return xobj;

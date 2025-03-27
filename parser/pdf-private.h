@@ -79,8 +79,8 @@ struct pdf_value
         char* string;
         int indirect;
         double number;
-        pdf_dict_t* dict;
-        pdf_array_t* array;
+        PdfDict* dict;
+        PdfArray* array;
     } val;
     int value_len;
     enum pdf_value_type type;
@@ -90,7 +90,7 @@ struct pdf_value
 struct pdf_obj
 {
     int seq;
-    pdf_obj_value_t* value;
+    pdf_value* value;
     pdf_stream_t* stream;
     pdf_xobject_t* xobject;
     unsigned char* font_data;
@@ -98,24 +98,24 @@ struct pdf_obj
     pdf_file_t* pdf;
 };
 
-struct pdf_dict_pair
-{
-    char* name;
-    int name_len;
-    pdf_dict_pair_value_t* value;
-};
+// struct pdf_dict_pair
+// {
+//     char* name;
+//     int name_len;
+//     pdf_dict_pair_value_t* value;
+// };
 
-struct pdf_dict
-{
-    int num_pairs;
-    pdf_dict_pair_t** pairs;
-};
+// struct pdf_dict
+// {
+//     int num_pairs;
+//     pdf_dict_pair_t** pairs;
+// };
 
-struct pdf_array
-{
-    int num_elements;
-    pdf_array_element_value_t** values;
-};
+// struct pdf_array
+// {
+//     int num_elements;
+//     pdf_array_element_value_t** values;
+// };
 
 typedef struct rect_d
 {
@@ -205,14 +205,14 @@ struct pdf_file
 
 struct pdf_resources
 {
-    pdf_dict_t* ext_gstate;
-    pdf_dict_t* color_space;
-    pdf_dict_t* pattern;
-    pdf_dict_t* shading;
-    pdf_dict_t* xobject_dict;
-    pdf_dict_t* font_dict;
-    pdf_array_t* proc_set;
-    pdf_dict_t* properties;
+    PdfDict* ext_gstate;
+    PdfDict* color_space;
+    PdfDict* pattern;
+    PdfDict* shading;
+    PdfDict* xobject_dict;
+    PdfDict* font_dict;
+    PdfArray* proc_set;
+    PdfDict* properties;
 };
 
 struct pdf_page
@@ -226,7 +226,7 @@ struct pdf_page
     int cur_content_index;
     int rotate;
     pdf_resources_t* resources;
-    pdf_array_t* annots;
+    PdfArray* annots;
 };
 
 
@@ -237,12 +237,12 @@ struct pdf_font
     char* basefont;
     char* encoding;
     pdf_cmap_t* to_unicode_map;
-    pdf_dict_t* descendant_font_dict;
-    pdf_dict_t* font_descriptor;
+    PdfDict* descendant_font_dict;
+    PdfDict* font_descriptor;
     int font_weight;
     int flags;
     int italic_angle;
-    pdf_array_t* font_bbox;
+    PdfArray* font_bbox;
     int ascent;
     int descent;
     int cap_height;
@@ -253,7 +253,7 @@ struct pdf_font
     int fontfile3_ref;
     int cid_system_info_ref;
     int dw;
-    pdf_array_t* w_aar;
+    PdfArray* w_aar;
     char* cid_to_gid_map;
     int cid_to_gid_map_ref;
     unsigned char* font_data;
@@ -261,7 +261,7 @@ struct pdf_font
     pdf_cmap_t* cmap;
     int first_char;
     int last_char;
-    pdf_array_t* widths;
+    PdfArray* widths;
 };
 
 struct pdf_image
@@ -326,6 +326,8 @@ struct pdf_parser
         unsigned char* rem;
         int len;
     } remain;
+    bool eof;
+    std::vector<pdf_parser_token_t*> token_cache;
 };
 
 struct pdf_buffer
@@ -396,7 +398,7 @@ pdf_parser_token_t* pdf_parser_token_init(const unsigned char* start, pdf_parser
 const char* pdf_parser_token_get_token(pdf_parser_token_t* token);
 pdf_parser_token_t* pdf_parser_next_token(pdf_parser_t* parser);
 pdf_obj_t* pdf_parser_build_obj(pdf_parser_t* parser);
-pdf_dict_t* pdf_parser_build_dict(pdf_parser_t* parser);
-pdf_array_t* pdf_parser_build_array(pdf_parser_t* parser);
+PdfDict* pdf_parser_build_dict(pdf_parser_t* parser);
+PdfArray* pdf_parser_build_array(pdf_parser_t* parser);
 pdf_cmap_t* pdf_parser_build_cmap(pdf_parser_t* parser);
 #endif

@@ -193,9 +193,9 @@ void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
     // Annots
     if (page->annots != NULL)
     {
-        for (int i = 0; i < page->annots->num_elements; i++)
+        for (int i = 0; i < page->annots->size(); i++)
         {
-            pdf_obj_t* anno_obj = pdf_file_get_obj(page->pdf, page->annots->values[i]->val.indirect);
+            pdf_obj_t* anno_obj = pdf_file_get_obj(page->pdf, (*page->annots)[i]->val.indirect);
             pdf_dict_get_name(anno_obj->value->val.dict, "/Type");
             pdf_dict_get_name(anno_obj->value->val.dict, "/SubType");
             pdf_dict_get_array(anno_obj->value->val.dict, "/Rect");
@@ -217,10 +217,10 @@ void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
                 if (F & 0b0100000000); // togglenoview
                 if (F & 0b1000000000); // lockedcontents
             }
-            pdf_dict_t* AP = pdf_dict_get_dict(anno_obj->value->val.dict, "/AP");
+            PdfDict* AP = pdf_dict_get_dict(anno_obj->value->val.dict, "/AP");
             if (AP != NULL)
             {
-                pdf_dict_t* nomal_dict = pdf_dict_get_dict(AP, "/N"); // required
+                PdfDict* nomal_dict = pdf_dict_get_dict(AP, "/N"); // required
                 if (nomal_dict == NULL)
                 {
                     int ref = pdf_dict_get_ref(AP, "/N");
@@ -360,11 +360,11 @@ void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
 
 void _do_render_operation(pdf_context_t* context, pdf_parser_token_t* tk)
 {
-    for (size_t i = 0; i < tk->token_len; i++)
-    {
-        printf("%c", tk->token[i]);
-    }
-    printf("\n");
+    // for (size_t i = 0; i < tk->token_len; i++)
+    // {
+    //     printf("%c", tk->token[i]);
+    // }
+    // printf("\n");
     int count = ARRAY_COUNT(handlers);
     int left = 0;
     int right = count - 1;
@@ -1345,7 +1345,7 @@ void handle_Do(pdf_context_t* context)
     pdf_xobject_t* xobj = NULL;
     if (context->current_obj != NULL)
     {
-        pdf_dict_t* tmp_dict = pdf_dict_get_dict(context->current_obj->value->val.dict, "/Resources");
+        PdfDict* tmp_dict = pdf_dict_get_dict(context->current_obj->value->val.dict, "/Resources");
         tmp_dict = pdf_dict_get_dict(tmp_dict, "/XObject");
         int ref = pdf_dict_get_ref(tmp_dict, buf);
         tmp_obj = pdf_file_get_obj(context->page->pdf, ref);
@@ -1960,7 +1960,7 @@ void handle_Tj(pdf_context_t* context)
             context->state->fillColor[0],
             context->state->fillColor[1],
             context->state->fillColor[2]);
-        printf("before %.2f\n", context->state->textState.textLineWidth);
+        //printf("before %.2f\n", context->state->textState.textLineWidth);
         if (context->state->textState.font_face_loaded)
         {
             if (strstr(context->state->textState.font->encoding, "Identity"))
@@ -1974,7 +1974,7 @@ void handle_Tj(pdf_context_t* context)
             context->state->textState.textLineWidth += plutovg_canvas_fill_text1(context->canvas, unicode, unicode_cnt,
                 PLUTOVG_TEXT_ENCODING_UTF16, context->state->textState.textLineWidth, 0);
         plutovg_canvas_restore(context->canvas);
-        printf("after %.2f\n", context->state->textState.textLineWidth);
+        //printf("after %.2f\n", context->state->textState.textLineWidth);
     }
     else if (buf[0] == '(')
     {

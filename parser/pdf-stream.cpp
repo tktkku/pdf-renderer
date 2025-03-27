@@ -41,20 +41,20 @@ pdf_stream_t* pdf_stream_init(pdf_file_t* pdf, pdf_obj_t* obj, int len, int offs
     {
         return NULL;
     }
-    pdf_dict_t* content_dict = obj->value->val.dict;
+    PdfDict* content_dict = obj->value->val.dict;
     const char* filter = pdf_dict_get_name(content_dict, "/Filter");
-    pdf_array_t* filter_arr = NULL;
+    PdfArray* filter_arr = NULL;
 
     if (filter == NULL)
     {
         filter_arr = pdf_dict_get_array(content_dict, "/Filter");
 
-        if (filter_arr != NULL && filter_arr->num_elements == 1)
+        if (filter_arr != NULL && filter_arr->size() == 1)
         {
-            filter = filter_arr->values[0]->val.name;
+            filter = (*filter_arr)[0]->val.name;
         }
     }
-    pdf_dict_t* parms_dict = pdf_dict_get_dict(content_dict, "/DecodeParms");
+    PdfDict* parms_dict = pdf_dict_get_dict(content_dict, "/DecodeParms");
     /**
      * 1 no prediction
      * 2 TIFF predictor 2

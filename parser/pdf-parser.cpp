@@ -194,6 +194,7 @@ pdf_parser_t* pdf_parser_init(pdf_file_t* pdf, pdf_parser_reader_type_t type, vo
     if (pdf == NULL) return NULL;
     pdf_parser_t* parser = (pdf_parser_t*)calloc(1, sizeof(pdf_parser_t));
     parser->pdf = pdf;
+    parser->eof = false;
     parser->buffer = (unsigned char*)malloc(4096);
     parser->buffer_size = 4096;
     parser->splite_pos = NULL;
@@ -252,7 +253,7 @@ void _decode_hex_string(char* str, int len, int* out_len)
     {
         if (_is_hex(*p))
             out[ol++] = *p;
-        
+
         p++;
     }
     memcpy(str, out, ol);
@@ -349,7 +350,8 @@ pdf_parser_token_t* _pdf_parser_next_one_token(const unsigned char* start, const
         return NULL;
     pdf_parser_token_t* tk = NULL;
     unsigned char c = *start;
-    do {
+    do
+    {
         int len = 1;
         const unsigned char* p = start;
         while (p < end)
@@ -753,7 +755,7 @@ pdf_parser_token_t* _pdf_parser_next_one_token(const unsigned char* start, const
     }
     else
     {
-        printf("unknow token: %c(%#x)", *start, *start);
+        //printf("unknow token: %c(%#x)", *start, *start);
         return NULL;
     }
 
@@ -817,10 +819,14 @@ void _pdf_parser_read_file(pdf_parser_t* parser, void* source)
     }
     int off = _pdf_parser_copy_rem(parser);
     int ret = 0;
-    ret = fread(parser->buffer + off, 1, parser->buffer_size - off, f);
-    if (ret < 0)
+    int need = parser->buffer_size - off;
+    ret = fread(parser->buffer + off, 1, need, f);
+    if (ret < need)
     {
-        return;
+        if (feof(f))
+            parser->eof = true;
+        else if (ferror(f))
+            return;
     }
     int end_i = off + ret - 1;
     _pdf_parser_split(parser, end_i);
@@ -841,6 +847,10 @@ void _pdf_parser_read_buffer(pdf_parser_t* parser, void* source)
             ret = MIN(parser->buffer_size - off, input->buffer_size - input->processed);
             memcpy(parser->buffer + off, input->buffer + input->processed, ret);
             input->processed += ret;
+        }
+        if (input->processed == input->buffer_size)
+        {
+            parser->eof = true;
         }
     }
 
@@ -863,6 +873,10 @@ void _pdf_parser_read_stream(pdf_parser_t* parser, void* source)
         {
             ret = pdf_stream_get_data(stream, parser->buffer + off, parser->buffer_size - off);
         }
+        if (stream->processed == stream->stream_len)
+        {
+            parser->eof = true;
+        }
     }
 
     int end_i = off + ret - 1;
@@ -873,7 +887,81 @@ pdf_parser_token_t* _pdf_next_token(pdf_parser_t* parser)
 {
     if (parser == NULL)
         return NULL;
+#if 1
+    unsigned char** start = &(parser->current_pos);
+    unsigned char* end = parser->splite_pos;
+    
+    while (*start < end && parser->token_cache.size() < 3)
+    {
+        pdf_parser_token_t* tk = _pdf_parser_next_one_token(*start, end);
+        if (tk == NULL)
+            break;
+        if (tk->type == TOKEN_SPACE || tk->type == TOKEN_COMMENT || tk->type == TOKEN_NEWLINE)
+        {
+            // ignored
+            *start += tk->steps;
+            pdf_parser_token_free(tk);
+            continue;
+        }
+        parser->token_cache.push_back(tk);
+        *start += tk->steps;
+    }
+    if (parser->token_cache.size() == 0)
+        return NULL;
+    auto iter = parser->token_cache.begin();
+    pdf_parser_token_t* tk = *iter; iter = parser->token_cache.erase(iter);
+    if (iter == parser->token_cache.end())
+    {
+        return tk;
+    }
+    else if (tk->type == TOKEN_NUMBER)
+    {
+        if (parser->token_cache.size() < 2)
+        {
+            return tk;
+        }
+        if (parser->token_cache[0]->type != TOKEN_NUMBER)
+        {
+            return tk;
+        }
+        if (parser->token_cache[1]->type == TOKEN_OBJ_BEG
+            || parser->token_cache[1]->type == TOKEN_INDIRECT)
+        {
+            pdf_parser_token_t* token = (pdf_parser_token_t*)malloc(sizeof(pdf_parser_token_t));
+            token->type = parser->token_cache[1]->type;
+            token->steps = tk->steps
+                + parser->token_cache[0]->steps
+                + parser->token_cache[1]->steps;
+            token->token_len = tk->token_len
+                + parser->token_cache[0]->token_len
+                + parser->token_cache[1]->token_len
+                + 2;// add 2 spaces
+            token->token = (char*)malloc(token->token_len + 1);
+            int off = 0;
+            memcpy(token->token, tk->token, tk->token_len);
+            off += tk->token_len;
+            token->token[off] = ' ';
+            off++;
+            pdf_parser_token_free(tk);
 
+            memcpy(token->token + off, parser->token_cache[0]->token, parser->token_cache[0]->token_len);
+            off += parser->token_cache[0]->token_len;
+            token->token[off] = ' ';
+            off++;
+            pdf_parser_token_free(*iter);
+            iter = parser->token_cache.erase(iter);
+
+            memcpy(token->token + off, parser->token_cache[0]->token, parser->token_cache[0]->token_len);
+            off += parser->token_cache[0]->token_len;
+            token->token[off] = '\0';
+            pdf_parser_token_free(*iter);
+            iter = parser->token_cache.erase(iter);
+
+            return token;
+        }
+    }
+    return tk;
+#else
     pdf_parser_token_t* head = (pdf_parser_token_t*)calloc(1, sizeof(pdf_parser_token_t));
     head->next = NULL;
     pdf_parser_token_t* tmp = head;
@@ -1063,6 +1151,7 @@ pdf_parser_token_t* _pdf_next_token(pdf_parser_t* parser)
         token->token_len = off;
         return token;
     }
+#endif
 }
 pdf_parser_token_t* pdf_stream_get_next_token(pdf_stream_t* stream)
 {
@@ -1166,7 +1255,7 @@ pdf_cmap_t* pdf_parser_build_cmap(pdf_parser_t* parser)
                 free(unicode_map);
                 cmap->unicode_map = tmp;
                 cmap->unicode_map_len += unicode_map_len;
-                
+
             }
             continue;
         }
@@ -1205,7 +1294,7 @@ pdf_cmap_t* pdf_parser_build_cmap(pdf_parser_t* parser)
             }
             else
             {
-                pdf_char_range_map_t* t = (pdf_char_range_map_t*)realloc(cmap->char_range_map, 
+                pdf_char_range_map_t* t = (pdf_char_range_map_t*)realloc(cmap->char_range_map,
                     sizeof(pdf_char_range_map_t) * (cmap->char_range_map_len + char_range_map_len));
                 if (t == NULL)
                 {
@@ -1213,7 +1302,7 @@ pdf_cmap_t* pdf_parser_build_cmap(pdf_parser_t* parser)
                     pdf_cmap_free(cmap);
                     return NULL;
                 }
-                    
+
                 memcpy(t + cmap->char_range_map_len, char_range_map, sizeof(pdf_char_range_map_t) * char_range_map_len);
                 free(char_range_map);
                 cmap->char_range_map = t;
@@ -1246,14 +1335,14 @@ pdf_cmap_t* pdf_parser_build_cmap(pdf_parser_t* parser)
             else
             {
                 pdf_code_range_map_t* t = (pdf_code_range_map_t*)realloc(cmap->code_range_map,
-                sizeof(pdf_code_range_map_t) * (cmap->code_range_map_len * code_range_map_len));
+                    sizeof(pdf_code_range_map_t) * (cmap->code_range_map_len * code_range_map_len));
                 if (t == NULL)
                 {
                     free(code_range_map);
                     pdf_cmap_free(cmap);
                     return NULL;
                 }
-                    
+
                 memcpy(t + cmap->code_range_map_len, code_range_map, sizeof(pdf_code_range_map_t) * code_range_map_len);
                 free(code_range_map);
                 cmap->code_range_map = t;
@@ -1333,7 +1422,7 @@ pdf_obj_t* pdf_parser_build_obj(pdf_parser_t* parser)
 
     pdf_parser_token_t* tk;
     pdf_obj_t* obj = pdf_obj_init();
-    obj->value = (pdf_obj_value_t*)malloc(sizeof(pdf_obj_value_t));
+    obj->value = (pdf_value*)malloc(sizeof(pdf_value));
 
     while ((tk = pdf_parser_next_token(parser)) != NULL)
     {
@@ -1344,7 +1433,8 @@ pdf_obj_t* pdf_parser_build_obj(pdf_parser_t* parser)
         }
         else if (tk->type == TOKEN_STREAM_BEG)
         {
-            fseek(parser->pdf->pFile, -(parser->end_pos - parser->current_pos), SEEK_CUR);
+            fseek(parser->pdf->pFile, -(parser->end_pos - parser->current_pos + 1), SEEK_CUR);
+            int offset = ftell(parser->pdf->pFile);
             char c;
             while (true)
             {
@@ -1356,7 +1446,7 @@ pdf_obj_t* pdf_parser_build_obj(pdf_parser_t* parser)
                 }
             }
             // store current offset
-            int offset = ftell(parser->pdf->pFile);
+            offset = ftell(parser->pdf->pFile);
             int len = pdf_dict_get_number(obj->value->val.dict, "/Length");
             if (len == -1)
             {
@@ -1393,17 +1483,15 @@ pdf_obj_t* pdf_parser_build_obj(pdf_parser_t* parser)
 
     return obj;
 }
-pdf_dict_t* pdf_parser_build_dict(pdf_parser_t* parser)
+PdfDict* pdf_parser_build_dict(pdf_parser_t* parser)
 {
     if (parser == NULL)
         return NULL;
-    pdf_dict_pair_t* p = NULL;
-    pdf_dict_pair_t** head = NULL;
-    int num_pairs = 0;
-    int index = 0;
+    // pdf_dict_pair_t* p = NULL;
+    // pdf_dict_pair_t** head = NULL;
+    PdfDict* dict = new PdfDict;
     pdf_parser_token_t* tk;
 
-    bool is_name = true;
     while ((tk = pdf_parser_next_token(parser)) != NULL)
     {
         if (tk->type == TOKEN_DICT_END)
@@ -1411,64 +1499,26 @@ pdf_dict_t* pdf_parser_build_dict(pdf_parser_t* parser)
             pdf_parser_token_free(tk);
             break;
         }
-        if (is_name)
+        pdf_parser_token_t* tk1 = pdf_parser_next_token(parser);
+        if (tk1 == NULL)
         {
-            num_pairs++;
-            pdf_dict_pair_t* v = (pdf_dict_pair_t*)malloc(sizeof(pdf_dict_pair_t));
-            if (head == NULL)
-            {
-                head = (pdf_dict_pair_t**)malloc(sizeof(pdf_dict_pair_t*));
-                if (head == NULL)
-                {
-                    return NULL;
-                }
-                *head = v;
-            }
-            else
-            {
-                pdf_dict_pair_t** pv = (pdf_dict_pair_t**)realloc(head, num_pairs * sizeof(pdf_dict_pair_t*));
-                if (pv == NULL)
-                {
-                    free(head);
-                    return NULL;
-                }
-                head = pv;
-                head[index] = v;
-            }
-            p = v;
-
-            p->name_len = tk->token_len;
-            p->name = (char*)malloc(p->name_len + 1);
-            memcpy(p->name, tk->token, p->name_len);
-            p->name[p->name_len] = '\0';
-            p->value = (pdf_dict_pair_value_t*)malloc(sizeof(pdf_dict_pair_value_t));
-
-            is_name = false;
+            break;
         }
-        else
-        {
-            _set_common_value(parser, tk, p->value);
-            is_name = true;
-            index++;
-        }
-
+        pdf_value* v = (pdf_value*)calloc(1, sizeof(pdf_value));
+        _set_common_value(parser, tk1, v);
+        (*dict)[tk->token] = v;
         pdf_parser_token_free(tk);
+        pdf_parser_token_free(tk1);
     }
-    pdf_dict_t* dict = pdf_dict_init();
-    if (dict == NULL)
-        return NULL;
-    dict->pairs = head;
-    dict->num_pairs = num_pairs;
     return dict;
 }
-pdf_array_t* pdf_parser_build_array(pdf_parser_t* parser)
+PdfArray* pdf_parser_build_array(pdf_parser_t* parser)
 {
     if (parser == NULL)
         return NULL;
 
-    pdf_array_element_value_t** head = NULL;
-    int ele_nums = 0;
-    int index = 0;
+    //pdf_array_element_value_t** head = NULL;
+    PdfArray* array = new PdfArray;
     pdf_parser_token_t* tk;
 
     while ((tk = pdf_parser_next_token(parser)) != NULL)
@@ -1480,38 +1530,13 @@ pdf_array_t* pdf_parser_build_array(pdf_parser_t* parser)
         }
         else
         {
-            ele_nums++;
-            pdf_array_element_value_t* v = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
-            if (head == NULL)
-            {
-                head = (pdf_array_element_value_t**)malloc(sizeof(pdf_array_element_value_t*));
-                if (head == NULL)
-                {
-                    return NULL;
-                }
-                *head = v;
-            }
-            else
-            {
-                pdf_array_element_value_t** pv = (pdf_array_element_value_t**)realloc(head, ele_nums * sizeof(pdf_array_element_value_t*));
-                if (pv == NULL)
-                {
-                    free(head);
-                    return NULL;
-                }
-                head = pv;
-                head[index] = v;
-            }
-
+            pdf_value* v = (pdf_value*)calloc(1, sizeof(pdf_value));
             _set_common_value(parser, tk, v);
-            index++;
+            array->push_back(v);
         }
-
 
         pdf_parser_token_free(tk);
     }
-    pdf_array_t* array = pdf_array_init();
-    array->values = head;
-    array->num_elements = ele_nums;
+
     return array;
 }
