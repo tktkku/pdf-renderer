@@ -113,7 +113,7 @@ const static handler_entry handlers[] = {
     {"ri", handle_ri},        {"s", handle_s},          {"sc", handle_sc},
     {"scn", handle_scn},      {"sh", handle_sh},        {"v", handle_v},
     {"w", handle_w},          {"y", handle_y} };
-void _do_render_operation(pdf_context_t* context, pdf_parser_token_t* tk);
+void _do_render_operation(pdf_context_t* context, PdfToken* tk);
 void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
 {
     int width = pdf_page_get_media_width(page) * PIXELS_PER_POINT;
@@ -170,11 +170,11 @@ void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
         if (stream == NULL)
             continue;
         pdf_stream_open(stream);
-        pdf_parser_token_t* tk;
+        PdfToken* tk;
         int count = 0;
         while ((tk = pdf_stream_get_next_token(stream)) != NULL)
         {
-            const char* token = pdf_parser_token_get_token(tk);
+            const char* token = tk->getValue();
             if (token == NULL)
                 continue;
             // printf("%s\n", token);
@@ -185,7 +185,7 @@ void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
             //     printf("Press any key to continue...");
             //     getchar();
             // }
-            pdf_parser_token_free(tk);
+            delete tk;
         }
 
         pdf_stream_close(stream);
@@ -229,11 +229,11 @@ void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
                     {
                         context.current_obj = obj;
                         pdf_stream_open(obj->stream);
-                        pdf_parser_token_t* tk = NULL;
+                        PdfToken* tk = NULL;
                         while ((tk = pdf_stream_get_next_token(obj->stream)) != NULL)
                         {
                             _do_render_operation(&context, tk);
-                            pdf_parser_token_free(tk);
+                            delete tk;
                         }
                         pdf_stream_close(obj->stream);
                     }
@@ -323,11 +323,11 @@ void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
         if (stream == NULL)
             continue;
         pdf_stream_open(stream);
-        pdf_parser_token_t* tk;
+        PdfToken* tk;
         int count = 0;
         while ((tk = pdf_stream_get_next_token(stream)) != NULL)
         {
-            const char* token = pdf_parser_token_get_token(tk);
+            const char* token = tk->getValue();
             if (token == NULL)
                 continue;
             // printf("%s\n", token);
@@ -338,7 +338,7 @@ void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
             //     printf("Press any key to continue...");
             //     getchar();
             // }
-            pdf_parser_token_free(tk);
+            delete tk;
         }
 
         pdf_stream_close(stream);
@@ -358,7 +358,7 @@ void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
     plutovg_surface_destroy(surface);
 }
 
-void _do_render_operation(pdf_context_t* context, pdf_parser_token_t* tk)
+void _do_render_operation(pdf_context_t* context, PdfToken* tk)
 {
     // for (size_t i = 0; i < tk->token_len; i++)
     // {
@@ -368,21 +368,23 @@ void _do_render_operation(pdf_context_t* context, pdf_parser_token_t* tk)
     int count = ARRAY_COUNT(handlers);
     int left = 0;
     int right = count - 1;
+    const char* token = tk->getValue();
+    int token_len = tk->getLen();
     while (left <= right)
     {
         int mid = left + (right - left) / 2;
-        int cmp = strcmp(handlers[mid].operation, tk->token);
+        int cmp = strcmp(handlers[mid].operation, token);
 
         if (cmp == 0)
         {
             if (handlers[mid].handler != NULL)
             {
-                if (strchr("fFbBW", tk->token[0]) != NULL)
+                if (strchr("fFbBW", token[0]) != NULL)
                 {
-                    if (tk->token[1] == '\0')
+                    if (token[1] == '\0')
                         plutovg_canvas_set_fill_rule(context->canvas,
                             PLUTOVG_FILL_RULE_NON_ZERO);
-                    else if (tk->token[1] == '*')
+                    else if (token[1] == '*')
                         plutovg_canvas_set_fill_rule(context->canvas,
                             PLUTOVG_FILL_RULE_EVEN_ODD);
                 }
@@ -404,7 +406,7 @@ void _do_render_operation(pdf_context_t* context, pdf_parser_token_t* tk)
     // push data to stack
     //pdf_stack_push(context->stack, tk->token, tk->token_len);
     std::vector<char> v;
-    v.insert(v.end(), tk->token, tk->token + tk->token_len);
+    v.insert(v.end(), token, token + token_len);
     context->stack.push(v);
 }
 void stroke(pdf_context_t* context)
@@ -1385,11 +1387,11 @@ void handle_Do(pdf_context_t* context)
             pdf_obj_t* save_obj = context->current_obj;
             context->current_obj = tmp_obj;
             pdf_stream_open(tmp_obj->stream);
-            pdf_parser_token_t* tk = NULL;
+            PdfToken* tk = NULL;
             while ((tk = pdf_stream_get_next_token(tmp_obj->stream)) != NULL)
             {
                 _do_render_operation(context, tk);
-                pdf_parser_token_free(tk);
+                delete tk;
             }
 
             pdf_stream_close(tmp_obj->stream);

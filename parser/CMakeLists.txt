@@ -1,6 +1,7 @@
 project(pdf-parser LANGUAGES CXX)
 
 set(PARSER_SOURCES
+    MemoryPool.cpp
     pdf-array.cpp
     pdf-common.cpp
     pdf-cmap.cpp

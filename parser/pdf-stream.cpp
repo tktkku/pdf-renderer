@@ -10,7 +10,7 @@ void pdf_stream_close(pdf_stream_t* stream)
 
     if (stream->parser)
     {
-        pdf_parser_free(stream->parser);
+        delete stream->parser;
         stream->parser = NULL;
     }
 }
@@ -119,7 +119,7 @@ void pdf_stream_open(pdf_stream_t* stream)
 {
     if (stream == NULL || stream->pdf == NULL)
         return;
-    stream->parser = pdf_parser_init(stream->pdf, STREAM_READER, stream);
+    stream->parser = new PdfParser(stream->pdf, STREAM_READER, stream);
     stream->decomp.flate.avail_in = 0;
     stream->decomp.flate.next_in = NULL;
     stream->decomp.flate.zalloc = NULL;

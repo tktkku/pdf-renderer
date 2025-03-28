@@ -158,21 +158,19 @@ bool _read_xref_and_trailer(pdf_file_t* pdf)
             }
         }
         // read trailer
-        pdf_parser_t* parser = pdf_parser_init(pdf, FILE_READER, pdf->pFile);
-        pdf_parser_token_t* tk = pdf_parser_next_token(parser);
-        if (tk == NULL || tk->type != TOKEN_DICT_BEG)
+        PdfParser parser(pdf, FILE_READER, pdf->pFile);
+        PdfToken* tk = parser.getNextToken();
+        if (tk == NULL || tk->getType() != TOKEN_DICT_BEG)
         {
-            pdf_parser_token_free(tk);
+            delete tk;
             tk = NULL;
-            pdf_parser_free(parser);
             return false;
         }
-        pdf_parser_token_free(tk);
+        delete tk;
         tk = NULL;
-        PdfDict* trailer = pdf_parser_build_dict(parser);
+        PdfDict* trailer = parser.buildDict();
         if (trailer == NULL)
         {
-            pdf_parser_free(parser);
             return false;
         }
         else
@@ -205,14 +203,12 @@ bool _read_xref_and_trailer(pdf_file_t* pdf)
             }
         }
         pdf_dict_free(trailer);
-        pdf_parser_free(parser);
         return true;
     }
     else //if (strstr(buffer, "obj") != NULL)
     {
-        pdf_parser_t* parser = pdf_parser_init(pdf, FILE_READER, pdf->pFile);
-        pdf_obj_t* xref_obj = pdf_parser_build_obj(parser);
-        pdf_parser_free(parser);
+        PdfParser parser(pdf, FILE_READER, pdf->pFile);
+        pdf_obj_t* xref_obj = parser.buildObj();
         if (xref_obj == NULL)
         {
             return false;
@@ -674,26 +670,23 @@ pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, int ref)
                     return NULL;
                 }
                 fseek(pdf->pFile, offset, SEEK_SET);
-                pdf_parser_t* parser = pdf_parser_init(pdf, FILE_READER, pdf->pFile);
-                pdf_parser_token_t* tk = pdf_parser_next_token(parser);
-                if (tk == NULL || tk->type != TOKEN_OBJ_BEG)
+                PdfParser parser(pdf, FILE_READER, pdf->pFile);
+                PdfToken* tk = parser.getNextToken();
+                if (tk == NULL || tk->getType() != TOKEN_OBJ_BEG)
                 {
-                    pdf_parser_token_free(tk);
-                    pdf_parser_free(parser);
+                    delete tk;
                     return NULL;
                 }
-                pdf_obj_t* obj = pdf_parser_build_obj(parser);
+                pdf_obj_t* obj = parser.buildObj();
                 if (obj == NULL)
                 {
-                    pdf_parser_token_free(tk);
-                    pdf_parser_free(parser);
+                    delete tk;
                     return NULL;
                 }
                 obj->seq = ref;
                 obj->pdf = pdf;
                 _add_to_obj_table(pdf, obj);
-                pdf_parser_token_free(tk);
-                pdf_parser_free(parser);
+                delete tk;
                 return obj;
             }
             else
@@ -716,18 +709,18 @@ pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, int ref)
                 b1.buffer = start;
                 b1.buffer_size = size;
                 b1.processed = 0;
-                pdf_parser_t* parser = pdf_parser_init(pdf, BUFFER_READER, &b1);
-                pdf_parser_token_t* tk = NULL;
+                PdfParser parser(pdf, BUFFER_READER, &b1);
+                PdfToken* tk = NULL;
                 for (int j = 0; j < num_pairs; j++)
                 {
-                    tk = pdf_parser_next_token(parser);
-                    int seq = atoi(tk->token);
-                    pdf_parser_token_free(tk);
+                    tk = parser.getNextToken();
+                    int seq = atoi(tk->getValue());
+                    delete tk;
                     tk = NULL;
 
-                    tk = pdf_parser_next_token(parser);
-                    int offset = atoi(tk->token);
-                    pdf_parser_token_free(tk);
+                    tk = parser.getNextToken();
+                    int offset = atoi(tk->getValue());
+                    delete tk;
                     tk = NULL;
 
                     unsigned char* p1 = start + first_offset + offset;
@@ -735,37 +728,34 @@ pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, int ref)
                     b2.buffer = p1;
                     b2.buffer_size = size - (first_offset + offset);
                     b2.processed = 0;
-                    pdf_parser_t* val_parser = pdf_parser_init(pdf, BUFFER_READER, &b2);
+                    PdfParser val_parser(pdf, BUFFER_READER, &b2);
 
-                    pdf_parser_token_t* tk1 = pdf_parser_next_token(val_parser);
+                    PdfToken* tk1 = val_parser.getNextToken();
                     if (tk1 == NULL)
                     {
-                        pdf_parser_free(val_parser);
                         return NULL;
                     }
                     pdf_obj_t* obj = pdf_obj_init();
                     obj->seq = seq;
                     obj->value = (pdf_value*)malloc(sizeof(pdf_value));
-                    if (tk1->type == TOKEN_DICT_BEG)
+                    if (tk1->getType() == TOKEN_DICT_BEG)
                     {
-                        PdfDict* obj_dict = pdf_parser_build_dict(val_parser);
+                        PdfDict* obj_dict = val_parser.buildDict();
                         if (obj_dict == NULL)
                         {
-                            pdf_parser_free(val_parser);
-                            pdf_parser_token_free(tk1);
+                            delete tk1;
                             return NULL;
                         }
 
                         obj->value->type = DICT;
                         obj->value->val.dict = obj_dict;
                     }
-                    else if (tk1->type == TOKEN_ARRAY_BEG)
+                    else if (tk1->getType() == TOKEN_ARRAY_BEG)
                     {
-                        PdfArray* array = pdf_parser_build_array(val_parser);
+                        PdfArray* array = val_parser.buildArray();
                         if (array == NULL)
                         {
-                            pdf_parser_free(val_parser);
-                            pdf_parser_token_free(tk1);
+                            delete tk1;
                             return NULL;
                         }
                         obj->value->type = ARRAY;
@@ -773,16 +763,13 @@ pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, int ref)
                     }
                     else
                     {
-                        pdf_parser_free(val_parser);
-                        pdf_parser_token_free(tk1);
+                        delete tk1;
                         return NULL;
                     }
-                    pdf_parser_token_free(tk1);
-                    pdf_parser_free(val_parser);
+                    delete tk1;
 
                     _add_to_obj_table(pdf, obj);
                 }
-                pdf_parser_free(parser);
 
                 return _get_obj_from_table(pdf, ref);
             }
@@ -830,9 +817,8 @@ pdf_cmap_t* pdf_file_get_cmap(pdf_file_t* pdf, char* name)
     b1.buffer = filedata;
     b1.buffer_size = filesize;
     b1.processed = 0;
-    pdf_parser_t* parser = pdf_parser_init(pdf, BUFFER_READER, &b1);
-    pdf_cmap_t *cmap = pdf_parser_build_cmap(parser);
-    pdf_parser_free(parser);
+    PdfParser parser(pdf, BUFFER_READER, &b1);
+    pdf_cmap_t *cmap = parser.buildCMap();
     free(filedata);
     cmap->worldwide = true;
     cmap->next = NULL;

@@ -155,10 +155,9 @@ pdf_font_t* _load_type0_font(pdf_page_t* page, PdfDict* font_dict)
         b1.buffer = data;
         b1.buffer_size = len;
         b1.processed = 0;
-        pdf_parser_t* cmap_parser = pdf_parser_init(page->pdf, BUFFER_READER, &b1);
+        PdfParser cmap_parser(page->pdf, BUFFER_READER, &b1);
 
-        pdf_cmap_t* cmap = pdf_parser_build_cmap(cmap_parser);
-        pdf_parser_free(cmap_parser);
+        pdf_cmap_t* cmap = cmap_parser.buildCMap();
         cmap->worldwide = false;
         font->to_unicode_map = cmap;
     }
@@ -350,10 +349,9 @@ pdf_font_t* _load_truetype_font(pdf_page_t* page, PdfDict* font_dict)
         b1.buffer = data;
         b1.buffer_size = len;
         b1.processed = 0;
-        pdf_parser_t* cmap_parser = pdf_parser_init(page->pdf, BUFFER_READER, &b1);
+        PdfParser cmap_parser(page->pdf, BUFFER_READER, &b1);
 
-        pdf_cmap_t* cmap = pdf_parser_build_cmap(cmap_parser);
-        pdf_parser_free(cmap_parser);
+        pdf_cmap_t* cmap = cmap_parser.buildCMap();
         cmap->worldwide = false;
         font->to_unicode_map = cmap;
     }

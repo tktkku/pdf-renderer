@@ -7,7 +7,8 @@
 #include <stack>
 #include <vector>
 #include <string>
-typedef struct pdf_parser_token pdf_parser_token_t;
+
+//typedef struct pdf_parser_token pdf_parser_token_t;
 
 struct pdf_value;
 // typedef struct pdf_value pdf_obj_value_t;
@@ -33,8 +34,10 @@ typedef struct pdf_image pdf_image_t;
 typedef struct pdf_form pdf_form_t;
 typedef struct pdf_xobject pdf_xobject_t;
 
-struct pdf_parser;
-typedef struct pdf_parser pdf_parser_t;
+// struct pdf_parser;
+// typedef struct pdf_parser pdf_parser_t;
+class PdfToken;
+class PdfParser;
 
 struct pdf_buffer;
 typedef struct pdf_buffer pdf_buffer_t;
@@ -67,7 +70,7 @@ int pdf_page_get_streams(pdf_page_t* page);
 pdf_stream_t* pdf_page_get_stream(pdf_page_t* page, int index);
 
 void pdf_stream_close(pdf_stream_t* stream);
-pdf_parser_token_t* pdf_stream_get_next_token(pdf_stream_t* stream);
+PdfToken* pdf_stream_get_next_token(pdf_stream_t* stream);
 int pdf_stream_get_data(pdf_stream_t* stream, unsigned char* buf, int size);
 pdf_stream_t* pdf_stream_init(pdf_file_t* pdf, pdf_obj_t* obj, int len, int offset);
 void pdf_stream_free(pdf_stream_t* stream);
