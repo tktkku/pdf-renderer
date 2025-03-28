@@ -73,55 +73,153 @@ bool _is_delimiter(char c)
     return false;
 }
 
-const static char* operators1[] =
+typedef struct 
 {
-// 34 39 66 70 71
-"\"", "'", "B", "F", "G",
-// 74 75 77 81 83
-"J", "K", "M", "Q", "S",
-// 87 98 99 100 102
-"W", "b", "c", "d", "f",
-// 103 104 105 106 107
-"g", "h", "i", "j", "k",
-// 108 109 110 113 115
-"l", "m", "n", "q", "s",
-// 118 119 121
-"v", "w", "y"
-};
-const static char* operators2[] =
+    const char *token;
+    PdfTokenType type;
+    int len;
+} fixed_token_t;
+typedef struct 
 {
-// 66,42 66,73 66,84 67,83 68,80
-"B*", "BI", "BT", "CS", "DP",
-// 68,111 69,73 69,84 73,68 77,80
-"Do", "EI", "ET", "ID", "MP",
-// 82,71 83,67 84,42 84,68 84,74
-"RG", "SC", "T*", "TD", "TJ",
-// 84,76 84,99 84,100 84,102 84,106
-"TL", "Tc", "Td", "Tf", "Tj",
-// 84,109 84,114 84,115 84,119 84,122
-"Tm", "Tr", "Ts", "Tw", "Tz",
-// 87,42 98,42 99,109 99,115 100,48
-"W*", "b*", "cm", "cs", "d0",
-// 100,49 102,42 103,115 114,101 114,103
-"d1", "f*", "gs", "re", "rg",
-// 114,105 115,99 115,104
-"ri", "sc", "sh"
-};
-const static char* operators3[] =
+    int nums;
+    fixed_token_t fixed_token_map[40];
+} fixed_token_map_t;
+
+const static fixed_token_map_t fixed_token_map[20] = 
 {
-// 66,68,67 66,77,67 69,77,67 83,67,78 115,99,110
-"BDC", "BMC", "EMC", "SCN", "scn"
-};
-const static char fisrtchar[] =
-{
-    //37, 40, 47, 60, 62
-'%', '(', '/', '<', '>',
-//91, 93, 82, 98, 100
-'[', ']', 'R', 'b', 'd',
-//101, 102, 110, 111, 115
-'e', 'f', 'n', 'o', 's',
-// 116, 120
-'t', 'x'
+    {0},
+    {31, {
+        {"\"", TOKEN_OPERATOR, 1}, // 34 
+        {"'", TOKEN_OPERATOR, 1}, // 39
+        {"B", TOKEN_OPERATOR, 1},// 66
+         {"F", TOKEN_OPERATOR, 1}, // 70
+         {"G", TOKEN_OPERATOR, 1}, // 71
+         {"J", TOKEN_OPERATOR, 1}, // 74
+         {"K", TOKEN_OPERATOR, 1}, // 75
+         {"M", TOKEN_OPERATOR, 1}, // 77
+         {"Q", TOKEN_OPERATOR, 1}, // 81
+        {"R", TOKEN_INDIRECT, 1}, // 82
+        {"S", TOKEN_OPERATOR, 1}, // 83
+        {"W", TOKEN_OPERATOR, 1}, // 87
+        {"[", TOKEN_ARRAY_BEG, 1}, // 91
+        {"[", TOKEN_ARRAY_END, 1}, // 93
+        {"b", TOKEN_OPERATOR, 1}, //98
+        {"c", TOKEN_OPERATOR, 1}, // 99
+        {"d", TOKEN_OPERATOR, 1}, // 100
+        {"f", TOKEN_OPERATOR, 1}, // 102
+        {"g", TOKEN_OPERATOR, 1},  //103
+        {"h", TOKEN_OPERATOR, 1}, // 104
+        {"i", TOKEN_OPERATOR, 1}, // 105
+        {"j", TOKEN_OPERATOR, 1}, // 106
+        {"k", TOKEN_OPERATOR, 1}, // 107
+        {"l", TOKEN_OPERATOR, 1}, // 108
+        {"m", TOKEN_OPERATOR, 1}, //109
+        {"n", TOKEN_OPERATOR, 1}, // 110
+        {"q", TOKEN_OPERATOR, 1}, // 113
+        {"s",TOKEN_OPERATOR, 1}, // 115
+        {"v", TOKEN_OPERATOR, 1}, // 118
+        {"w", TOKEN_OPERATOR, 1}, // 119
+        {"y", TOKEN_OPERATOR, 1} // 121
+    }},
+    {40, {
+        {"<<", TOKEN_DICT_BEG, 2}, // 60
+        {">>", TOKEN_DICT_END, 2}, // 62
+        {"B*", TOKEN_OPERATOR, 2}, 
+        {"BI", TOKEN_OPERATOR, 2}, 
+        {"BT", TOKEN_OPERATOR, 2}, 
+        {"CS", TOKEN_OPERATOR, 2}, 
+        {"DP", TOKEN_OPERATOR, 2},
+        {"Do", TOKEN_OPERATOR, 2}, 
+        {"EI", TOKEN_OPERATOR, 2}, 
+        {"ET", TOKEN_OPERATOR, 2}, 
+        {"ID", TOKEN_OPERATOR, 2}, 
+        {"MP", TOKEN_OPERATOR, 2},
+        {"RG", TOKEN_OPERATOR, 2}, 
+        {"SC", TOKEN_OPERATOR, 2}, 
+        {"T*", TOKEN_OPERATOR, 2}, 
+        {"TD", TOKEN_OPERATOR, 2}, 
+        {"TJ", TOKEN_OPERATOR, 2},
+        {"TL", TOKEN_OPERATOR, 2}, 
+        {"Tc", TOKEN_OPERATOR, 2}, 
+        {"Td", TOKEN_OPERATOR, 2}, 
+        {"Tf", TOKEN_OPERATOR, 2}, 
+        {"Tj", TOKEN_OPERATOR, 2},
+        {"Tm", TOKEN_OPERATOR, 2}, 
+        {"Tr", TOKEN_OPERATOR, 2}, 
+        {"Ts", TOKEN_OPERATOR, 2}, 
+        {"Tw", TOKEN_OPERATOR, 2}, 
+        {"Tz", TOKEN_OPERATOR, 2},
+        {"W*", TOKEN_OPERATOR, 2}, 
+        {"b*", TOKEN_OPERATOR, 2}, 
+        {"cm", TOKEN_OPERATOR, 2}, 
+        {"cs", TOKEN_OPERATOR, 2}, 
+        {"d0", TOKEN_OPERATOR, 2},
+        {"d1", TOKEN_OPERATOR, 2}, 
+        {"f*", TOKEN_OPERATOR, 2}, 
+        {"gs", TOKEN_OPERATOR, 2}, 
+        {"re", TOKEN_OPERATOR, 2}, 
+        {"rg", TOKEN_OPERATOR, 2},
+        {"ri", TOKEN_OPERATOR, 2}, 
+        {"sc", TOKEN_OPERATOR, 2}, 
+        {"sh", TOKEN_OPERATOR, 2},
+    }},
+    {9, {
+        {"BDC", TOKEN_OPERATOR, 3}, 
+        {"BMC", TOKEN_OPERATOR, 3}, 
+        {"EMC", TOKEN_OPERATOR, 3}, 
+        {"SCN", TOKEN_OPERATOR, 3},
+        {"def", TOKEN_DEF, 3},
+        {"dup", TOKEN_DUP, 3},
+        {"end", TOKEN_END, 3},
+        {"obj", TOKEN_OBJ_BEG, 3},
+        {"scn", TOKEN_OPERATOR, 3}
+    }},
+    {4, {
+        {"dict", TOKEN_DICT, 4},
+        {"null", TOKEN_NULL, 4},
+        {"true", TOKEN_BOOLEAN_TRUE, 4},
+        {"xref", TOKEN_XREF, 4},
+    }},
+    {2,{
+        {"begin", TOKEN_BEGIN, 5},
+        {"false", TOKEN_BOOLEAN_FALSE, 5}
+    }},
+    {2, {
+        {"endobj", TOKEN_OBJ_END, 6},
+        {"stream", TOKEN_STREAM_BEG, 6},
+    }},
+    {1, {
+        {"endcmap", TOKEN_ENDCMAP, 7},
+    }},
+    {0},
+    {3, {
+        {"begincmap",TOKEN_BEGINCMAP, 9},
+        {"endbfchar",TOKEN_ENDBFCHAR, 9},
+        {"endstream",TOKEN_STREAM_END, 9},
+    }},
+    {2, {
+        {"endbfrange",TOKEN_ENDBFRANGE, 10},
+        {"endcidchar",TOKEN_ENDCIDCHAR, 10},
+    }},
+    {2, {
+        {"beginbfchar",TOKEN_BEGINBFCHAR, 11},
+        {"endcidrange",TOKEN_ENDCIDRANGE, 11},
+    }},
+    {3, {
+        {"beginbfrange",TOKEN_BEGINBFRANGE, 12},
+        {"begincidchar",TOKEN_BEGINCIDCHAR, 12},
+        {"findresource",TOKEN_FINDRESOURCE, 12},
+    }},
+    {1, {
+        {"begincidrange", TOKEN_BEGINCIDRANGE, 13},
+    }},
+    {0}, {0}, {0},
+    {1, {
+        {"endcodespacerange",TOKEN_ENDCODESPACERANGE, 17},
+    }}, {0},
+    {1, {
+        {"begincodespacerange",TOKEN_BEGINCODESPACERANGE, 19},
+    }}
 };
 PdfToken::~PdfToken()
 {
@@ -398,33 +496,25 @@ PdfToken* PdfParser::_getNextOneToken(const unsigned char* start, const unsigned
         {
             p++; len++;
             c = *p;
-            if (len > 3)
-            {
-                goto NOT_OPERATOR;
-            }
-            else if (_is_space(c) || _is_delimiter(*p))
+            if (_is_space(c) || _is_delimiter(*p))
             {
                 p--; len--;
                 break;
             }
         }
-        const char** to_compare = NULL;
-        if (len == 1) to_compare = operators1;
-        else if (len == 2) to_compare = operators2;
-        else to_compare = operators3;
-
-        int operator_count = ARRAY_COUNT(to_compare);
-        bool is_operator = false;
+        
+        auto to_compare = fixed_token_map[len].fixed_token_map;
+        int operator_count = fixed_token_map[len].nums;
+        bool isfind = false;
         int left = 0;
         int right = operator_count - 1;
-
+        int mid = -1;
         while (left <= right)
         {
-            int mid = left + (right - left) / 2;
-            int cmp = memcmp(start, to_compare[mid],  len);
+            mid = left + (right - left) / 2;
+            int cmp = memcmp(start, to_compare[mid].token,  len);
             if (cmp < 0)
             {
-                
                 right = mid - 1;
             }
             else if (cmp > 0)
@@ -433,15 +523,19 @@ PdfToken* PdfParser::_getNextOneToken(const unsigned char* start, const unsigned
             }
             else
             {
-                is_operator = true;
+                isfind = true;
                 break;
             }
         }
-        if (is_operator)
+        if (isfind)
         {
-            tk = _buildToken(start, TOKEN_OPERATOR, len);
+            tk = _buildToken(start, to_compare[mid].type, len);
             start += len;
             return tk;
+        }
+        else
+        {
+            return NULL;    
         }
     } while (0);
 NOT_OPERATOR:
@@ -492,11 +586,6 @@ NOT_OPERATOR:
                 {
                     break;
                 }
-            }
-            else if (c == -1)
-            {
-                printf("unexcepted end of string");
-                return NULL;
             }
         }
 
@@ -562,7 +651,6 @@ NOT_OPERATOR:
         }
         else
         {
-            printf("unexcepted tag >");
             return NULL;
         }
     }
@@ -581,199 +669,6 @@ NOT_OPERATOR:
             }
         }
         tk = _buildToken(start, TOKEN_COMMENT, len);
-        start += len;
-    }
-    else if (c == 'b')
-    {
-        if (memcmp(start, "begincodespacerange", 19) == 0)
-        {
-            int len = 19;
-            tk = _buildToken(start, TOKEN_BEGINCODESPACERANGE, len);
-            start += len;
-        }
-        else if (memcmp(start, "begincidrange", 13) == 0)
-        {
-            int len = 13;
-            tk = _buildToken(start, TOKEN_BEGINCIDRANGE, len);
-            start += len;
-        }
-        else if (memcmp(start, "beginbfrange", 12) == 0)
-        {
-            int len = 12;
-            tk = _buildToken(start, TOKEN_BEGINBFRANGE, len);
-            start += len;
-        }
-        else if (memcmp(start, "begincidchar", 12) == 0)
-        {
-            int len = 12;
-            tk = _buildToken(start, TOKEN_BEGINCIDCHAR, len);
-            start += len;
-        }
-        else if (memcmp(start, "beginbfchar", 11) == 0)
-        {
-            int len = 11;
-            tk = _buildToken(start, TOKEN_BEGINBFCHAR, len);
-            start += len;
-        }
-        else if (memcmp(start, "begincmap", 9) == 0)
-        {
-            int len = 9;
-            tk = _buildToken(start, TOKEN_BEGINCMAP, len);
-            start += len;
-        }
-        else if (memcmp(start, "begin", 5) == 0)
-        {
-            int len = 5;
-            tk = _buildToken(start, TOKEN_BEGIN, len);
-            start += len;
-        }
-
-    }
-    else if (c == 'd')
-    {
-        if (memcmp(start, "dict", 4) == 0)
-        {
-            int len = 4;
-            tk = _buildToken(start, TOKEN_DICT, len);
-            start += len;
-        }
-        else if (memcmp(start, "def", 3) == 0)
-        {
-            int len = 3;
-            tk = _buildToken(start, TOKEN_DEF, len);
-            start += len;
-        }
-        else if (memcmp(start, "dup", 3) == 0)
-        {
-            int len = 3;
-            tk = _buildToken(start, TOKEN_DUP, len);
-            start += len;
-        }
-    }
-    else if (c == 'e')
-    {
-        if (memcmp(start, "endcodespacerange", 17) == 0)
-        {
-            int len = 17;
-            tk = _buildToken(start, TOKEN_ENDCODESPACERANGE, len);
-            start += len;
-        }
-        else if (memcmp(start, "endcidrange", 11) == 0)
-        {
-            int len = 11;
-            tk = _buildToken(start, TOKEN_ENDCIDRANGE, len);
-            start += len;
-        }
-        else if (memcmp(start, "endbfrange", 10) == 0)
-        {
-            int len = 10;
-            tk = _buildToken(start, TOKEN_ENDBFRANGE, len);
-            start += len;
-        }
-        else if (memcmp(start, "endcidchar", 10) == 0)
-        {
-            int len = 10;
-            tk = _buildToken(start, TOKEN_ENDCIDCHAR, len);
-            start += len;
-        }
-        else if (memcmp(start, "endstream", 9) == 0)
-        {
-            int len = 9;
-            tk = _buildToken(start, TOKEN_STREAM_END, len);
-            start += len;
-        }
-        else if (memcmp(start, "endbfchar", 9) == 0)
-        {
-            int len = 9;
-            tk = _buildToken(start, TOKEN_ENDBFCHAR, len);
-            start += len;
-        }
-        else if (memcmp(start, "endcmap", 7) == 0)
-        {
-            int len = 7;
-            tk = _buildToken(start, TOKEN_ENDCMAP, len);
-            start += len;
-        }
-        else if (memcmp(start, "endobj", 6) == 0)
-        {
-            int len = 6;
-            tk = _buildToken(start, TOKEN_OBJ_END, len);
-            start += len;
-        }
-        else if (memcmp(start, "end", 3) == 0)
-        {
-            int len = 3;
-            tk = _buildToken(start, TOKEN_OBJ_END, len);
-            start += len;
-        }
-    }
-    else if (c == 'f')
-    {
-        if (memcmp(start, "false", 5) == 0)
-        {
-            int len = 5;
-            tk = _buildToken(start, TOKEN_BOOLEAN_FALSE, len);
-            start += len;
-        }
-        else if (memcmp(start, "findresource", 12) == 0)
-        {
-            int len = 12;
-            tk = _buildToken(start, TOKEN_FINDRESOURCE, len);
-            start += len;
-        }
-    }
-    else if (c == 'o')
-    {
-        if (memcmp(start, "obj", 3) == 0)
-        {
-            int len = 3;
-            tk = _buildToken(start, TOKEN_OBJ_BEG, len);
-            start += len;
-
-        }
-    }
-    else if (c == 's')
-    {
-        if (memcmp(start, "stream", 6) == 0)
-        {
-            int len = 6;
-
-            tk = _buildToken(start, TOKEN_STREAM_BEG, len);
-            start += len;
-
-        }
-    }
-    else if (c == 'n')
-    {
-        if (memcmp(start, "null", 4) == 0)
-        {
-            int len = 4;
-            tk = _buildToken(start, TOKEN_NULL, len);
-            start += len;
-        }
-    }
-    else if (c == 't')
-    {
-        if (memcmp(start, "true", 4) == 0)
-        {
-            int len = 4;
-            tk = _buildToken(start, TOKEN_BOOLEAN_TRUE, len);
-            start += len;
-        }
-    }
-    else if (c == 'x')
-    {
-        if (memcmp(start, "xref", 4) == 0)
-        {
-            int len = 4;
-            tk = _buildToken(start, TOKEN_XREF, len);
-            start += len;
-        }
-    }
-    else if (c == 'R')
-    {
-        int len = 1;
-        tk = _buildToken(start, TOKEN_INDIRECT, len);
         start += len;
     }
     else if (c == '-' || c == '+' || c == '.' || _is_digit(c))
