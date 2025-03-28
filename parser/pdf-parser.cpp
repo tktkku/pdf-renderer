@@ -6,14 +6,27 @@
 #include <stdlib.h>
 
 const char space_tag[] = {
-    '\0', '\t', '\n', '\r', '\f', ' '
+    // 0 9 10 12 13 32
+    '\0', '\t', '\n', '\f', '\r', ' '
 };
 bool _is_space(char c)
 {
     int len = ARRAY_COUNT(space_tag);
-    for (int i = 0; i < len; i++)
+    int left = 0;
+    int right = len - 1;
+
+    while (left <= right)
     {
-        if (c == space_tag[i])
+        int mid = left + (right - left) / 2;
+        if (c < space_tag[mid])
+        {
+            right = mid - 1;
+        }
+        else if (c > space_tag[mid])
+        {
+            left = mid + 1;
+        }
+        else
         {
             return true;
         }
@@ -32,14 +45,26 @@ bool _is_hex(char c)
         || ((c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'));
 }
 const char delimiter_tag[] = {
-    '(', ')', '<', '>', '[', ']', '{', '}', '/', '%'
+    // 37 40 41 47 60 62 91 93 123 125
+    '%', '(', ')', '/', '<', '>', '[', ']', '{', '}', 
 };
 bool _is_delimiter(char c)
 {
     int len = ARRAY_COUNT(delimiter_tag);
-    for (int i = 0; i < len; i++)
+    int left = 0;
+    int right = len - 1;
+    while (left <= right)
     {
-        if (c == delimiter_tag[i])
+        int mid = left + (right - left) / 2;
+        if (c < delimiter_tag[mid])
+        {
+            right = mid - 1;
+        }
+        else if (c > delimiter_tag[mid])
+        {
+            left = mid + 1;
+        }
+        else
         {
             return true;
         }
@@ -48,43 +73,56 @@ bool _is_delimiter(char c)
     return false;
 }
 
-const static char* operators[] = {
-    "\"", "'",
-    "B", "B*", "BDC", "BMC", "BI", "BT",
-    "CS",
-    "DP", "Do",
-    "EI", "EMC", "ET",
-    "F",
-    "G",
-    "ID",
-    "J",
-    "K",
-    "M", "MP",
-    "Q",
-    "RG",
-    "S", "SC", "SCN",
-    "T*", "TD", "TJ", "TL", "Tc", "Td", "Tf", "Tj", "Tm", "Tr", "Ts", "Tw", "Tz",
-    "W", "W*",
-    "b", "b*",
-    "c", "cm", "cs",
-    "d", "d0", "d1",
-    "f", "f*",
-    "g", "gs",
-    "h",
-    "i",
-    "j",
-    "k",
-    "l",
-    "m",
-    "n",
-    "q",
-    "re", "rg", "ri",
-    "s", "sc", "scn", "sh",
-    "v",
-    "w",
-    "y"
+const static char* operators1[] =
+{
+// 34 39 66 70 71
+"\"", "'", "B", "F", "G",
+// 74 75 77 81 83
+"J", "K", "M", "Q", "S",
+// 87 98 99 100 102
+"W", "b", "c", "d", "f",
+// 103 104 105 106 107
+"g", "h", "i", "j", "k",
+// 108 109 110 113 115
+"l", "m", "n", "q", "s",
+// 118 119 121
+"v", "w", "y"
 };
-
+const static char* operators2[] =
+{
+// 66,42 66,73 66,84 67,83 68,80
+"B*", "BI", "BT", "CS", "DP",
+// 68,111 69,73 69,84 73,68 77,80
+"Do", "EI", "ET", "ID", "MP",
+// 82,71 83,67 84,42 84,68 84,74
+"RG", "SC", "T*", "TD", "TJ",
+// 84,76 84,99 84,100 84,102 84,106
+"TL", "Tc", "Td", "Tf", "Tj",
+// 84,109 84,114 84,115 84,119 84,122
+"Tm", "Tr", "Ts", "Tw", "Tz",
+// 87,42 98,42 99,109 99,115 100,48
+"W*", "b*", "cm", "cs", "d0",
+// 100,49 102,42 103,115 114,101 114,103
+"d1", "f*", "gs", "re", "rg",
+// 114,105 115,99 115,104
+"ri", "sc", "sh"
+};
+const static char* operators3[] =
+{
+// 66,68,67 66,77,67 69,77,67 83,67,78 115,99,110
+"BDC", "BMC", "EMC", "SCN", "scn"
+};
+const static char fisrtchar[] =
+{
+    //37, 40, 47, 60, 62
+'%', '(', '/', '<', '>',
+//91, 93, 82, 98, 100
+'[', ']', 'R', 'b', 'd',
+//101, 102, 110, 111, 115
+'e', 'f', 'n', 'o', 's',
+// 116, 120
+'t', 'x'
+};
 PdfToken::~PdfToken()
 {
     if (token)
@@ -344,37 +382,54 @@ PdfToken* PdfParser::_getNextOneToken(const unsigned char* start, const unsigned
     {
         int len = 1;
         const unsigned char* p = start;
+        if (c == '-' || c == '+' || c == '.' || _is_digit(c))
+        {
+            goto PARSE_NUMBER;
+        }
+        else if (_is_space(c))
+        {
+            goto PARSE_SPACE;
+        }
+        if (_is_delimiter(*p))
+        {
+            goto NOT_OPERATOR;
+        }
         while (p < end)
         {
             p++; len++;
             c = *p;
-            if (_is_space(c) || _is_delimiter(c))
+            if (len > 3)
+            {
+                goto NOT_OPERATOR;
+            }
+            else if (_is_space(c) || _is_delimiter(*p))
             {
                 p--; len--;
                 break;
             }
         }
+        const char** to_compare = NULL;
+        if (len == 1) to_compare = operators1;
+        else if (len == 2) to_compare = operators2;
+        else to_compare = operators3;
 
-        char* to_compare = (char*)malloc(len + 1);
-        memcpy(to_compare, start, len);
-        to_compare[len] = '\0';
-        int operator_count = ARRAY_COUNT(operators);
+        int operator_count = ARRAY_COUNT(to_compare);
         bool is_operator = false;
-
         int left = 0;
         int right = operator_count - 1;
 
         while (left <= right)
         {
             int mid = left + (right - left) / 2;
-            int cmp = strcmp(operators[mid], to_compare);
+            int cmp = memcmp(start, to_compare[mid],  len);
             if (cmp < 0)
             {
-                left = mid + 1;
+                
+                right = mid - 1;
             }
             else if (cmp > 0)
             {
-                right = mid - 1;
+                left = mid + 1;
             }
             else
             {
@@ -382,7 +437,6 @@ PdfToken* PdfParser::_getNextOneToken(const unsigned char* start, const unsigned
                 break;
             }
         }
-        free(to_compare);
         if (is_operator)
         {
             tk = _buildToken(start, TOKEN_OPERATOR, len);
@@ -390,12 +444,10 @@ PdfToken* PdfParser::_getNextOneToken(const unsigned char* start, const unsigned
             return tk;
         }
     } while (0);
+NOT_OPERATOR:
     c = *start;
-    if (c == -1)
-    {
-        return NULL;
-    }
-    else if (c == '/') // parse name
+
+    if (c == '/') // parse name
     {
         int len = 1;
         const unsigned char* p = start;
@@ -726,12 +778,13 @@ PdfToken* PdfParser::_getNextOneToken(const unsigned char* start, const unsigned
     }
     else if (c == '-' || c == '+' || c == '.' || _is_digit(c))
     {
-
+PARSE_NUMBER:
         tk = _buildNumber(start, end);
         start += tk->steps;
     }
     else if (_is_space(c))
     {
+PARSE_SPACE:
         if (memcmp(start, "\r\n", 2) == 0)
         {
             tk = _buildToken(start, TOKEN_NEWLINE, 2);
@@ -914,13 +967,13 @@ PdfToken* PdfParser::_getNextToken()
             off += this->token_cache[0]->token_len;
             token->token[off] = ' ';
             off++;
-            delete *iter;
+            delete* iter;
             iter = this->token_cache.erase(iter);
 
             memcpy(token->token + off, this->token_cache[0]->token, this->token_cache[0]->token_len);
             off += this->token_cache[0]->token_len;
             token->token[off] = '\0';
-            delete *iter;
+            delete* iter;
             iter = this->token_cache.erase(iter);
 
             return token;
