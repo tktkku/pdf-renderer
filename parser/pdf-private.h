@@ -136,7 +136,7 @@ typedef enum xref_type
     COMPRESSED
 } xref_type_t;
 
-typedef struct xref
+typedef struct
 {
     xref_type_t type;
     int sequence;
@@ -157,10 +157,10 @@ typedef struct xref
     char inuse;
 } xref_t;
 
-typedef struct xref_table {
-    int size;
-    xref_t* xrefs;
-} xref_table_t;
+// typedef struct xref_table {
+//     int size;
+//     xref_t* xrefs;
+// } xref_table_t;
 
 typedef struct
 {
@@ -204,7 +204,8 @@ struct pdf_file
     std::vector<pdf_obj_t*> read_objs;
     int root_obj_ref;
     int info_obj_ref;
-    xref_table_t* xref_table;
+    // xref_table_t* xref_table;
+    std::vector<xref_t*> xref_table;
     // pdf_obj_t** pages;
     // int num_pages;
     std::vector<pdf_obj_t*> pages;
