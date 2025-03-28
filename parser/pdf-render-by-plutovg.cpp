@@ -185,7 +185,7 @@ void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
             //     printf("Press any key to continue...");
             //     getchar();
             // }
-            delete tk;
+            stream->parser->freeToken(tk);
         }
 
         pdf_stream_close(stream);
@@ -233,7 +233,7 @@ void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
                         while ((tk = pdf_stream_get_next_token(obj->stream)) != NULL)
                         {
                             _do_render_operation(&context, tk);
-                            delete tk;
+                            obj->stream->parser->freeToken(tk);
                         }
                         pdf_stream_close(obj->stream);
                     }
@@ -338,7 +338,7 @@ void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
             //     printf("Press any key to continue...");
             //     getchar();
             // }
-            delete tk;
+            stream->parser->freeToken(tk);
         }
 
         pdf_stream_close(stream);
@@ -1391,7 +1391,7 @@ void handle_Do(pdf_context_t* context)
             while ((tk = pdf_stream_get_next_token(tmp_obj->stream)) != NULL)
             {
                 _do_render_operation(context, tk);
-                delete tk;
+                tmp_obj->stream->parser->freeToken(tk);
             }
 
             pdf_stream_close(tmp_obj->stream);

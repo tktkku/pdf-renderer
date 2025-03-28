@@ -129,11 +129,11 @@ bool _read_xref_and_trailer(pdf_file_t* pdf)
         PdfToken* tk = parser.getNextToken();
         if (tk == NULL || tk->getType() != TOKEN_DICT_BEG)
         {
-            delete tk;
+            parser.freeToken(tk);
             tk = NULL;
             return false;
         }
-        delete tk;
+        parser.freeToken(tk);
         tk = NULL;
         PdfDict* trailer = parser.buildDict();
         if (trailer == NULL)
@@ -585,19 +585,19 @@ pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, int ref)
                 PdfToken* tk = parser.getNextToken();
                 if (tk == NULL || tk->getType() != TOKEN_OBJ_BEG)
                 {
-                    delete tk;
+                    parser.freeToken(tk);
                     return NULL;
                 }
                 pdf_obj_t* obj = parser.buildObj();
                 if (obj == NULL)
                 {
-                    delete tk;
+                    parser.freeToken(tk);
                     return NULL;
                 }
                 obj->seq = ref;
                 obj->pdf = pdf;
                 _add_to_obj_table(pdf, obj);
-                delete tk;
+                parser.freeToken(tk);
                 return obj;
             }
             else
@@ -626,12 +626,12 @@ pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, int ref)
                 {
                     tk = parser.getNextToken();
                     int seq = atoi(tk->getValue());
-                    delete tk;
+                    parser.freeToken(tk);
                     tk = NULL;
 
                     tk = parser.getNextToken();
                     int offset = atoi(tk->getValue());
-                    delete tk;
+                    parser.freeToken(tk);
                     tk = NULL;
 
                     unsigned char* p1 = start + first_offset + offset;
@@ -654,7 +654,7 @@ pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, int ref)
                         PdfDict* obj_dict = val_parser.buildDict();
                         if (obj_dict == NULL)
                         {
-                            delete tk1;
+                            val_parser.freeToken(tk1);
                             return NULL;
                         }
 
@@ -666,7 +666,7 @@ pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, int ref)
                         PdfArray* array = val_parser.buildArray();
                         if (array == NULL)
                         {
-                            delete tk1;
+                            val_parser.freeToken(tk1);
                             return NULL;
                         }
                         obj->value->type = ARRAY;
@@ -674,10 +674,10 @@ pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, int ref)
                     }
                     else
                     {
-                        delete tk1;
+                        val_parser.freeToken(tk1);
                         return NULL;
                     }
-                    delete tk1;
+                    val_parser.freeToken(tk1);
 
                     _add_to_obj_table(pdf, obj);
                 }

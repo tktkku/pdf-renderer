@@ -59,12 +59,12 @@ private:
     int steps;
     PdfToken* next;
     friend class PdfParser;
+    ~PdfToken();
 public:
     PdfToken() = default;
     const char* getValue() const;
     int getLen() const;
     PdfTokenType getType() const;
-    ~PdfToken();
 };
 
 enum pdf_value_type
@@ -333,6 +333,7 @@ private:
         int len;
     } remain;
     std::vector<PdfToken*> token_cache;
+    PdfToken* freedTokens;
 public:
     /**
      * @param pdf
@@ -343,6 +344,7 @@ public:
     ~PdfParser();
 
     PdfToken* getNextToken();
+    void freeToken(PdfToken* token);
     pdf_obj_t* buildObj();
     PdfDict* buildDict();
     PdfArray* buildArray();

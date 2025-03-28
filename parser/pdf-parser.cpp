@@ -84,8 +84,8 @@ typedef struct
     int nums;
     fixed_token_t fixed_token_map[40];
 } fixed_token_map_t;
-
-const static fixed_token_map_t fixed_token_map[20] = 
+#define MAX_FIXED_TOKEN_LEN 19
+const static fixed_token_map_t fixed_token_map[MAX_FIXED_TOKEN_LEN + 1] = 
 {
     {0},
     {31, {
@@ -302,14 +302,42 @@ PdfToken* PdfParser::_buildNumber(const unsigned char* start, const unsigned cha
 
 PdfToken* PdfParser::_buildToken(const unsigned char* start, PdfTokenType type, int len)
 {
-    PdfToken* tk = new PdfToken;
+    PdfToken* tk = NULL;
+    if (len > MAX_FIXED_TOKEN_LEN)
+    {
+        tk = new PdfToken;
+        tk->token = (char*)malloc(len + 1);
+    }
+    else if (freedTokens == NULL)
+    {
+        tk = new PdfToken;
+        tk->token = (char*)malloc(MAX_FIXED_TOKEN_LEN + 1);
+    }
+    else
+    {
+        tk = freedTokens;
+        freedTokens = freedTokens->next;
+    }
     tk->type = type;
-    tk->token = (char*)malloc(len + 1);
     memcpy(tk->token, start, len);
     tk->token[len] = '\0';
     tk->token_len = len;
     tk->steps = len;
     tk->next = NULL;
+    return tk;
+}
+void PdfParser::freeToken(PdfToken* token)
+{
+    if (token == NULL) return;
+    if (token->token_len < MAX_FIXED_TOKEN_LEN)
+    {
+        token->next = freedTokens;
+        freedTokens = token;
+    }
+    else
+    {
+        delete token;
+    }
 }
 const char* PdfToken::getValue() const
 {
@@ -333,7 +361,7 @@ PdfParser::PdfParser(pdf_file_t* pdf, PdfParserReadType type, void* source)
     this->end_pos = NULL;
     this->remain.rem = NULL;
     this->remain.len = 0;
-
+    this->freedTokens = NULL;
     this->reader.type = type;
     this->reader.source = source;
     switch (type)
@@ -366,6 +394,12 @@ PdfParser::~PdfParser()
     if (this->remain.len > 0)
     {
         free(this->remain.rem);
+    }
+    while (freedTokens != NULL)
+    {
+        PdfToken* t = freedTokens;
+        freedTokens = freedTokens->next;
+        delete t;
     }
 }
 void _decode_hex_string(char* str, int len, int* out_len)
