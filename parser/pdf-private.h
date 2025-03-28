@@ -60,8 +60,7 @@ private:
     PdfToken* next;
     friend class PdfParser;
 public:
-    PdfToken();
-    PdfToken(const unsigned char* start, PdfTokenType type, int len);
+    PdfToken() = default;
     const char* getValue() const;
     int getLen() const;
     PdfTokenType getType() const;
@@ -346,6 +345,8 @@ public:
     PdfArray* buildArray();
     pdf_cmap_t* buildCMap();
 private:
+    PdfToken* _buildNumber(const unsigned char* start, const unsigned char* end);
+    PdfToken* _buildToken(const unsigned char* start, PdfTokenType type, int len);
     PdfToken* _getNextToken();
     PdfToken* _getNextOneToken(const unsigned char* start, const unsigned char* end);
     int _copyRem();

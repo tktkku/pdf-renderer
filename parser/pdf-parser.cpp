@@ -93,7 +93,7 @@ PdfToken::~PdfToken()
     }
 }
 
-PdfToken* _parse_number(const unsigned char* start, const unsigned char* end)
+PdfToken* PdfParser::_buildNumber(const unsigned char* start, const unsigned char* end)
 {
     int len = 1;
     const unsigned char* p = start;
@@ -132,7 +132,7 @@ PdfToken* _parse_number(const unsigned char* start, const unsigned char* end)
                 break;
             }
         }
-        PdfToken* tk = new PdfToken(start, TOKEN_NUMBER, len);
+        PdfToken* tk = _buildToken(start, TOKEN_NUMBER, len);
 
         return tk;
     }
@@ -164,19 +164,16 @@ PdfToken* _parse_number(const unsigned char* start, const unsigned char* end)
     }
 }
 
-PdfToken::PdfToken(const unsigned char* start, PdfTokenType type, int len)
+PdfToken* PdfParser::_buildToken(const unsigned char* start, PdfTokenType type, int len)
 {
-    this->type = type;
-    this->token = (char*)malloc(len + 1);
-    memcpy(this->token, start, len);
-    this->token[len] = '\0';
-    this->token_len = len;
-    this->steps = len;
-    this->next = NULL;
-}
-PdfToken::PdfToken()
-{
-
+    PdfToken* tk = new PdfToken;
+    tk->type = type;
+    tk->token = (char*)malloc(len + 1);
+    memcpy(tk->token, start, len);
+    tk->token[len] = '\0';
+    tk->token_len = len;
+    tk->steps = len;
+    tk->next = NULL;
 }
 const char* PdfToken::getValue() const
 {
@@ -388,7 +385,7 @@ PdfToken* PdfParser::_getNextOneToken(const unsigned char* start, const unsigned
         free(to_compare);
         if (is_operator)
         {
-            tk = new PdfToken(start, TOKEN_OPERATOR, len);
+            tk = _buildToken(start, TOKEN_OPERATOR, len);
             start += len;
             return tk;
         }
@@ -413,7 +410,7 @@ PdfToken* PdfParser::_getNextOneToken(const unsigned char* start, const unsigned
             }
         }
 
-        tk = new PdfToken(start, TOKEN_NAME, len);
+        tk = _buildToken(start, TOKEN_NAME, len);
         start += len;
 
     }
@@ -451,7 +448,7 @@ PdfToken* PdfParser::_getNextOneToken(const unsigned char* start, const unsigned
             }
         }
 
-        tk = new PdfToken(start, TOKEN_STRING, len);
+        tk = _buildToken(start, TOKEN_STRING, len);
         tk->token[tk->token_len - 1] = '\0';
         tk->token_len--;
         start += len;
@@ -461,13 +458,13 @@ PdfToken* PdfParser::_getNextOneToken(const unsigned char* start, const unsigned
     else if (c == '[')
     {
         int len = 1;
-        tk = new PdfToken(start, TOKEN_ARRAY_BEG, len);
+        tk = _buildToken(start, TOKEN_ARRAY_BEG, len);
         start += len;
     }
     else if (c == ']')
     {
         int len = 1;
-        tk = new PdfToken(start, TOKEN_ARRAY_END, len);
+        tk = _buildToken(start, TOKEN_ARRAY_END, len);
         start += len;
 
     }
@@ -476,7 +473,7 @@ PdfToken* PdfParser::_getNextOneToken(const unsigned char* start, const unsigned
         if (memcmp(start, "<<", 2) == 0) // dict
         {
             int len = 2;
-            tk = new PdfToken(start, TOKEN_DICT_BEG, len);
+            tk = _buildToken(start, TOKEN_DICT_BEG, len);
             start += len;
 
         }
@@ -494,7 +491,7 @@ PdfToken* PdfParser::_getNextOneToken(const unsigned char* start, const unsigned
                 }
             }
 
-            tk = new PdfToken(start, TOKEN_HEX_STRING, len);
+            tk = _buildToken(start, TOKEN_HEX_STRING, len);
             tk->token[tk->token_len - 1] = '\0';
             tk->token_len--;
             start += len;
@@ -507,7 +504,7 @@ PdfToken* PdfParser::_getNextOneToken(const unsigned char* start, const unsigned
         if (memcmp(start, ">>", 2) == 0) // dict
         {
             int len = 2;
-            tk = new PdfToken(start, TOKEN_DICT_END, len);
+            tk = _buildToken(start, TOKEN_DICT_END, len);
             start += len;
 
         }
@@ -531,7 +528,7 @@ PdfToken* PdfParser::_getNextOneToken(const unsigned char* start, const unsigned
                 break;
             }
         }
-        tk = new PdfToken(start, TOKEN_COMMENT, len);
+        tk = _buildToken(start, TOKEN_COMMENT, len);
         start += len;
     }
     else if (c == 'b')
@@ -539,43 +536,43 @@ PdfToken* PdfParser::_getNextOneToken(const unsigned char* start, const unsigned
         if (memcmp(start, "begincodespacerange", 19) == 0)
         {
             int len = 19;
-            tk = new PdfToken(start, TOKEN_BEGINCODESPACERANGE, len);
+            tk = _buildToken(start, TOKEN_BEGINCODESPACERANGE, len);
             start += len;
         }
         else if (memcmp(start, "begincidrange", 13) == 0)
         {
             int len = 13;
-            tk = new PdfToken(start, TOKEN_BEGINCIDRANGE, len);
+            tk = _buildToken(start, TOKEN_BEGINCIDRANGE, len);
             start += len;
         }
         else if (memcmp(start, "beginbfrange", 12) == 0)
         {
             int len = 12;
-            tk = new PdfToken(start, TOKEN_BEGINBFRANGE, len);
+            tk = _buildToken(start, TOKEN_BEGINBFRANGE, len);
             start += len;
         }
         else if (memcmp(start, "begincidchar", 12) == 0)
         {
             int len = 12;
-            tk = new PdfToken(start, TOKEN_BEGINCIDCHAR, len);
+            tk = _buildToken(start, TOKEN_BEGINCIDCHAR, len);
             start += len;
         }
         else if (memcmp(start, "beginbfchar", 11) == 0)
         {
             int len = 11;
-            tk = new PdfToken(start, TOKEN_BEGINBFCHAR, len);
+            tk = _buildToken(start, TOKEN_BEGINBFCHAR, len);
             start += len;
         }
         else if (memcmp(start, "begincmap", 9) == 0)
         {
             int len = 9;
-            tk = new PdfToken(start, TOKEN_BEGINCMAP, len);
+            tk = _buildToken(start, TOKEN_BEGINCMAP, len);
             start += len;
         }
         else if (memcmp(start, "begin", 5) == 0)
         {
             int len = 5;
-            tk = new PdfToken(start, TOKEN_BEGIN, len);
+            tk = _buildToken(start, TOKEN_BEGIN, len);
             start += len;
         }
 
@@ -585,19 +582,19 @@ PdfToken* PdfParser::_getNextOneToken(const unsigned char* start, const unsigned
         if (memcmp(start, "dict", 4) == 0)
         {
             int len = 4;
-            tk = new PdfToken(start, TOKEN_DICT, len);
+            tk = _buildToken(start, TOKEN_DICT, len);
             start += len;
         }
         else if (memcmp(start, "def", 3) == 0)
         {
             int len = 3;
-            tk = new PdfToken(start, TOKEN_DEF, len);
+            tk = _buildToken(start, TOKEN_DEF, len);
             start += len;
         }
         else if (memcmp(start, "dup", 3) == 0)
         {
             int len = 3;
-            tk = new PdfToken(start, TOKEN_DUP, len);
+            tk = _buildToken(start, TOKEN_DUP, len);
             start += len;
         }
     }
@@ -606,55 +603,55 @@ PdfToken* PdfParser::_getNextOneToken(const unsigned char* start, const unsigned
         if (memcmp(start, "endcodespacerange", 17) == 0)
         {
             int len = 17;
-            tk = new PdfToken(start, TOKEN_ENDCODESPACERANGE, len);
+            tk = _buildToken(start, TOKEN_ENDCODESPACERANGE, len);
             start += len;
         }
         else if (memcmp(start, "endcidrange", 11) == 0)
         {
             int len = 11;
-            tk = new PdfToken(start, TOKEN_ENDCIDRANGE, len);
+            tk = _buildToken(start, TOKEN_ENDCIDRANGE, len);
             start += len;
         }
         else if (memcmp(start, "endbfrange", 10) == 0)
         {
             int len = 10;
-            tk = new PdfToken(start, TOKEN_ENDBFRANGE, len);
+            tk = _buildToken(start, TOKEN_ENDBFRANGE, len);
             start += len;
         }
         else if (memcmp(start, "endcidchar", 10) == 0)
         {
             int len = 10;
-            tk = new PdfToken(start, TOKEN_ENDCIDCHAR, len);
+            tk = _buildToken(start, TOKEN_ENDCIDCHAR, len);
             start += len;
         }
         else if (memcmp(start, "endstream", 9) == 0)
         {
             int len = 9;
-            tk = new PdfToken(start, TOKEN_STREAM_END, len);
+            tk = _buildToken(start, TOKEN_STREAM_END, len);
             start += len;
         }
         else if (memcmp(start, "endbfchar", 9) == 0)
         {
             int len = 9;
-            tk = new PdfToken(start, TOKEN_ENDBFCHAR, len);
+            tk = _buildToken(start, TOKEN_ENDBFCHAR, len);
             start += len;
         }
         else if (memcmp(start, "endcmap", 7) == 0)
         {
             int len = 7;
-            tk = new PdfToken(start, TOKEN_ENDCMAP, len);
+            tk = _buildToken(start, TOKEN_ENDCMAP, len);
             start += len;
         }
         else if (memcmp(start, "endobj", 6) == 0)
         {
             int len = 6;
-            tk = new PdfToken(start, TOKEN_OBJ_END, len);
+            tk = _buildToken(start, TOKEN_OBJ_END, len);
             start += len;
         }
         else if (memcmp(start, "end", 3) == 0)
         {
             int len = 3;
-            tk = new PdfToken(start, TOKEN_OBJ_END, len);
+            tk = _buildToken(start, TOKEN_OBJ_END, len);
             start += len;
         }
     }
@@ -663,13 +660,13 @@ PdfToken* PdfParser::_getNextOneToken(const unsigned char* start, const unsigned
         if (memcmp(start, "false", 5) == 0)
         {
             int len = 5;
-            tk = new PdfToken(start, TOKEN_BOOLEAN_FALSE, len);
+            tk = _buildToken(start, TOKEN_BOOLEAN_FALSE, len);
             start += len;
         }
         else if (memcmp(start, "findresource", 12) == 0)
         {
             int len = 12;
-            tk = new PdfToken(start, TOKEN_FINDRESOURCE, len);
+            tk = _buildToken(start, TOKEN_FINDRESOURCE, len);
             start += len;
         }
     }
@@ -678,7 +675,7 @@ PdfToken* PdfParser::_getNextOneToken(const unsigned char* start, const unsigned
         if (memcmp(start, "obj", 3) == 0)
         {
             int len = 3;
-            tk = new PdfToken(start, TOKEN_OBJ_BEG, len);
+            tk = _buildToken(start, TOKEN_OBJ_BEG, len);
             start += len;
 
         }
@@ -689,7 +686,7 @@ PdfToken* PdfParser::_getNextOneToken(const unsigned char* start, const unsigned
         {
             int len = 6;
 
-            tk = new PdfToken(start, TOKEN_STREAM_BEG, len);
+            tk = _buildToken(start, TOKEN_STREAM_BEG, len);
             start += len;
 
         }
@@ -699,7 +696,7 @@ PdfToken* PdfParser::_getNextOneToken(const unsigned char* start, const unsigned
         if (memcmp(start, "null", 4) == 0)
         {
             int len = 4;
-            tk = new PdfToken(start, TOKEN_NULL, len);
+            tk = _buildToken(start, TOKEN_NULL, len);
             start += len;
         }
     }
@@ -708,7 +705,7 @@ PdfToken* PdfParser::_getNextOneToken(const unsigned char* start, const unsigned
         if (memcmp(start, "true", 4) == 0)
         {
             int len = 4;
-            tk = new PdfToken(start, TOKEN_BOOLEAN_TRUE, len);
+            tk = _buildToken(start, TOKEN_BOOLEAN_TRUE, len);
             start += len;
         }
     }
@@ -717,32 +714,32 @@ PdfToken* PdfParser::_getNextOneToken(const unsigned char* start, const unsigned
         if (memcmp(start, "xref", 4) == 0)
         {
             int len = 4;
-            tk = new PdfToken(start, TOKEN_XREF, len);
+            tk = _buildToken(start, TOKEN_XREF, len);
             start += len;
         }
     }
     else if (c == 'R')
     {
         int len = 1;
-        tk = new PdfToken(start, TOKEN_INDIRECT, len);
+        tk = _buildToken(start, TOKEN_INDIRECT, len);
         start += len;
     }
     else if (c == '-' || c == '+' || c == '.' || _is_digit(c))
     {
 
-        tk = _parse_number(start, end);
+        tk = _buildNumber(start, end);
         start += tk->steps;
     }
     else if (_is_space(c))
     {
         if (memcmp(start, "\r\n", 2) == 0)
         {
-            tk = new PdfToken(start, TOKEN_NEWLINE, 2);
+            tk = _buildToken(start, TOKEN_NEWLINE, 2);
             start += tk->steps;
         }
         else
         {
-            tk = new PdfToken(start, TOKEN_SPACE, 1);
+            tk = _buildToken(start, TOKEN_SPACE, 1);
             start += tk->steps;
         }
     }
@@ -896,7 +893,7 @@ PdfToken* PdfParser::_getNextToken()
         if (this->token_cache[1]->type == TOKEN_OBJ_BEG
             || this->token_cache[1]->type == TOKEN_INDIRECT)
         {
-            PdfToken* token = new PdfToken();
+            PdfToken* token = new PdfToken;
             token->type = this->token_cache[1]->type;
             token->steps = tk->steps
                 + this->token_cache[0]->steps
