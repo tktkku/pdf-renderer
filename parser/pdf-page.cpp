@@ -23,9 +23,7 @@ int pdf_page_get_streams(pdf_page_t* page)
 {
     if (page == NULL) return 0;
 
-    if (page->contents == NULL) return 0;
-
-    return page->num_contents;
+    return page->contents.size();
 }
 void pdf_page_get_ext_gstate(pdf_page_t* page, const char* name)
 {
@@ -450,8 +448,7 @@ void pdf_page_xobject_free(pdf_xobject_t* xobject)
 pdf_stream_t* pdf_page_get_stream(pdf_page_t* page, int index)
 {
     if (page == NULL) return NULL;
-    if (page->contents == NULL) return NULL;
-    if (index > page->num_contents - 1) return NULL;
+    if (index > page->contents.size() - 1) return NULL;
 
     pdf_obj_t* obj = page->contents[index];
     if (obj == NULL)
@@ -472,11 +469,13 @@ void pdf_page_free(pdf_page_t* page)
         page->resources = NULL;
     }
 
-    if (page->contents)
-    {
-        free(page->contents);
-        page->contents = NULL;
-    }
+    // if (page->contents.size() > 0)
+    // {
+    //     for (auto* ptr : page->contents)
+    //     {
+    //         pdf_obj_free(ptr);
+    //     }
+    // }
 
     free(page);
     page = NULL;

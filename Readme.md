@@ -13,6 +13,10 @@ cmake --build build
 ## Git error
 find .git/objects/ -size 0 -exec rm -f {} \;
 git fetch origin
+## Perf
+perf record -g -- ./build/test ../pdf-renderer/fp.pdf 
+perf report -n
+perf report -n --stdio
 ## Valgrind
 valgrind --tool=memcheck --leak-check=full --show-leak-kinds=all --log-file="valgrind.log" --vgdb=yes --vgdb-error=0 -s ./build/test test.pdf
 

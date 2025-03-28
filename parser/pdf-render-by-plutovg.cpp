@@ -1505,7 +1505,7 @@ void handle_Do(pdf_context_t* context)
         }
 
         sprintf(filename, "%s.png", buf + 1);
-        plutovg_surface_write_to_png(s, filename);
+        //plutovg_surface_write_to_png(s, filename);
 
         // Scale factors to normalize image dimensions to unit space
         // plutovg_matrix_t m = { xobj->image->width, 0, 0, -xobj->image->height, 0,

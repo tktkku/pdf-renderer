@@ -432,10 +432,9 @@ pdf_file_t* pdf_file_read_file(const char* file_name)
         return NULL;
     }
 
-    pdf_file->num_pages = pdf_dict_get_number(pages_obj->value->val.dict, "/Count");
-    pdf_file->pages = (pdf_obj_t**)malloc(sizeof(pdf_obj_t*) * pdf_file->num_pages);
+    int num_pages = pdf_dict_get_number(pages_obj->value->val.dict, "/Count");
     PdfArray* kids_arr = pdf_dict_get_array(pages_obj->value->val.dict, "/Kids");
-    for (int i = 0; i < pdf_file->num_pages; i++)
+    for (int i = 0; i < num_pages; i++)
     {
         ref = (*kids_arr)[i]->val.indirect;
         pdf_obj_t* page_obj = pdf_file_get_obj(pdf_file, ref);
@@ -444,7 +443,7 @@ pdf_file_t* pdf_file_read_file(const char* file_name)
             pdf_file_free(pdf_file);
             return NULL;
         }
-        pdf_file->pages[i] = page_obj;
+        pdf_file->pages.push_back(page_obj);
     }
 
     return pdf_file;
@@ -452,7 +451,7 @@ pdf_file_t* pdf_file_read_file(const char* file_name)
 int pdf_file_get_pages(pdf_file_t* pdf)
 {
     if (pdf == NULL) return 0;
-    return pdf->num_pages;
+    return pdf->pages.size();
 }
 pdf_page_t* pdf_file_get_page(pdf_file_t* pdf, int pageNo)
 {
@@ -544,8 +543,6 @@ pdf_page_t* pdf_file_get_page(pdf_file_t* pdf, int pageNo)
 
     if (contents_ref == -1)
     {
-        page->contents = (pdf_obj_t**)malloc(sizeof(pdf_obj_t*) * contents_arr->size());
-        page->num_contents = contents_arr->size();
         for (int i = 0; i < contents_arr->size(); i++)
         {
             contents_ref = (*contents_arr)[i]->val.indirect;
@@ -556,20 +553,18 @@ pdf_page_t* pdf_file_get_page(pdf_file_t* pdf, int pageNo)
                 return NULL;
             }
 
-            page->contents[i] = content_obj;
+            page->contents.push_back(content_obj);
         }
     }
     else
     {
-        page->num_contents = 1;
-        page->contents = (pdf_obj_t**)malloc(sizeof(pdf_obj_t*));
         pdf_obj_t* content_obj = pdf_file_get_obj(pdf, contents_ref);
         if (content_obj == NULL)
         {
             pdf_page_free(page);
             return NULL;
         }
-        page->contents[0] = content_obj;
+        page->contents.push_back(content_obj);
     }
 
 
@@ -598,25 +593,7 @@ bool _add_to_obj_table(pdf_file_t* pdf, pdf_obj_t* obj)
 {
     if (pdf == NULL || obj == NULL)
         return false;
-
-    pdf->num_read_objs++;
-    if (pdf->read_objs == NULL)
-    {
-        pdf->read_objs = (pdf_obj_t**)malloc(sizeof(pdf_obj_t*));
-        *(pdf->read_objs) = obj;
-    }
-    else
-    {
-        pdf_obj_t** o = (pdf_obj_t**)realloc(pdf->read_objs, pdf->num_read_objs * sizeof(pdf_obj_t*));
-        if (o == NULL)
-        {
-            return false;
-        }
-
-        pdf->read_objs = o;
-        pdf->read_objs[pdf->num_read_objs - 1] = obj;
-    }
-
+    pdf->read_objs.push_back(obj);
     return true;
 }
 pdf_obj_t* _get_obj_from_table(pdf_file_t* pdf, int ref)
@@ -624,12 +601,12 @@ pdf_obj_t* _get_obj_from_table(pdf_file_t* pdf, int ref)
     if (pdf == NULL || ref < 0)
         return NULL;
 
-    if (pdf->num_read_objs == 0 || pdf->read_objs == NULL)
+    if (pdf->read_objs.size() == 0)
         return NULL;
 
-    if (pdf->num_read_objs > 0 && pdf->read_objs != NULL)
+    if (pdf->read_objs.size() > 0)
     {
-        for (int i = 0; i < pdf->num_read_objs; i++)
+        for (int i = 0; i < pdf->read_objs.size(); i++)
         {
             if (pdf->read_objs[i]->seq == ref)
             {
@@ -858,20 +835,21 @@ void pdf_file_free(pdf_file_t* file)
         file->xref_table = NULL;
     }
 
-    if (file->pages)
-    {
-        free(file->pages);
-        file->pages = NULL;
-    }
+    // if (file->pages.size() > 0)
+    // {
+    //     for (auto* ptr : file->pages)
+    //     {
+    //         pdf_obj_free(ptr);
+    //     }
+        
+    // }
 
-    if (file->num_read_objs > 0 && file->read_objs != NULL)
+    if (file->read_objs.size() > 0)
     {
-        for (int i = 0; i < file->num_read_objs; i++)
+        for (auto* ptr : file->read_objs)
         {
-            pdf_obj_free(file->read_objs[i]);
+            pdf_obj_free(ptr);
         }
-        free(file->read_objs);
-        file->read_objs = NULL;
     }
     if (file->cmaps)
     {

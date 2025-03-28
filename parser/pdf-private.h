@@ -199,14 +199,15 @@ struct pdf_file
     FILE* pFile;
     long data_len;
     long current_index;
-    int num_read_objs;
-    pdf_obj_t** read_objs;
+    // int num_read_objs;
+    // pdf_obj_t** read_objs;
+    std::vector<pdf_obj_t*> read_objs;
     int root_obj_ref;
     int info_obj_ref;
     xref_table_t* xref_table;
-    pdf_obj_t** pages;
-    int num_pages;
-
+    // pdf_obj_t** pages;
+    // int num_pages;
+    std::vector<pdf_obj_t*> pages;
     pdf_cmap_t* cmaps;
     int num_cmaps;
 };
@@ -229,8 +230,9 @@ struct pdf_page
     pdf_file_t* pdf;
     rect_d_t crop_box;
     rect_d_t media_box;
-    pdf_obj_t** contents;
-    int num_contents;
+    // pdf_obj_t** contents;
+    // int num_contents;
+    std::vector<pdf_obj_t*> contents;
     int cur_content_index;
     int rotate;
     pdf_resources_t* resources;
@@ -303,18 +305,18 @@ struct pdf_xobject
         pdf_image_t* image;
     };
 };
-typedef enum pdf_parser_reader_type {
+typedef enum {
     BUFFER_READER,
     FILE_READER,
     STREAM_READER
-} pdf_parser_reader_type_t;
+} PdfParserReadType;
 
 class PdfParser
 {
 private:
     using ParserReadFunc = void (PdfParser::*)(void*);
     struct {
-        enum pdf_parser_reader_type type;
+        PdfParserReadType type;
         void* source;
         ParserReadFunc read;
     } reader;
@@ -336,7 +338,7 @@ public:
      * @param type BUFFER_READER, FILE_READER, STREAM_READER
      * @param source pdf_buffer_t*, FILE*, pdf_stream_t*
      */
-    PdfParser(pdf_file_t* pdf, pdf_parser_reader_type_t type, void* source);
+    PdfParser(pdf_file_t* pdf, PdfParserReadType type, void* source);
     ~PdfParser();
 
     PdfToken* getNextToken();
@@ -392,17 +394,17 @@ struct pdf_stream
     int earlychange;
 };
 
-struct pdf_stack_node
-{
-    char* data;
-    size_t size;
-    struct pdf_stack_node* next;
-};
+// struct pdf_stack_node
+// {
+//     char* data;
+//     size_t size;
+//     struct pdf_stack_node* next;
+// };
 
-struct pdf_stack
-{
-    pdf_stack_node_t* top;
-};
+// struct pdf_stack
+// {
+//     pdf_stack_node_t* top;
+// };
 bool _is_space(char c);
 bool _is_hex(char c);
 bool _is_digit(char c);

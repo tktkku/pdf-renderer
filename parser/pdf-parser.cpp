@@ -187,7 +187,7 @@ int PdfToken::getLen() const
 {
     return this->token_len;
 }
-PdfParser::PdfParser(pdf_file_t* pdf, pdf_parser_reader_type_t type, void* source)
+PdfParser::PdfParser(pdf_file_t* pdf, PdfParserReadType type, void* source)
 {
     this->pdf = pdf;
     this->buffer = (unsigned char*)malloc(4096);
