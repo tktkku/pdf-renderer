@@ -195,35 +195,35 @@ void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
     {
         for (int i = 0; i < page->annots->size(); i++)
         {
-            pdf_obj_t* anno_obj = pdf_file_get_obj(page->pdf, (*page->annots)[i]->val.indirect);
-            pdf_dict_get_name(anno_obj->value->val.dict, "/Type");
-            pdf_dict_get_name(anno_obj->value->val.dict, "/SubType");
-            pdf_dict_get_array(anno_obj->value->val.dict, "/Rect");
-            pdf_dict_get_string(anno_obj->value->val.dict, "/Contents");
-            pdf_dict_get_dict(anno_obj->value->val.dict, "/P");
-            pdf_dict_get_string(anno_obj->value->val.dict, "/NM");
-            pdf_dict_get_string(anno_obj->value->val.dict, "/M");
-            int F = pdf_dict_get_number(anno_obj->value->val.dict, "/F");
-            if (F != -1)
-            {
-                if (F & 0b0000000001); // invisible
-                if (F & 0b0000000010); // hidden
-                if (F & 0b0000000100); // print
-                if (F & 0b0000001000); // nozoom
-                if (F & 0b0000010000); // norotate
-                if (F & 0b0000100000); // noview
-                if (F & 0b0001000000); // readonly
-                if (F & 0b0010000000); // locked
-                if (F & 0b0100000000); // togglenoview
-                if (F & 0b1000000000); // lockedcontents
-            }
-            PdfDict* AP = pdf_dict_get_dict(anno_obj->value->val.dict, "/AP");
+            pdf_obj_t* anno_obj = pdf_file_get_obj(page->pdf, (*page->annots)[i]->indirect);
+            // pdf_dict_get_name(anno_obj->value->val.dict, "/Type");
+            // pdf_dict_get_name(anno_obj->value->val.dict, "/SubType");
+            // pdf_dict_get_array(anno_obj->value->val.dict, "/Rect");
+            // pdf_dict_get_string(anno_obj->value->val.dict, "/Contents");
+            // pdf_dict_get_dict(anno_obj->value->val.dict, "/P");
+            // pdf_dict_get_string(anno_obj->value->val.dict, "/NM");
+            // pdf_dict_get_string(anno_obj->value->val.dict, "/M");
+            // int F = pdf_dict_get_number(anno_obj->value->val.dict, "/F");
+            // if (F != -1)
+            // {
+            //     if (F & 0b0000000001); // invisible
+            //     if (F & 0b0000000010); // hidden
+            //     if (F & 0b0000000100); // print
+            //     if (F & 0b0000001000); // nozoom
+            //     if (F & 0b0000010000); // norotate
+            //     if (F & 0b0000100000); // noview
+            //     if (F & 0b0001000000); // readonly
+            //     if (F & 0b0010000000); // locked
+            //     if (F & 0b0100000000); // togglenoview
+            //     if (F & 0b1000000000); // lockedcontents
+            // }
+            PdfDict* AP = (*anno_obj->value->dict)["/AP"].dict;
             if (AP != NULL)
             {
-                PdfDict* nomal_dict = pdf_dict_get_dict(AP, "/N"); // required
+                PdfDict* nomal_dict = (*AP)["/N"].dict; // required
                 if (nomal_dict == NULL)
                 {
-                    int ref = pdf_dict_get_ref(AP, "/N");
+                    int ref = (*AP)["/N"].indirect;
                     pdf_obj_t* obj = pdf_file_get_obj(page->pdf, ref);
                     if (obj->stream != NULL)
                     {
@@ -239,11 +239,11 @@ void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
                     }
                 }
             }
-            pdf_dict_get_name(anno_obj->value->val.dict, "/AS");
-            pdf_dict_get_array(anno_obj->value->val.dict, "/Border");
-            pdf_dict_get_array(anno_obj->value->val.dict, "/C");
-            pdf_dict_get_number(anno_obj->value->val.dict, "/StructParent");
-            pdf_dict_get_dict(anno_obj->value->val.dict, "/OC");
+            // pdf_dict_get_name(anno_obj->value->val.dict, "/AS");
+            // pdf_dict_get_array(anno_obj->value->val.dict, "/Border");
+            // pdf_dict_get_array(anno_obj->value->val.dict, "/C");
+            // pdf_dict_get_number(anno_obj->value->val.dict, "/StructParent");
+            // pdf_dict_get_dict(anno_obj->value->val.dict, "/OC");
         }
     }
     //pdf_stack_free(stack);
@@ -1347,16 +1347,16 @@ void handle_Do(pdf_context_t* context)
     pdf_xobject_t* xobj = NULL;
     if (context->current_obj != NULL)
     {
-        PdfDict* tmp_dict = pdf_dict_get_dict(context->current_obj->value->val.dict, "/Resources");
-        tmp_dict = pdf_dict_get_dict(tmp_dict, "/XObject");
-        int ref = pdf_dict_get_ref(tmp_dict, buf);
+        PdfDict* tmp_dict = (*context->current_obj->value->dict)["/Resources"].dict;
+        PdfDict* tmp_dict1 = (*tmp_dict)["/XObject"].dict;
+        int ref = (*tmp_dict1)[buf].indirect;
         tmp_obj = pdf_file_get_obj(context->page->pdf, ref);
         xobj = pdf_obj_get_xobject(tmp_obj);
     }
 
     if (xobj == NULL)
     {
-        int ref = pdf_dict_get_ref(context->page->resources->xobject_dict, buf);
+        int ref = (*context->page->resources->xobject_dict)[buf].indirect;
         if (ref != -1)
         {
             tmp_obj = pdf_file_get_obj(context->page->pdf, ref);
@@ -1653,7 +1653,7 @@ void handle_Tf(pdf_context_t* context)
     context->stack.pop();
     memcpy(buf, vec.data(), vec.size());
     assert(vec.size() < sizeof(buf)); buf[vec.size()] = '\0';
-    int ref = pdf_dict_get_ref(context->page->resources->font_dict, buf);
+    int ref = (*context->page->resources->font_dict)[buf].indirect;
     if (ref == -1)
         return;
     pdf_font_t* font = pdf_page_get_font(context->page, buf);

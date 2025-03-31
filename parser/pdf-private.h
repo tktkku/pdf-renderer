@@ -67,7 +67,7 @@ public:
     PdfTokenType getType() const;
 };
 
-enum pdf_value_type
+enum PdfValueType
 {
     NUL,
     BOOLEAN,
@@ -79,7 +79,7 @@ enum pdf_value_type
     STRING
 };
 
-struct pdf_value
+struct PdfValue
 {
     union {
         bool boolean;
@@ -89,16 +89,20 @@ struct pdf_value
         double number;
         PdfDict* dict;
         PdfArray* array;
-    } val;
+    };
     int value_len;
-    enum pdf_value_type type;
+    enum PdfValueType type;
+    PdfValue() 
+    : type(NUL), indirect(0)
+    {}
+    ~PdfValue();
 };
 
 
 struct pdf_obj
 {
     int seq;
-    pdf_value* value;
+    PdfValue* value;
     pdf_stream_t* stream;
     pdf_xobject_t* xobject;
     unsigned char* font_data;
@@ -106,6 +110,48 @@ struct pdf_obj
     pdf_file_t* pdf;
 };
 
+class PdfArray
+{
+private:
+    std::vector<PdfValue*> elements;
+public:
+    PdfArray(const PdfArray&) = delete;
+    PdfArray& operator=(const PdfArray&) = delete;
+    PdfArray() {}
+    ~PdfArray();
+    size_t size() const
+    {
+        return elements.size();
+    }
+    void push(PdfValue* v)
+    {
+        elements.emplace_back(v);
+    }
+    PdfValue* operator[](int index) const;
+};
+class PdfDict
+{
+private:
+    std::map<std::string, PdfValue*> entries;
+public:
+    PdfDict() {}
+    PdfDict(const PdfDict&) = delete;
+    PdfDict& operator=(const PdfDict&) = delete;
+    ~PdfDict();
+    size_t size() const
+    {
+        return entries.size();
+    }
+    PdfValue& operator[](const std::string& key);
+    // const pdf_value* operator[](const std::string& key) const
+    // {
+    //     auto it = entries.find(key);
+    //     if (it != entries.end())
+    //         return it->second;
+    //     else
+    //         return nullptr;
+    // }
+};
 // struct pdf_dict_pair
 // {
 //     char* name;
@@ -198,19 +244,15 @@ struct pdf_file
 {
     FILE* pFile;
     long data_len;
-    long current_index;
     // int num_read_objs;
     // pdf_obj_t** read_objs;
     std::vector<pdf_obj_t*> read_objs;
-    int root_obj_ref;
-    int info_obj_ref;
     // xref_table_t* xref_table;
     std::vector<xref_t*> xref_table;
     // pdf_obj_t** pages;
     // int num_pages;
     std::vector<pdf_obj_t*> pages;
-    pdf_cmap_t* cmaps;
-    int num_cmaps;
+    std::vector<pdf_cmap_t*> cmaps;
 };
 
 struct pdf_resources
@@ -322,7 +364,7 @@ private:
         ParserReadFunc read;
     } reader;
     pdf_file_t* pdf;
-    unsigned char* buffer;
+    unsigned char buffer[4096];
     int buffer_size;
     unsigned char* end_pos;
     unsigned char* splite_pos;
@@ -359,7 +401,7 @@ private:
     void _readFile(void* source);
     void _readBuffer(void* source);
     void _readStream(void* source);
-    void _setCommonValue(PdfToken* tk, struct pdf_value* p);
+    void _setCommonValue(PdfToken* tk, PdfValue& p);
 };
 
 struct pdf_buffer
@@ -389,7 +431,7 @@ struct pdf_stream
     int processed;
     int readin_len;
     PdfParser* parser;
-    struct pdf_value* filter;
+    PdfValue* filter;
     int predictor;
     int colors;
     int bitspercomponent;

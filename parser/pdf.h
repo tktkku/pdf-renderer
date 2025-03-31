@@ -10,7 +10,6 @@
 
 //typedef struct pdf_parser_token pdf_parser_token_t;
 
-struct pdf_value;
 // typedef struct pdf_value pdf_obj_value_t;
 // typedef struct pdf_value pdf_dict_pair_value_t;
 // typedef struct pdf_value pdf_array_element_value_t;
@@ -21,8 +20,9 @@ typedef struct pdf_obj pdf_obj_t;
 struct pdf_stream;
 typedef struct pdf_stream pdf_stream_t;
 
-using PdfDict = std::map<std::string, pdf_value*>;
-using PdfArray = std::vector<pdf_value*>;
+class PdfArray;
+class PdfDict;
+struct PdfValue;
 
 typedef struct pdf_file pdf_file_t;
 typedef struct pdf_resources pdf_resources_t;
@@ -34,8 +34,6 @@ typedef struct pdf_image pdf_image_t;
 typedef struct pdf_form pdf_form_t;
 typedef struct pdf_xobject pdf_xobject_t;
 
-// struct pdf_parser;
-// typedef struct pdf_parser pdf_parser_t;
 class PdfToken;
 class PdfParser;
 
@@ -44,16 +42,6 @@ typedef struct pdf_buffer pdf_buffer_t;
 
 struct pdf_cmap;
 typedef struct pdf_cmap pdf_cmap_t;
-
-typedef struct pdf_stack_node pdf_stack_node_t;
-typedef struct pdf_stack pdf_stack_t;
-void pdf_value_free(struct pdf_value* value);
-
-// pdf_stack_t* pdf_stack_init();
-// void pdf_stack_push(pdf_stack_t* s, const void* data, size_t size);
-// void pdf_stack_pop(pdf_stack_t* s, pdf_stack_node_t* data);
-// void pdf_stack_free(pdf_stack_t* s);
-// void pdf_stack_show(pdf_stack_t* s);
 
 pdf_page_t* pdf_page_init();
 void pdf_page_free(pdf_page_t* page);
@@ -87,22 +75,11 @@ int pdf_file_get_pages(pdf_file_t* pdf);
 pdf_page_t* pdf_file_get_page(pdf_file_t* pdf, int pageNo);
 pdf_cmap_t* pdf_file_get_cmap(pdf_file_t* pdf, char* name);
 
-PdfDict* pdf_dict_init();
-void pdf_dict_free(PdfDict* dict);
-double pdf_dict_get_number(PdfDict* dict, const char* name);
-int pdf_dict_get_ref(PdfDict* dict, const char* name);
-PdfArray* pdf_dict_get_array(PdfDict* dict, const char* name);
-PdfDict* pdf_dict_get_dict(PdfDict* dict, const char* name);
-const char* pdf_dict_get_name(PdfDict* dict, const char* name);
-int pdf_dict_get_bool(PdfDict* dict, const char* name);
-bool pdf_dict_add_array(PdfDict* dict, const char* name, PdfArray* array);
-const char* pdf_dict_get_string(PdfDict* dict, const char* name);
-
 pdf_font_t* pdf_font_init();
 void pdf_font_free(pdf_font_t* font);
 
-PdfArray* pdf_array_init();
-void pdf_array_free(PdfArray* array);
+// PdfArray* pdf_array_init();
+// void pdf_array_free(PdfArray* array);
 
 pdf_cmap_t* pdf_cmap_init();
 void pdf_cmap_free(pdf_cmap_t* cmap);

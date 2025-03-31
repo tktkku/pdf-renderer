@@ -18,3 +18,4 @@ void pdf_cmap_free(pdf_cmap_t* cmap)
         free(cmap->unicode_map);
     free(cmap);
 }
+

@@ -41,20 +41,24 @@ pdf_stream_t* pdf_stream_init(pdf_file_t* pdf, pdf_obj_t* obj, int len, int offs
     {
         return NULL;
     }
-    PdfDict* content_dict = obj->value->val.dict;
-    const char* filter = pdf_dict_get_name(content_dict, "/Filter");
+    auto& content_dict = *obj->value->dict;
+    const char* filter = content_dict["/Filter"].name;
     PdfArray* filter_arr = NULL;
 
     if (filter == NULL)
     {
-        filter_arr = pdf_dict_get_array(content_dict, "/Filter");
+        filter_arr = content_dict["/Filter"].array;
 
         if (filter_arr != NULL && filter_arr->size() == 1)
         {
-            filter = (*filter_arr)[0]->val.name;
+            filter = (*filter_arr)[0]->name;
         }
     }
-    PdfDict* parms_dict = pdf_dict_get_dict(content_dict, "/DecodeParms");
+    PdfDict* parms_dict = NULL;
+    if (content_dict["/DecodeParms"].type == DICT)
+    {
+        parms_dict = content_dict["/DecodeParms"].dict;
+    }
     /**
      * 1 no prediction
      * 2 TIFF predictor 2
@@ -69,22 +73,22 @@ pdf_stream_t* pdf_stream_init(pdf_file_t* pdf, pdf_obj_t* obj, int len, int offs
         colors = 1, bitspercomponent = 8, columns = 1, earlychange = 1;
     if (parms_dict != NULL)
     {
-        predictor = pdf_dict_get_number(parms_dict, "/Predictor");
+        predictor = (*parms_dict)["/Predictor"].number;
         if (predictor < 1) predictor = 1;
 
-        colors = pdf_dict_get_number(parms_dict, "/Colors");
+        colors = (*parms_dict)["/Colors"].number;
         if (colors < 1 || colors > 4) colors = 1;
 
-        bitspercomponent = pdf_dict_get_number(parms_dict, "/BitsPerComponent");
+        bitspercomponent = (*parms_dict)["/BitsPerComponent"].number;
         if (bitspercomponent != 1
             && bitspercomponent != 4
             && bitspercomponent != 8
             && bitspercomponent != 16) bitspercomponent = 8;
 
-        columns = pdf_dict_get_number(parms_dict, "/Columns");
+        columns = (*parms_dict)["/Columns"].number;
         if (columns < 1) columns = 1;
 
-        earlychange = pdf_dict_get_number(parms_dict, "/EarlyChange");
+        earlychange = (*parms_dict)["/EarlyChange"].number;
         if (earlychange != 0 && earlychange != 1) earlychange = 1;
     }
 
@@ -101,16 +105,16 @@ pdf_stream_t* pdf_stream_init(pdf_file_t* pdf, pdf_obj_t* obj, int len, int offs
     s->earlychange = earlychange;
     if (filter != NULL)
     {
-        s->filter = (struct pdf_value*)calloc(1, sizeof(struct pdf_value));
+        s->filter = new PdfValue;
         s->filter->type = NAME;
-        s->filter->val.name = (char*)filter;
+        s->filter->name = (char*)filter;
         s->filter->value_len = strlen(filter);
     }
     else if (filter_arr != NULL)
     {
-        s->filter = (struct pdf_value*)calloc(1, sizeof(struct pdf_value));
+        s->filter = new PdfValue;
         s->filter->type = ARRAY;
-        s->filter->val.array = filter_arr;
+        s->filter->array = filter_arr;
     }
 
     return s;
@@ -147,7 +151,7 @@ int pdf_stream_get_data(pdf_stream_t* stream, unsigned char* buf, int size)
     {
         if (stream->filter->type == NAME)
         {
-            if (strcmp(stream->filter->val.name, "/FlateDecode") == 0)
+            if (strcmp(stream->filter->name, "/FlateDecode") == 0)
             {
                 if (stream->decomp.cur_pos >= stream->decomp.len && stream->readin_len < stream->stream_len)
                 {

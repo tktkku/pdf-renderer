@@ -31,7 +31,7 @@ void pdf_obj_free(pdf_obj_t* obj)
     {
         free(obj->font_data);
     }
-    pdf_value_free(obj->value);
+    delete obj->value;
     obj->value = NULL;
     free(obj);
     obj = NULL;
@@ -60,14 +60,14 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj)
     if (obj->xobject != NULL)
         return obj->xobject;
     // unsigned char* input = img_obj->stream;
-    PdfDict* img_dict = obj->value->val.dict;
-    const char* type = pdf_dict_get_name(img_dict, "/Type"); // XObject
+    auto& img_dict = *(obj->value->dict);
+    const char* type = img_dict["/Type"].name; // XObject
     if (strcmp(type, "/XObject") != 0)
     {
         return NULL;
     }
-    const char* subtype = pdf_dict_get_name(img_dict, "/Subtype");
-    const char* subtype2 = pdf_dict_get_name(img_dict, "/Subtype2");
+    const char* subtype = img_dict["/Subtype"].name;
+    const char* subtype2 = img_dict["/Subtype2"].name;
     if (strcmp(subtype, "/PS") == 0 || (subtype2 != NULL && !strcmp(subtype, "/Form") && !strcmp(subtype2, "/PS")))
     {
         // not used
@@ -76,12 +76,12 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj)
     {
         // the value shall be one of 1 2 4 8 16
         // if ImageMask is true, this entry is optional, but if specified, its value shall be 1
-        int bits_per_component = pdf_dict_get_number(img_dict, "/BitsPerComponent");
-        const char* filter = pdf_dict_get_name(img_dict, "/Filter");
+        int bits_per_component = img_dict["/BitsPerComponent"].number;
+        const char* filter = img_dict["/Filter"].name;
         PdfArray* filter_arr = NULL;
         if (filter == NULL)
         {
-            filter_arr = pdf_dict_get_array(img_dict, "/Filter");
+            filter_arr = img_dict["/Filter"].array;
             if (filter_arr == NULL)
             {
                 return NULL;
@@ -89,28 +89,32 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj)
 
             if (filter_arr->size() == 1)
             {
-                filter = (*filter_arr)[0]->val.name;
+                filter = (*filter_arr)[0]->name;
             }
         }
-        int width = pdf_dict_get_number(img_dict, "/Width");
-        int height = pdf_dict_get_number(img_dict, "/Height");
-        int length = pdf_dict_get_number(img_dict, "/Length");
-        const char* color_space = pdf_dict_get_name(img_dict, "/ColorSpace");
-        const char* name = pdf_dict_get_name(img_dict, "/Intent");
-        PdfArray* mask_arr = pdf_dict_get_array(img_dict, "/Mask");
-        PdfArray* decode_aar = pdf_dict_get_array(img_dict, "/Decode");
-        int interpolate = pdf_dict_get_bool(img_dict, "/Interpolate");
-        PdfArray* alter_aar = pdf_dict_get_array(img_dict, "/Alternates");
-        int smask_ref = pdf_dict_get_ref(img_dict, "/SMask");
-        int smask_in_data = pdf_dict_get_number(img_dict, "/SMaskInData");
-        const char* metadata = pdf_dict_get_name(img_dict, "/Metadata");
-        PdfDict* oc_dict = pdf_dict_get_dict(img_dict, "/OC");
+        int width = img_dict["/Width"].number;
+        int height = img_dict["/Height"].number;
+        int length = img_dict["/Length"].number;
+        const char* color_space = img_dict["/ColorSpace"].name;
+        const char* name = img_dict["/Intent"].name;
+        PdfArray* mask_arr = img_dict["/Mask"].array;
+        PdfArray* decode_aar = img_dict["/Decode"].array;
+        int interpolate = img_dict["/Interpolate"].boolean;
+        PdfArray* alter_aar = img_dict["/Alternates"].array;
+        int smask_ref = -1;
+        if (img_dict["/SMask"].type == INDIRECT)
+        {
+            smask_ref = img_dict["/SMask"].indirect;
+        }
+        int smask_in_data = img_dict["/SMaskInData"].number;
+        const char* metadata = img_dict["/Metadata"].name;
+        PdfDict* oc_dict = img_dict["/OC"].dict;
         PdfArray* color_space_aar = NULL;
         if (color_space == NULL)
         {
-            color_space_aar = pdf_dict_get_array(img_dict, "/ColorSpace");
+            color_space_aar = img_dict["/ColorSpace"].array;
         }
-        int imageMask = pdf_dict_get_bool(img_dict, "/ImageMask");
+        int imageMask = img_dict["/ImageMask"].boolean;
         if (imageMask > 0)
         {
 
@@ -218,15 +222,15 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj)
         xobj->type = XOBJ_FORM;
         xobj->form = (pdf_form_t*)malloc(sizeof(pdf_form_t));
 
-        PdfArray* ctm_aar = pdf_dict_get_array(img_dict, "/Matrix");
+        PdfArray* ctm_aar = img_dict["/Matrix"].array;
         for (int i = 0; ctm_aar && i < ctm_aar->size(); i++)
         {
-            xobj->form->matrix[i] = (*ctm_aar)[i]->val.number;
+            xobj->form->matrix[i] = (*ctm_aar)[i]->number;
         }
-        PdfArray* bbox_aar = pdf_dict_get_array(img_dict, "/BBox");
+        PdfArray* bbox_aar = img_dict["/BBox"].array;
         for (int i = 0; bbox_aar && i < bbox_aar->size(); i++)
         {
-            xobj->form->bbox[i] = (*bbox_aar)[i]->val.number;
+            xobj->form->bbox[i] = (*bbox_aar)[i]->number;
         }
         obj->xobject = xobj;
         return xobj;

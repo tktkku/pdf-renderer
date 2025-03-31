@@ -354,8 +354,8 @@ int PdfToken::getLen() const
 PdfParser::PdfParser(pdf_file_t* pdf, PdfParserReadType type, void* source)
 {
     this->pdf = pdf;
-    this->buffer = (unsigned char*)malloc(4096);
-    this->buffer_size = 4096;
+    memset(this->buffer, 0, sizeof(this->buffer));
+    this->buffer_size = sizeof(this->buffer);
     this->splite_pos = NULL;
     this->current_pos = NULL;
     this->end_pos = NULL;
@@ -382,10 +382,6 @@ PdfParser::PdfParser(pdf_file_t* pdf, PdfParserReadType type, void* source)
 }
 PdfParser::~PdfParser()
 {
-    if (this->buffer)
-    {
-        free(this->buffer);
-    }
     int last = this->end_pos - this->current_pos;
     if (last > 0)
     {
@@ -536,7 +532,8 @@ PdfToken* PdfParser::_getNextOneToken(const unsigned char* start, const unsigned
                 break;
             }
         }
-        
+        if (len > MAX_FIXED_TOKEN_LEN)
+            return NULL;
         auto to_compare = fixed_token_map[len].fixed_token_map;
         int operator_count = fixed_token_map[len].nums;
         bool isfind = false;
@@ -1303,68 +1300,68 @@ pdf_cmap_t* PdfParser::buildCMap()
     }
     return cmap;
 }
-void PdfParser::_setCommonValue(PdfToken* tk, struct pdf_value* p)
+void PdfParser::_setCommonValue(PdfToken* tk, PdfValue& p)
 {
     PdfTokenType type = tk->getType();
     if (type == TOKEN_NULL)
     {
-        p->type = NUL;
+        p.type = NUL;
     }
     else if (type == TOKEN_ARRAY_BEG)
     {
-        p->type = ARRAY;
-        p->val.array = buildArray();
+        p.type = ARRAY;
+        p.array = buildArray();
     }
     else if (type == TOKEN_DICT_BEG)
     {
-        p->type = DICT;
-        p->val.dict = buildDict();
+        p.type = DICT;
+        p.dict = buildDict();
     }
     else if (type == TOKEN_BOOLEAN_TRUE)
     {
-        p->type = BOOLEAN;
-        p->val.boolean = true;
+        p.type = BOOLEAN;
+        p.boolean = true;
     }
     else if (type == TOKEN_BOOLEAN_FALSE)
     {
-        p->type = BOOLEAN;
-        p->val.boolean = false;
+        p.type = BOOLEAN;
+        p.boolean = false;
     }
     else if (type == TOKEN_NAME)
     {
-        p->type = NAME;
-        p->value_len = tk->getLen();
-        p->val.name = (char*)malloc(p->value_len + 1);
-        memcpy(p->val.name, tk->getValue(), p->value_len);
-        p->val.name[p->value_len] = '\0';
+        p.type = NAME;
+        p.value_len = tk->getLen();
+        p.name = (char*)malloc(p.value_len + 1);
+        memcpy(p.name, tk->getValue(), p.value_len);
+        p.name[p.value_len] = '\0';
     }
     else if (type == TOKEN_INDIRECT)
     {
-        p->type = INDIRECT;
+        p.type = INDIRECT;
         char ref[256] = { 0 };
         memcpy(ref, tk->getValue(), tk->getLen());
         char* token = strtok(ref, " ");
-        p->val.indirect = atoi(token);
+        p.indirect = atoi(token);
     }
     else if (type == TOKEN_NUMBER)
     {
-        p->type = NUMBER;
-        p->val.number = strtod(tk->getValue(), NULL);
+        p.type = NUMBER;
+        p.number = strtod(tk->getValue(), NULL);
     }
     else if (type == TOKEN_STRING || type == TOKEN_HEX_STRING)
     {
-        p->type = STRING;
-        p->value_len = tk->getLen();
-        p->val.string = (char*)malloc(p->value_len + 1);
-        memcpy(p->val.string, tk->getValue(), p->value_len);
-        p->val.string[p->value_len] = '\0';
+        p.type = STRING;
+        p.value_len = tk->getLen();
+        p.string = (char*)malloc(p.value_len + 1);
+        memcpy(p.string, tk->getValue(), p.value_len);
+        p.string[p.value_len] = '\0';
     }
 }
 pdf_obj_t* PdfParser::buildObj()
 {
     PdfToken* tk;
     pdf_obj_t* obj = pdf_obj_init();
-    obj->value = (pdf_value*)malloc(sizeof(pdf_value));
+    obj->value = new PdfValue;
 
     while ((tk = getNextToken()) != NULL)
     {
@@ -1389,12 +1386,12 @@ pdf_obj_t* PdfParser::buildObj()
             }
             // store current offset
             offset = ftell(this->pdf->pFile);
-            int len = pdf_dict_get_number(obj->value->val.dict, "/Length");
+            int len = (*obj->value->dict)["/Length"].number;
             if (len == -1)
             {
-                int ref = pdf_dict_get_ref(obj->value->val.dict, "/Length");
+                int ref = (*obj->value->dict)["/Length"].indirect;
                 pdf_obj_t* l_obj = pdf_file_get_obj(this->pdf, ref);
-                len = l_obj->value->val.number;
+                len = l_obj->value->number;
                 fseek(this->pdf->pFile, offset, SEEK_SET);
             }
             //int offset = ftell(parser->pdf->pFile);
@@ -1417,7 +1414,7 @@ pdf_obj_t* PdfParser::buildObj()
         }
         else
         {
-            _setCommonValue(tk, obj->value);
+            _setCommonValue(tk, *obj->value);
         }
 
         delete tk;
@@ -1444,9 +1441,7 @@ PdfDict* PdfParser::buildDict()
         {
             break;
         }
-        pdf_value* v = (pdf_value*)calloc(1, sizeof(pdf_value));
-        _setCommonValue(tk1, v);
-        (*dict)[tk->token] = v;
+        _setCommonValue(tk1, (*dict)[tk->token]);
         delete tk;
         delete tk1;
     }
@@ -1467,9 +1462,9 @@ PdfArray* PdfParser::buildArray()
         }
         else
         {
-            pdf_value* v = (pdf_value*)calloc(1, sizeof(pdf_value));
-            _setCommonValue(tk, v);
-            array->push_back(v);
+            PdfValue* v = new PdfValue;
+            _setCommonValue(tk, *v);
+            array->push(v);
         }
 
         delete tk;
