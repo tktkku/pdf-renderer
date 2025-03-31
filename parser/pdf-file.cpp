@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
-#include <zlib.h>
+#include "zlib.h"
 
 int _read_line(pdf_file_t* pdf, char* buf, int size)
 {

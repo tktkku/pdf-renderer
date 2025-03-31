@@ -88,21 +88,21 @@ typedef struct
 const static fixed_token_map_t fixed_token_map[MAX_FIXED_TOKEN_LEN + 1] = 
 {
     {0},
-    {31, {
+    {29, {
         {"\"", TOKEN_OPERATOR, 1}, // 34 
         {"'", TOKEN_OPERATOR, 1}, // 39
         {"B", TOKEN_OPERATOR, 1},// 66
-         {"F", TOKEN_OPERATOR, 1}, // 70
-         {"G", TOKEN_OPERATOR, 1}, // 71
-         {"J", TOKEN_OPERATOR, 1}, // 74
-         {"K", TOKEN_OPERATOR, 1}, // 75
-         {"M", TOKEN_OPERATOR, 1}, // 77
-         {"Q", TOKEN_OPERATOR, 1}, // 81
+        {"F", TOKEN_OPERATOR, 1}, // 70
+        {"G", TOKEN_OPERATOR, 1}, // 71
+        {"J", TOKEN_OPERATOR, 1}, // 74
+        {"K", TOKEN_OPERATOR, 1}, // 75
+        {"M", TOKEN_OPERATOR, 1}, // 77
+        {"Q", TOKEN_OPERATOR, 1}, // 81
         {"R", TOKEN_INDIRECT, 1}, // 82
         {"S", TOKEN_OPERATOR, 1}, // 83
         {"W", TOKEN_OPERATOR, 1}, // 87
-        {"[", TOKEN_ARRAY_BEG, 1}, // 91
-        {"[", TOKEN_ARRAY_END, 1}, // 93
+        //{"[", TOKEN_ARRAY_BEG, 1}, // 91
+        //{"[", TOKEN_ARRAY_END, 1}, // 93
         {"b", TOKEN_OPERATOR, 1}, //98
         {"c", TOKEN_OPERATOR, 1}, // 99
         {"d", TOKEN_OPERATOR, 1}, // 100
@@ -121,9 +121,9 @@ const static fixed_token_map_t fixed_token_map[MAX_FIXED_TOKEN_LEN + 1] =
         {"w", TOKEN_OPERATOR, 1}, // 119
         {"y", TOKEN_OPERATOR, 1} // 121
     }},
-    {40, {
-        {"<<", TOKEN_DICT_BEG, 2}, // 60
-        {">>", TOKEN_DICT_END, 2}, // 62
+    {38, {
+        //{"<<", TOKEN_DICT_BEG, 2}, // 60
+        //{">>", TOKEN_DICT_END, 2}, // 62
         {"B*", TOKEN_OPERATOR, 2}, 
         {"BI", TOKEN_OPERATOR, 2}, 
         {"BT", TOKEN_OPERATOR, 2}, 
