@@ -67,7 +67,11 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj)
         return NULL;
     }
     const char* subtype = img_dict["/Subtype"].name;
-    const char* subtype2 = img_dict["/Subtype2"].name;
+    const char* subtype2 = NULL;
+    if (img_dict["/Subtype2"].type == NAME)
+    {
+        subtype2 = img_dict["/Subtype2"].name;
+    }
     if (strcmp(subtype, "/PS") == 0 || (subtype2 != NULL && !strcmp(subtype, "/Form") && !strcmp(subtype2, "/PS")))
     {
         // not used
@@ -94,7 +98,20 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj)
         }
         int width = img_dict["/Width"].number;
         int height = img_dict["/Height"].number;
-        int length = img_dict["/Length"].number;
+        int length = 0;
+        if (img_dict["/Length"].type == NUMBER)
+        {
+            length = img_dict["/Length"].number;
+        }
+        else if (img_dict["/Length"].type == INDIRECT)
+        {
+            int ref = img_dict["/Length"].indirect;
+            pdf_obj_t* len_obj = pdf_file_get_obj(obj->pdf, ref);
+            if (len_obj != NULL)
+            {
+                length = len_obj->value->number;
+            }
+        }
         const char* color_space = img_dict["/ColorSpace"].name;
         const char* name = img_dict["/Intent"].name;
         PdfArray* mask_arr = img_dict["/Mask"].array;
@@ -153,7 +170,7 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj)
                                 int index = (i * width + j);
                                 int index1 = index * 3;
                                 int index2 = index * 4;
-                                tmp[index2] = img->data[index1];
+                                tmp[index2    ] = img->data[index1];
                                 tmp[index2 + 1] = img->data[index1 + 1];
                                 tmp[index2 + 2] = img->data[index1 + 2];
                                 tmp[index2 + 3] = smask[index];

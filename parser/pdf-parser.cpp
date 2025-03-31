@@ -46,7 +46,7 @@ bool _is_hex(char c)
 }
 const char delimiter_tag[] = {
     // 37 40 41 47 60 62 91 93 123 125
-    '%', '(', ')', '/', '<', '>', '[', ']', '{', '}', 
+    '%', '(', ')', '/', '<', '>', '[', ']', '{', '}',
 };
 bool _is_delimiter(char c)
 {
@@ -73,19 +73,18 @@ bool _is_delimiter(char c)
     return false;
 }
 
-typedef struct 
-{
-    const char *token;
-    PdfTokenType type;
-    int len;
-} fixed_token_t;
-typedef struct 
+typedef struct
 {
     int nums;
-    fixed_token_t fixed_token_map[40];
+    struct
+    {
+        const char* token;
+        PdfTokenType type;
+        int len;
+    } fixed_token_map[40];
 } fixed_token_map_t;
 #define MAX_FIXED_TOKEN_LEN 19
-const static fixed_token_map_t fixed_token_map[MAX_FIXED_TOKEN_LEN + 1] = 
+const static fixed_token_map_t fixed_token_map[MAX_FIXED_TOKEN_LEN + 1] =
 {
     {0},
     {29, {
@@ -116,7 +115,7 @@ const static fixed_token_map_t fixed_token_map[MAX_FIXED_TOKEN_LEN + 1] =
         {"m", TOKEN_OPERATOR, 1}, //109
         {"n", TOKEN_OPERATOR, 1}, // 110
         {"q", TOKEN_OPERATOR, 1}, // 113
-        {"s",TOKEN_OPERATOR, 1}, // 115
+        {"s", TOKEN_OPERATOR, 1}, // 115
         {"v", TOKEN_OPERATOR, 1}, // 118
         {"w", TOKEN_OPERATOR, 1}, // 119
         {"y", TOKEN_OPERATOR, 1} // 121
@@ -124,49 +123,49 @@ const static fixed_token_map_t fixed_token_map[MAX_FIXED_TOKEN_LEN + 1] =
     {38, {
         //{"<<", TOKEN_DICT_BEG, 2}, // 60
         //{">>", TOKEN_DICT_END, 2}, // 62
-        {"B*", TOKEN_OPERATOR, 2}, 
-        {"BI", TOKEN_OPERATOR, 2}, 
-        {"BT", TOKEN_OPERATOR, 2}, 
-        {"CS", TOKEN_OPERATOR, 2}, 
+        {"B*", TOKEN_OPERATOR, 2},
+        {"BI", TOKEN_OPERATOR, 2},
+        {"BT", TOKEN_OPERATOR, 2},
+        {"CS", TOKEN_OPERATOR, 2},
         {"DP", TOKEN_OPERATOR, 2},
-        {"Do", TOKEN_OPERATOR, 2}, 
-        {"EI", TOKEN_OPERATOR, 2}, 
-        {"ET", TOKEN_OPERATOR, 2}, 
-        {"ID", TOKEN_OPERATOR, 2}, 
+        {"Do", TOKEN_OPERATOR, 2},
+        {"EI", TOKEN_OPERATOR, 2},
+        {"ET", TOKEN_OPERATOR, 2},
+        {"ID", TOKEN_OPERATOR, 2},
         {"MP", TOKEN_OPERATOR, 2},
-        {"RG", TOKEN_OPERATOR, 2}, 
-        {"SC", TOKEN_OPERATOR, 2}, 
-        {"T*", TOKEN_OPERATOR, 2}, 
-        {"TD", TOKEN_OPERATOR, 2}, 
+        {"RG", TOKEN_OPERATOR, 2},
+        {"SC", TOKEN_OPERATOR, 2},
+        {"T*", TOKEN_OPERATOR, 2},
+        {"TD", TOKEN_OPERATOR, 2},
         {"TJ", TOKEN_OPERATOR, 2},
-        {"TL", TOKEN_OPERATOR, 2}, 
-        {"Tc", TOKEN_OPERATOR, 2}, 
-        {"Td", TOKEN_OPERATOR, 2}, 
-        {"Tf", TOKEN_OPERATOR, 2}, 
+        {"TL", TOKEN_OPERATOR, 2},
+        {"Tc", TOKEN_OPERATOR, 2},
+        {"Td", TOKEN_OPERATOR, 2},
+        {"Tf", TOKEN_OPERATOR, 2},
         {"Tj", TOKEN_OPERATOR, 2},
-        {"Tm", TOKEN_OPERATOR, 2}, 
-        {"Tr", TOKEN_OPERATOR, 2}, 
-        {"Ts", TOKEN_OPERATOR, 2}, 
-        {"Tw", TOKEN_OPERATOR, 2}, 
+        {"Tm", TOKEN_OPERATOR, 2},
+        {"Tr", TOKEN_OPERATOR, 2},
+        {"Ts", TOKEN_OPERATOR, 2},
+        {"Tw", TOKEN_OPERATOR, 2},
         {"Tz", TOKEN_OPERATOR, 2},
-        {"W*", TOKEN_OPERATOR, 2}, 
-        {"b*", TOKEN_OPERATOR, 2}, 
-        {"cm", TOKEN_OPERATOR, 2}, 
-        {"cs", TOKEN_OPERATOR, 2}, 
+        {"W*", TOKEN_OPERATOR, 2},
+        {"b*", TOKEN_OPERATOR, 2},
+        {"cm", TOKEN_OPERATOR, 2},
+        {"cs", TOKEN_OPERATOR, 2},
         {"d0", TOKEN_OPERATOR, 2},
-        {"d1", TOKEN_OPERATOR, 2}, 
-        {"f*", TOKEN_OPERATOR, 2}, 
-        {"gs", TOKEN_OPERATOR, 2}, 
-        {"re", TOKEN_OPERATOR, 2}, 
+        {"d1", TOKEN_OPERATOR, 2},
+        {"f*", TOKEN_OPERATOR, 2},
+        {"gs", TOKEN_OPERATOR, 2},
+        {"re", TOKEN_OPERATOR, 2},
         {"rg", TOKEN_OPERATOR, 2},
-        {"ri", TOKEN_OPERATOR, 2}, 
-        {"sc", TOKEN_OPERATOR, 2}, 
+        {"ri", TOKEN_OPERATOR, 2},
+        {"sc", TOKEN_OPERATOR, 2},
         {"sh", TOKEN_OPERATOR, 2},
     }},
     {9, {
-        {"BDC", TOKEN_OPERATOR, 3}, 
-        {"BMC", TOKEN_OPERATOR, 3}, 
-        {"EMC", TOKEN_OPERATOR, 3}, 
+        {"BDC", TOKEN_OPERATOR, 3},
+        {"BMC", TOKEN_OPERATOR, 3},
+        {"EMC", TOKEN_OPERATOR, 3},
         {"SCN", TOKEN_OPERATOR, 3},
         {"def", TOKEN_DEF, 3},
         {"dup", TOKEN_DUP, 3},
@@ -193,32 +192,32 @@ const static fixed_token_map_t fixed_token_map[MAX_FIXED_TOKEN_LEN + 1] =
     }},
     {0},
     {3, {
-        {"begincmap",TOKEN_BEGINCMAP, 9},
-        {"endbfchar",TOKEN_ENDBFCHAR, 9},
-        {"endstream",TOKEN_STREAM_END, 9},
+        {"begincmap", TOKEN_BEGINCMAP, 9},
+        {"endbfchar", TOKEN_ENDBFCHAR, 9},
+        {"endstream", TOKEN_STREAM_END, 9},
     }},
     {2, {
-        {"endbfrange",TOKEN_ENDBFRANGE, 10},
-        {"endcidchar",TOKEN_ENDCIDCHAR, 10},
+        {"endbfrange", TOKEN_ENDBFRANGE, 10},
+        {"endcidchar", TOKEN_ENDCIDCHAR, 10},
     }},
     {2, {
-        {"beginbfchar",TOKEN_BEGINBFCHAR, 11},
-        {"endcidrange",TOKEN_ENDCIDRANGE, 11},
+        {"beginbfchar", TOKEN_BEGINBFCHAR, 11},
+        {"endcidrange", TOKEN_ENDCIDRANGE, 11},
     }},
     {3, {
-        {"beginbfrange",TOKEN_BEGINBFRANGE, 12},
-        {"begincidchar",TOKEN_BEGINCIDCHAR, 12},
-        {"findresource",TOKEN_FINDRESOURCE, 12},
+        {"beginbfrange", TOKEN_BEGINBFRANGE, 12},
+        {"begincidchar", TOKEN_BEGINCIDCHAR, 12},
+        {"findresource", TOKEN_FINDRESOURCE, 12},
     }},
     {1, {
         {"begincidrange", TOKEN_BEGINCIDRANGE, 13},
     }},
     {0}, {0}, {0},
     {1, {
-        {"endcodespacerange",TOKEN_ENDCODESPACERANGE, 17},
+        {"endcodespacerange", TOKEN_ENDCODESPACERANGE, 17},
     }}, {0},
     {1, {
-        {"begincodespacerange",TOKEN_BEGINCODESPACERANGE, 19},
+        {"begincodespacerange", TOKEN_BEGINCODESPACERANGE, 19},
     }}
 };
 PdfToken::~PdfToken()
@@ -430,14 +429,12 @@ void _decode_string(char** str, int* len)
         {
             if (p + 1 >= end)
             {
-                out[ol++] = 0x0;
                 out[ol++] = *p;
                 break;
             }
             p++;
             if (*p == 'n')
             {
-                out[ol++] = 0x0;
                 out[ol++] = '\n';
             }
             else if (*p == '\n')
@@ -446,27 +443,22 @@ void _decode_string(char** str, int* len)
             }
             else if (*p == 'r')
             {
-                out[ol++] = 0x0;
                 out[ol++] = '\r';
             }
             else if (*p == 't')
             {
-                out[ol++] = 0x0;
                 out[ol++] = '\t';
             }
             else if (*p == 'b')
             {
-                out[ol++] = 0x0;
                 out[ol++] = '\b';
             }
             else if (*p == 'f')
             {
-                out[ol++] = 0x0;
                 out[ol++] = '\f';
             }
             else if (*p == '(' || *p == ')' || *p == '\\')
             {
-                out[ol++] = 0x0;
                 out[ol++] = *p;
             }
             else if (_is_digit(*p))
@@ -490,7 +482,6 @@ void _decode_string(char** str, int* len)
         }
         else
         {
-            out[ol++] = 0x0;
             out[ol++] = *p;
         }
         p++;
@@ -543,7 +534,7 @@ PdfToken* PdfParser::_getNextOneToken(const unsigned char* start, const unsigned
         while (left <= right)
         {
             mid = left + (right - left) / 2;
-            int cmp = memcmp(start, to_compare[mid].token,  len);
+            int cmp = memcmp(start, to_compare[mid].token, len);
             if (cmp < 0)
             {
                 right = mid - 1;
@@ -566,7 +557,7 @@ PdfToken* PdfParser::_getNextOneToken(const unsigned char* start, const unsigned
         }
         else
         {
-            return NULL;    
+            return NULL;
         }
     } while (0);
 NOT_OPERATOR:
@@ -704,13 +695,13 @@ NOT_OPERATOR:
     }
     else if (c == '-' || c == '+' || c == '.' || _is_digit(c))
     {
-PARSE_NUMBER:
+    PARSE_NUMBER:
         tk = _buildNumber(start, end);
         start += tk->steps;
     }
     else if (_is_space(c))
     {
-PARSE_SPACE:
+    PARSE_SPACE:
         if (memcmp(start, "\r\n", 2) == 0)
         {
             tk = _buildToken(start, TOKEN_NEWLINE, 2);
@@ -845,7 +836,7 @@ PdfToken* PdfParser::_getNextToken()
         {
             // ignored
             *start += tk->steps;
-            delete tk;
+            freeToken(tk);
             continue;
         }
         this->token_cache.push_back(tk);
@@ -887,19 +878,19 @@ PdfToken* PdfParser::_getNextToken()
             off += tk->token_len;
             token->token[off] = ' ';
             off++;
-            delete tk;
+            freeToken(tk);
 
             memcpy(token->token + off, this->token_cache[0]->token, this->token_cache[0]->token_len);
             off += this->token_cache[0]->token_len;
             token->token[off] = ' ';
             off++;
-            delete* iter;
+            freeToken(*iter);
             iter = this->token_cache.erase(iter);
 
             memcpy(token->token + off, this->token_cache[0]->token, this->token_cache[0]->token_len);
             off += this->token_cache[0]->token_len;
             token->token[off] = '\0';
-            delete* iter;
+            freeToken(*iter);
             iter = this->token_cache.erase(iter);
 
             return token;
@@ -1129,6 +1120,14 @@ PdfToken* PdfParser::getNextToken()
             }
         }
     }
+    if (tk != NULL)
+    {
+        for (size_t i = 0; i < tk->token_len; i++)
+        {
+            printf("%c", tk->token[i]);
+        }
+        printf("\n");
+    }
     return tk;
 }
 pdf_cmap_t* PdfParser::buildCMap()
@@ -1141,9 +1140,9 @@ pdf_cmap_t* PdfParser::buildCMap()
     {
         if (current_token->type == TOKEN_ENDCMAP)
         {
-            delete last_token;
+            freeToken(last_token);
             last_token = NULL;
-            delete current_token;
+            freeToken(current_token);
             current_token = NULL;
             break;
         }
@@ -1153,9 +1152,9 @@ pdf_cmap_t* PdfParser::buildCMap()
             bool isCid = (current_token->type == TOKEN_BEGINCIDCHAR);
             int unicode_map_len = strtol(last_token->token, NULL, 10);
             pdf_unicode_map_t* unicode_map = (pdf_unicode_map_t*)calloc(unicode_map_len, sizeof(pdf_unicode_map_t));
-            delete last_token;
+            freeToken(last_token);
             last_token = NULL;
-            delete current_token;
+            freeToken(current_token);
             current_token = NULL;
 
             for (int i = 0; i < unicode_map_len; i++)
@@ -1172,9 +1171,9 @@ pdf_cmap_t* PdfParser::buildCMap()
                     unicode_map[i].unicode = _hex_str_to_16bit(current_token->token + 1);
                 }
 
-                delete last_token;
+                freeToken(last_token);
                 last_token = NULL;
-                delete current_token;
+                freeToken(current_token);
                 current_token = NULL;
             }
             if (cmap->unicode_map_len == 0)
@@ -1205,9 +1204,9 @@ pdf_cmap_t* PdfParser::buildCMap()
             bool isCid = (current_token->type == TOKEN_BEGINCIDRANGE);
             int char_range_map_len = strtol(last_token->token, NULL, 10);
             pdf_char_range_map_t* char_range_map = (pdf_char_range_map_t*)calloc(char_range_map_len, sizeof(pdf_char_range_map_t));
-            delete last_token;
+            freeToken(last_token);
             last_token = NULL;
-            delete current_token;
+            freeToken(current_token);
             current_token = NULL;
             for (int i = 0; i < char_range_map_len; i++)
             {
@@ -1224,9 +1223,9 @@ pdf_cmap_t* PdfParser::buildCMap()
                 {
                     char_range_map[i].dstStart = _hex_str_to_16bit(tk3->token + 1);
                 }
-                delete tk1;
-                delete tk2;
-                delete tk3;
+                freeToken(tk1);
+                freeToken(tk2);
+                freeToken(tk3);
             }
             if (cmap->char_range_map_len == 0)
             {
@@ -1255,9 +1254,9 @@ pdf_cmap_t* PdfParser::buildCMap()
         {
             int code_range_map_len = strtol(last_token->token, NULL, 10);
             pdf_code_range_map_t* code_range_map = (pdf_code_range_map_t*)calloc(code_range_map_len, sizeof(pdf_code_range_map_t));
-            delete last_token;
+            freeToken(last_token);
             last_token = NULL;
-            delete current_token;
+            freeToken(current_token);
             current_token = NULL;
             for (int i = 0; i < code_range_map_len; i++)
             {
@@ -1265,8 +1264,8 @@ pdf_cmap_t* PdfParser::buildCMap()
                 PdfToken* tk2 = getNextToken();
                 code_range_map[i].srcStart = _hex_str_to_16bit(tk1->token + 1);
                 code_range_map[i].srcEnd = _hex_str_to_16bit(tk2->token + 1);
-                delete tk1;
-                delete tk2;
+                freeToken(tk1);
+                freeToken(tk2);
             }
             if (cmap->code_range_map_len == 0)
             {
@@ -1293,7 +1292,7 @@ pdf_cmap_t* PdfParser::buildCMap()
         }
         if (last_token != NULL)
         {
-            delete last_token;
+            freeToken(last_token);
             last_token = NULL;
         }
         last_token = current_token;
@@ -1367,7 +1366,7 @@ pdf_obj_t* PdfParser::buildObj()
     {
         if (tk->type == TOKEN_OBJ_END)
         {
-            delete tk;
+            freeToken(tk);
             break;
         }
         else if (tk->type == TOKEN_STREAM_BEG)
@@ -1386,8 +1385,12 @@ pdf_obj_t* PdfParser::buildObj()
             }
             // store current offset
             offset = ftell(this->pdf->pFile);
-            int len = (*obj->value->dict)["/Length"].number;
-            if (len == -1)
+            int len = -1;
+            if ((*obj->value->dict)["/Length"].type == NUMBER)
+            {
+                len = (*obj->value->dict)["/Length"].number;
+            }
+            else
             {
                 int ref = (*obj->value->dict)["/Length"].indirect;
                 pdf_obj_t* l_obj = pdf_file_get_obj(this->pdf, ref);
@@ -1403,7 +1406,7 @@ pdf_obj_t* PdfParser::buildObj()
             this->splite_pos = NULL;
             this->current_pos = NULL;
             (this->*(reader.read))(this->reader.source);
-            delete tk;
+            freeToken(tk);
 
             tk = getNextToken();
             if (tk == NULL || tk->type != TOKEN_STREAM_END)
@@ -1417,7 +1420,7 @@ pdf_obj_t* PdfParser::buildObj()
             _setCommonValue(tk, *obj->value);
         }
 
-        delete tk;
+        freeToken(tk);
     }
 
     return obj;
@@ -1433,7 +1436,7 @@ PdfDict* PdfParser::buildDict()
     {
         if (tk->type == TOKEN_DICT_END)
         {
-            delete tk;
+            freeToken(tk);
             break;
         }
         PdfToken* tk1 = getNextToken();
@@ -1442,8 +1445,8 @@ PdfDict* PdfParser::buildDict()
             break;
         }
         _setCommonValue(tk1, (*dict)[tk->token]);
-        delete tk;
-        delete tk1;
+        freeToken(tk);
+        freeToken(tk1);
     }
     return dict;
 }
@@ -1457,7 +1460,7 @@ PdfArray* PdfParser::buildArray()
     {
         if (tk->type == TOKEN_ARRAY_END)
         {
-            delete tk;
+            freeToken(tk);
             break;
         }
         else
@@ -1467,7 +1470,7 @@ PdfArray* PdfParser::buildArray()
             array->push(v);
         }
 
-        delete tk;
+        freeToken(tk);
     }
 
     return array;

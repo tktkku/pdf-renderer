@@ -13,7 +13,7 @@
 typedef void (*OPERATION_HANDLER)(pdf_context_t* context);
 
 typedef struct {
-    char* operation;
+    const char* operation;
     OPERATION_HANDLER handler;
 } handler_entry;
 
@@ -220,8 +220,7 @@ void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
             PdfDict* AP = (*anno_obj->value->dict)["/AP"].dict;
             if (AP != NULL)
             {
-                PdfDict* nomal_dict = (*AP)["/N"].dict; // required
-                if (nomal_dict == NULL)
+                if ((*AP)["/N"].type == INDIRECT)
                 {
                     int ref = (*AP)["/N"].indirect;
                     pdf_obj_t* obj = pdf_file_get_obj(page->pdf, ref);
@@ -360,11 +359,6 @@ void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
 
 void _do_render_operation(pdf_context_t* context, PdfToken* tk)
 {
-    // for (size_t i = 0; i < tk->token_len; i++)
-    // {
-    //     printf("%c", tk->token[i]);
-    // }
-    // printf("\n");
     int count = ARRAY_COUNT(handlers);
     int left = 0;
     int right = count - 1;
