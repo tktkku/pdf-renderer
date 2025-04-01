@@ -146,7 +146,7 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj)
                         if (color_space_aar != NULL && !strcmp(color_space_aar->values[0]->val.name, "/Indexed"))
                         {
                             int lookup_cnt = color_space_aar->values[2]->val.number;
-                            char* lookup = color_space_aar->values[2]->val.string + 1;
+                            char* lookup = color_space_aar->values[3]->val.string + 1;
                             for (int i = 0; i < height; i++)
                             {
                                 for (int j = 0; j < width; j++)
