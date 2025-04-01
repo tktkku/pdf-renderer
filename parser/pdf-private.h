@@ -99,8 +99,9 @@ struct PdfValue
 };
 
 
-struct pdf_obj
+class PdfObj
 {
+public:
     int seq;
     PdfValue* value;
     pdf_stream_t* stream;
@@ -108,6 +109,13 @@ struct pdf_obj
     unsigned char* font_data;
     int font_data_len;
     pdf_file_t* pdf;
+public:
+    PdfObj()
+    : seq(0), value(nullptr), stream(nullptr), xobject(nullptr),
+    font_data(nullptr), font_data_len(0), pdf(nullptr)
+    {}
+    pdf_xobject_t* getXobject();
+    ~PdfObj();
 };
 
 class PdfArray
@@ -171,10 +179,10 @@ public:
 //     pdf_array_element_value_t** values;
 // };
 
-typedef struct rect_d
+struct PdfRect
 {
     double x, y, width, height;
-} rect_d_t;
+};
 
 typedef enum xref_type
 {
@@ -246,12 +254,12 @@ struct pdf_file
     long data_len;
     // int num_read_objs;
     // pdf_obj_t** read_objs;
-    std::vector<pdf_obj_t*> read_objs;
+    std::vector<PdfObj*> read_objs;
     // xref_table_t* xref_table;
     std::vector<xref_t*> xref_table;
     // pdf_obj_t** pages;
     // int num_pages;
-    std::vector<pdf_obj_t*> pages;
+    std::vector<PdfObj*> pages;
     std::vector<pdf_cmap_t*> cmaps;
 };
 
@@ -267,19 +275,34 @@ struct pdf_resources
     PdfDict* properties;
 };
 
-struct pdf_page
+class PdfPage
 {
+public:
     int pageNo;
     pdf_file_t* pdf;
-    rect_d_t crop_box;
-    rect_d_t media_box;
+    PdfRect crop_box;
+    PdfRect media_box;
     // pdf_obj_t** contents;
     // int num_contents;
-    std::vector<pdf_obj_t*> contents;
-    int cur_content_index;
+    std::vector<PdfObj*> contents;
     int rotate;
     pdf_resources_t* resources;
     PdfArray* annots;
+public:
+    PdfPage()
+    : pageNo(0), pdf(nullptr), rotate(0), resources(nullptr), annots(nullptr)
+    {}
+    ~PdfPage();
+    int getMediaWidth() { return media_box.width; }
+    int getMediaHeight() { return media_box.height; }
+    pdf_font_t* getFont(const char* name);
+
+    void getExtGState(const char* name);
+    int getStreams();
+    pdf_stream_t* getStream(int index);
+private:
+    pdf_font_t* _loadType0Font(PdfDict& font_dict);
+    pdf_font_t* _loadTruetypeFont(PdfDict& font_dict);
 };
 
 
@@ -387,7 +410,7 @@ public:
 
     PdfToken* getNextToken();
     void freeToken(PdfToken* token);
-    pdf_obj_t* buildObj();
+    PdfObj* buildObj();
     PdfDict* buildDict();
     PdfArray* buildArray();
     pdf_cmap_t* buildCMap();
@@ -414,7 +437,7 @@ struct pdf_buffer
 struct pdf_stream
 {
     pdf_file_t* pdf;
-    pdf_obj_t* obj;
+    PdfObj* obj;
     int stream_offset;
     int stream_len;
     struct

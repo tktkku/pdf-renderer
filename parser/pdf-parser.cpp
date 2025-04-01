@@ -1348,10 +1348,10 @@ void PdfParser::_setCommonValue(PdfToken* tk, PdfValue& p)
         p.string[p.value_len] = '\0';
     }
 }
-pdf_obj_t* PdfParser::buildObj()
+PdfObj* PdfParser::buildObj()
 {
     PdfToken* tk;
-    pdf_obj_t* obj = pdf_obj_init();
+    PdfObj* obj = new PdfObj;
     obj->value = new PdfValue;
 
     while ((tk = getNextToken()) != NULL)
@@ -1385,7 +1385,7 @@ pdf_obj_t* PdfParser::buildObj()
             else
             {
                 int ref = (*obj->value->dict)["/Length"].indirect;
-                pdf_obj_t* l_obj = pdf_file_get_obj(this->pdf, ref);
+                PdfObj* l_obj = pdf_file_get_obj(this->pdf, ref);
                 len = l_obj->value->number;
                 fseek(this->pdf->pFile, offset, SEEK_SET);
             }
@@ -1403,7 +1403,7 @@ pdf_obj_t* PdfParser::buildObj()
             tk = getNextToken();
             if (tk == NULL || tk->type != TOKEN_STREAM_END)
             {
-                pdf_obj_free(obj);
+                delete obj;
                 return NULL;
             }
         }

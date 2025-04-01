@@ -5,36 +5,45 @@
 #include <stdio.h>
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "plutovg-stb-image-write.h"
-pdf_obj_t* pdf_obj_init()
-{
-    pdf_obj_t* obj = (pdf_obj_t*)malloc(sizeof(pdf_obj_t));
-    memset(obj, 0, sizeof(pdf_obj_t));
 
-    return obj;
-}
-
-void pdf_obj_free(pdf_obj_t* obj)
+PdfObj::~PdfObj()
 {
-    if (obj == NULL)
+    if (stream != nullptr)
     {
-        return;
+        pdf_stream_free(stream);
     }
-    if (obj->stream != NULL)
+    if (xobject != nullptr)
     {
-        pdf_stream_free(obj->stream);
+        if (xobject->type == XOBJ_IMAGE)
+        {
+            if (xobject->image)
+            {
+                if (xobject->image->data)
+                {
+                    free(xobject->image->data);
+                    xobject->image->data = NULL;
+                }
+
+                free(xobject->image);
+                xobject->image = NULL;
+            }
+
+        }
+        else if (xobject->type == XOBJ_FORM)
+        {
+            if (xobject->form)
+            {
+                free(xobject->form);
+                xobject->form = NULL;
+            }
+        }
+        free(xobject);
     }
-    if (obj->xobject != NULL)
+    if (font_data != nullptr)
     {
-        pdf_page_xobject_free(obj->xobject);
+        free(font_data);
     }
-    if (obj->font_data != NULL)
-    {
-        free(obj->font_data);
-    }
-    delete obj->value;
-    obj->value = NULL;
-    free(obj);
-    obj = NULL;
+    delete value;
 }
 void _write_png_callback(void* context, void* data, int size)
 {
@@ -53,14 +62,12 @@ void _write_png_callback(void* context, void* data, int size)
     img->data_len += size;
 }
 
-pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj)
+pdf_xobject_t* PdfObj::getXobject()
 {
-    if (obj == NULL)
-        return NULL;
-    if (obj->xobject != NULL)
-        return obj->xobject;
+    if (xobject != nullptr)
+        return xobject;
     // unsigned char* input = img_obj->stream;
-    auto& img_dict = *(obj->value->dict);
+    auto& img_dict = *(value->dict);
     const char* type = img_dict["/Type"].name; // XObject
     if (strcmp(type, "/XObject") != 0)
     {
@@ -106,7 +113,7 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj)
         else if (img_dict["/Length"].type == INDIRECT)
         {
             int ref = img_dict["/Length"].indirect;
-            pdf_obj_t* len_obj = pdf_file_get_obj(obj->pdf, ref);
+            PdfObj* len_obj = pdf_file_get_obj(pdf, ref);
             if (len_obj != NULL)
             {
                 length = len_obj->value->number;
@@ -155,10 +162,10 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj)
             // img->data = (unsigned char*)calloc(image_size, sizeof(unsigned char));
             // //memcpy(img->data, input, img_obj->stream_len);
             // img->data_len = image_size;
-            pdf_stream_get_all(obj->stream, &img->data, &img->data_len);
+            pdf_stream_get_all(stream, &img->data, &img->data_len);
             if (smask_ref != -1)
             {
-                pdf_obj_t* smask_obj = pdf_file_get_obj(obj->pdf, smask_ref);
+                PdfObj* smask_obj = pdf_file_get_obj(pdf, smask_ref);
                 if (smask_obj != NULL)
                 {
                     unsigned char* smask = NULL;
@@ -180,7 +187,7 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj)
                                     int index = (i * width + j);
                                     int index1 = img->data[i * stride + j] * 3;
                                     int index2 = index * 4;
-                                    
+
                                     tmp[index2] = lookup[index1];
                                     tmp[index2 + 1] = lookup[index1 + 1];
                                     tmp[index2 + 2] = lookup[index1 + 2];
@@ -226,7 +233,7 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj)
             pdf_xobject_t* xobj = (pdf_xobject_t*)malloc(sizeof(pdf_xobject_t));
             xobj->type = XOBJ_IMAGE;
             xobj->image = img;
-            obj->xobject = xobj;
+            this->xobject = xobj;
             return xobj;
         }
         else if (strcmp(filter, "/DCTDecode") == 0)
@@ -240,8 +247,8 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj)
             {
                 strcpy(img->color_space, color_space);
             }
-            fseek(obj->pdf->pFile, obj->stream->stream_offset, SEEK_SET);
-            int ret = fread(img->data, 1, length, obj->pdf->pFile);
+            fseek(pdf->pFile, stream->stream_offset, SEEK_SET);
+            int ret = fread(img->data, 1, length, pdf->pFile);
             if (ret != length)
             {
                 free(img);
@@ -267,18 +274,26 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj)
         xobj->type = XOBJ_FORM;
         xobj->form = (pdf_form_t*)malloc(sizeof(pdf_form_t));
 
-        PdfArray* ctm_aar = img_dict["/Matrix"].array;
-        for (int i = 0; ctm_aar && i < ctm_aar->size(); i++)
+        if (img_dict["/Matrix"].type == ARRAY)
         {
-            xobj->form->matrix[i] = (*ctm_aar)[i]->number;
+            PdfArray* ctm_aar = img_dict["/Matrix"].array;
+            for (int i = 0; ctm_aar && i < ctm_aar->size(); i++)
+            {
+                xobj->form->matrix[i] = (*ctm_aar)[i]->number;
+            }
         }
-        PdfArray* bbox_aar = img_dict["/BBox"].array;
-        for (int i = 0; bbox_aar && i < bbox_aar->size(); i++)
+
+        if (img_dict["/BBox"].type == ARRAY)
         {
-            xobj->form->bbox[i] = (*bbox_aar)[i]->number;
+            PdfArray* bbox_aar = img_dict["/BBox"].array;
+            for (int i = 0; bbox_aar && i < bbox_aar->size(); i++)
+            {
+                xobj->form->bbox[i] = (*bbox_aar)[i]->number;
+            }
+            this->xobject = xobj;
         }
-        obj->xobject = xobj;
+
         return xobj;
     }
-    return NULL;
+    return nullptr;
 }

@@ -163,7 +163,7 @@ bool _read_xref_and_trailer(pdf_file_t* pdf, int *root_obj_ref, int *info_obj_re
     else //if (strstr(buffer, "obj") != NULL)
     {
         PdfParser parser(pdf, FILE_READER, pdf->pFile);
-        pdf_obj_t* xref_obj = parser.buildObj();
+        PdfObj* xref_obj = parser.buildObj();
         if (xref_obj == NULL)
         {
             return false;
@@ -278,7 +278,7 @@ bool _read_xref_and_trailer(pdf_file_t* pdf, int *root_obj_ref, int *info_obj_re
             }
         }
 
-        pdf_obj_free(xref_obj);
+        delete xref_obj;
         return true;
     }
 
@@ -317,7 +317,7 @@ pdf_file_t* pdf_file_read_file(const char* file_name)
         return NULL;
     }
 
-    pdf_obj_t* root_obj = pdf_file_get_obj(pdf_file, root_obj_ref);
+    PdfObj* root_obj = pdf_file_get_obj(pdf_file, root_obj_ref);
     if (root_obj == NULL)
     {
         pdf_file_free(pdf_file);
@@ -338,7 +338,7 @@ pdf_file_t* pdf_file_read_file(const char* file_name)
         if ((*names_dict)["/EmbeddedFiles"].type == INDIRECT)
         {
             int embedded_ref = (*names_dict)["/EmbeddedFiles"].indirect;
-            pdf_obj_t* embedded_obj1 = pdf_file_get_obj(pdf_file, embedded_ref);
+            PdfObj* embedded_obj1 = pdf_file_get_obj(pdf_file, embedded_ref);
             if ((*embedded_obj1->value->dict)["/Names"].type == ARRAY)
             {
                 PdfArray* names_aar = (*embedded_obj1->value->dict)["/Names"].array;
@@ -346,10 +346,10 @@ pdf_file_t* pdf_file_read_file(const char* file_name)
                 {
                     if ((*names_aar)[i]->type == INDIRECT)
                     {
-                        pdf_obj_t* embedded_obj2 = pdf_file_get_obj(pdf_file, (*names_aar)[i]->indirect);
+                        PdfObj* embedded_obj2 = pdf_file_get_obj(pdf_file, (*names_aar)[i]->indirect);
                         PdfDict* ef_dict = (*embedded_obj2->value->dict)["/EF"].dict;
                         int ref = (*ef_dict)["/UF"].indirect;
-                        pdf_obj_t* embedded_obj = pdf_file_get_obj(pdf_file, ref);
+                        PdfObj* embedded_obj = pdf_file_get_obj(pdf_file, ref);
                         unsigned char* embedded_file = NULL;
                         int embedded_file_len = 0;
                         pdf_stream_get_all(embedded_obj->stream, &embedded_file, &embedded_file_len);
@@ -369,7 +369,7 @@ pdf_file_t* pdf_file_read_file(const char* file_name)
     }
 
     int ref = root_dict["/Pages"].indirect;
-    pdf_obj_t* pages_obj = pdf_file_get_obj(pdf_file, ref);
+    PdfObj* pages_obj = pdf_file_get_obj(pdf_file, ref);
     if (pages_obj == NULL)
     {
         pdf_file_free(pdf_file);
@@ -381,7 +381,7 @@ pdf_file_t* pdf_file_read_file(const char* file_name)
     for (int i = 0; i < num_pages; i++)
     {
         ref = (*kids_arr)[i]->indirect;
-        pdf_obj_t* page_obj = pdf_file_get_obj(pdf_file, ref);
+        PdfObj* page_obj = pdf_file_get_obj(pdf_file, ref);
         if (page_obj == NULL)
         {
             pdf_file_free(pdf_file);
@@ -397,14 +397,14 @@ int pdf_file_get_pages(pdf_file_t* pdf)
     if (pdf == NULL) return 0;
     return pdf->pages.size();
 }
-pdf_page_t* pdf_file_get_page(pdf_file_t* pdf, int pageNo)
+PdfPage* pdf_file_get_page(pdf_file_t* pdf, int pageNo)
 {
     if (pdf == NULL)
     {
         return NULL;
     }
 
-    pdf_obj_t* page_obj = pdf->pages[pageNo];
+    PdfObj* page_obj = pdf->pages[pageNo];
     auto& page_obj_dict = *(page_obj->value->dict);
     const char* type = page_obj_dict["/Type"].name;
     if (strcmp(type, "/Page") != 0)
@@ -431,12 +431,12 @@ pdf_page_t* pdf_file_get_page(pdf_file_t* pdf, int pageNo)
     }
     else
     {
-        pdf_obj_t* res_obj = pdf_file_get_obj(pdf, res_ref);
+        PdfObj* res_obj = pdf_file_get_obj(pdf, res_ref);
         if (res_obj == NULL)
             return NULL;
         tmp_dict = res_obj->value->dict;
     }
-    pdf_page_t* page = pdf_page_init();
+    PdfPage* page = new PdfPage;
     if (page_obj_dict["/Annots"].type == ARRAY)
     {
         page->annots = page_obj_dict["/Annots"].array;
@@ -452,7 +452,7 @@ pdf_page_t* pdf_file_get_page(pdf_file_t* pdf, int pageNo)
             if (tmp_dict_ref["/ExtGState"].type == INDIRECT)
             {
                 int ext_ref = tmp_dict_ref["/ExtGState"].indirect;
-                pdf_obj_t* ext_obj = pdf_file_get_obj(pdf, ext_ref);
+                PdfObj* ext_obj = pdf_file_get_obj(pdf, ext_ref);
                 if (ext_obj != NULL)
                 {
                     page->resources->ext_gstate = ext_obj->value->dict;
@@ -467,7 +467,7 @@ pdf_page_t* pdf_file_get_page(pdf_file_t* pdf, int pageNo)
         else if (tmp_dict_ref["/Font"].type == INDIRECT)
         {
             int font_ref = tmp_dict_ref["/Font"].indirect;
-            pdf_obj_t* font_obj = pdf_file_get_obj(pdf, font_ref);
+            PdfObj* font_obj = pdf_file_get_obj(pdf, font_ref);
             page->resources->font_dict = font_obj->value->dict;
         }
         if (tmp_dict_ref["/XObject"].type == DICT)
@@ -477,7 +477,7 @@ pdf_page_t* pdf_file_get_page(pdf_file_t* pdf, int pageNo)
         else if (tmp_dict_ref["/XObject"].type == INDIRECT)
         {
             int xobj_ref = tmp_dict_ref["/XObject"].indirect;
-            pdf_obj_t* xobj_obj = pdf_file_get_obj(pdf, xobj_ref);
+            PdfObj* xobj_obj = pdf_file_get_obj(pdf, xobj_ref);
             page->resources->xobject_dict = xobj_obj->value->dict;
         }
     }
@@ -489,10 +489,10 @@ pdf_page_t* pdf_file_get_page(pdf_file_t* pdf, int pageNo)
     else if (page_obj_dict["/Contents"].type == INDIRECT)
     {
         contents_ref = page_obj_dict["/Contents"].indirect;
-        pdf_obj_t* content_obj = pdf_file_get_obj(pdf, contents_ref);
+        PdfObj* content_obj = pdf_file_get_obj(pdf, contents_ref);
         if (content_obj == NULL)
         {
-            pdf_page_free(page);
+            delete page;
             return NULL;
         }
         page->contents.push_back(content_obj);
@@ -507,10 +507,10 @@ pdf_page_t* pdf_file_get_page(pdf_file_t* pdf, int pageNo)
         for (int i = 0; i < contents_arr->size(); i++)
         {
             contents_ref = (*contents_arr)[i]->indirect;
-            pdf_obj_t* content_obj = pdf_file_get_obj(pdf, contents_ref);
+            PdfObj* content_obj = pdf_file_get_obj(pdf, contents_ref);
             if (content_obj == NULL)
             {
-                pdf_page_free(page);
+                delete page;
                 return NULL;
             }
             page->contents.push_back(content_obj);
@@ -540,14 +540,20 @@ pdf_page_t* pdf_file_get_page(pdf_file_t* pdf, int pageNo)
     return page;
 }
 
-bool _add_to_obj_table(pdf_file_t* pdf, pdf_obj_t* obj)
+void pdf_file_free_page(pdf_file_t* pdf, PdfPage* page)
+{
+    if (page == nullptr) return;
+    delete page;
+}
+
+bool _add_to_obj_table(pdf_file_t* pdf, PdfObj* obj)
 {
     if (pdf == NULL || obj == NULL)
         return false;
     pdf->read_objs.push_back(obj);
     return true;
 }
-pdf_obj_t* _get_obj_from_table(pdf_file_t* pdf, int ref)
+PdfObj* _get_obj_from_table(pdf_file_t* pdf, int ref)
 {
     if (pdf == NULL || ref < 0)
         return NULL;
@@ -570,14 +576,14 @@ pdf_obj_t* _get_obj_from_table(pdf_file_t* pdf, int ref)
     return NULL;
 }
 
-pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, int ref)
+PdfObj* pdf_file_get_obj(pdf_file_t* pdf, int ref)
 {
     if (pdf == NULL || ref < 0)
     {
         return NULL;
     }
 
-    pdf_obj_t* ret_obj = _get_obj_from_table(pdf, ref);
+    PdfObj* ret_obj = _get_obj_from_table(pdf, ref);
     if (ret_obj != NULL)
         return ret_obj;
 
@@ -605,7 +611,7 @@ pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, int ref)
                     parser.freeToken(tk);
                     return NULL;
                 }
-                pdf_obj_t* obj = parser.buildObj();
+                PdfObj* obj = parser.buildObj();
                 if (obj == NULL)
                 {
                     parser.freeToken(tk);
@@ -620,7 +626,7 @@ pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, int ref)
             else
             {
                 int obj_ref = pdf->xref_table[i]->compressed.ref;
-                pdf_obj_t* objs_obj = pdf_file_get_obj(pdf, obj_ref);
+                PdfObj* objs_obj = pdf_file_get_obj(pdf, obj_ref);
                 if (objs_obj == NULL)
                 {
                     return NULL;
@@ -663,7 +669,7 @@ pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, int ref)
                     {
                         return NULL;
                     }
-                    pdf_obj_t* obj = pdf_obj_init();
+                    PdfObj* obj = new PdfObj;
                     obj->seq = seq;
                     obj->value = new PdfValue;
                     if (tk1->getType() == TOKEN_DICT_BEG)
@@ -779,7 +785,7 @@ void pdf_file_free(pdf_file_t* file)
     {
         for (auto* ptr : file->read_objs)
         {
-            pdf_obj_free(ptr);
+            delete ptr;
         }
     }
     if (file->cmaps.size() > 0)

@@ -35,7 +35,7 @@ void pdf_stream_free(pdf_stream_t* stream)
     stream = NULL;
 }
 
-pdf_stream_t* pdf_stream_init(pdf_file_t* pdf, pdf_obj_t* obj, int len, int offset)
+pdf_stream_t* pdf_stream_init(pdf_file_t* pdf, PdfObj* obj, int len, int offset)
 {
     if (pdf == NULL || obj == NULL)
     {

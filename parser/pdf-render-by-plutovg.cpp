@@ -114,10 +114,10 @@ const static handler_entry handlers[] = {
     {"scn", handle_scn},      {"sh", handle_sh},        {"v", handle_v},
     {"w", handle_w},          {"y", handle_y} };
 void _do_render_operation(pdf_context_t* context, PdfToken* tk);
-void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
+void render_to_png_by_plutovg(PdfPage* page, char* filename)
 {
-    int width = pdf_page_get_media_width(page) * PIXELS_PER_POINT;
-    int height = pdf_page_get_media_height(page) * PIXELS_PER_POINT;
+    int width = page->getMediaWidth() * PIXELS_PER_POINT;
+    int height = page->getMediaHeight() * PIXELS_PER_POINT;
     int stride = width * 4;
     unsigned char* pixels = (unsigned char*)malloc(stride * height);
     memset(pixels, 0xFF, stride * height);
@@ -163,10 +163,10 @@ void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
     context.state->textState.font = NULL;
     context.state->textState.fontface = NULL;
     context.current_obj = NULL;
-    int numStreams = pdf_page_get_streams(page);
+    int numStreams = page->getStreams();
     for (int j = 0; j < numStreams; j++)
     {
-        pdf_stream_t* stream = pdf_page_get_stream(page, j);
+        pdf_stream_t* stream = page->getStream(j);
         if (stream == NULL)
             continue;
         pdf_stream_open(stream);
@@ -195,7 +195,7 @@ void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
     {
         for (int i = 0; i < page->annots->size(); i++)
         {
-            pdf_obj_t* anno_obj = pdf_file_get_obj(page->pdf, (*page->annots)[i]->indirect);
+            PdfObj* anno_obj = pdf_file_get_obj(page->pdf, (*page->annots)[i]->indirect);
             // pdf_dict_get_name(anno_obj->value->val.dict, "/Type");
             // pdf_dict_get_name(anno_obj->value->val.dict, "/SubType");
             PdfArray* rect = (*anno_obj->value->dict)["/Rect"].array;
@@ -224,7 +224,7 @@ void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
                 if ((*AP)["/N"].type == INDIRECT)
                 {
                     int ref = (*AP)["/N"].indirect;
-                    pdf_obj_t* obj = pdf_file_get_obj(page->pdf, ref);
+                    PdfObj* obj = pdf_file_get_obj(page->pdf, ref);
                     if (obj->stream != NULL)
                     {
                         context.current_obj = obj;
@@ -271,7 +271,7 @@ void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
     free(pixels);
 }
 
-void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
+void render_to_buffer_by_plutovg(PdfPage* page, unsigned char* pixels,
     int width, int height, int stride)
 {
     //pdf_stack_t* stack = pdf_stack_init();
@@ -316,10 +316,10 @@ void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
     context.state->textState.font = NULL;
     context.state->textState.fontface = NULL;
     context.current_obj = NULL;
-    int numStreams = pdf_page_get_streams(page);
+    int numStreams = page->getStreams();
     for (int j = 0; j < numStreams; j++)
     {
-        pdf_stream_t* stream = pdf_page_get_stream(page, j);
+        pdf_stream_t* stream = page->getStream(j);
         if (stream == NULL)
             continue;
         pdf_stream_open(stream);
@@ -643,7 +643,7 @@ void handle_gs(pdf_context_t* context)
     auto vec = context->stack.top();
     context->stack.pop();
     memcpy(buf, vec.data(), vec.size());
-    pdf_page_get_ext_gstate(context->page, buf);
+    context->page->getExtGState(buf);
 }
 
 void handle_m(pdf_context_t* context)
@@ -1338,7 +1338,7 @@ void handle_Do(pdf_context_t* context)
     auto vec = context->stack.top();
     context->stack.pop();
     memcpy(buf, vec.data(), vec.size());
-    pdf_obj_t* tmp_obj = NULL;
+    PdfObj* tmp_obj = NULL;
     pdf_xobject_t* xobj = NULL;
     if (context->current_obj != NULL)
     {
@@ -1346,7 +1346,7 @@ void handle_Do(pdf_context_t* context)
         PdfDict* tmp_dict1 = (*tmp_dict)["/XObject"].dict;
         int ref = (*tmp_dict1)[buf].indirect;
         tmp_obj = pdf_file_get_obj(context->page->pdf, ref);
-        xobj = pdf_obj_get_xobject(tmp_obj);
+        xobj = tmp_obj->getXobject();
     }
 
     if (xobj == NULL)
@@ -1355,7 +1355,7 @@ void handle_Do(pdf_context_t* context)
         if (ref != -1)
         {
             tmp_obj = pdf_file_get_obj(context->page->pdf, ref);
-            xobj = pdf_obj_get_xobject(tmp_obj);
+            xobj = tmp_obj->getXobject();
             if (xobj == NULL)
                 return;
         }
@@ -1379,7 +1379,7 @@ void handle_Do(pdf_context_t* context)
 
         if (tmp_obj->stream != NULL)
         {
-            pdf_obj_t* save_obj = context->current_obj;
+            PdfObj* save_obj = context->current_obj;
             context->current_obj = tmp_obj;
             pdf_stream_open(tmp_obj->stream);
             PdfToken* tk = NULL;
@@ -1651,7 +1651,7 @@ void handle_Tf(pdf_context_t* context)
     int ref = (*context->page->resources->font_dict)[buf].indirect;
     if (ref == -1)
         return;
-    pdf_font_t* font = pdf_page_get_font(context->page, buf);
+    pdf_font_t* font = context->page->getFont(buf);
     // if (context->fontCache.find(ref) == context->fontCache.end())
     //     font = pdf_page_get_font(context->page, buf);
     // else
