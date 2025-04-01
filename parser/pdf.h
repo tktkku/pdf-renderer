@@ -130,19 +130,19 @@ void pdf_array_free(pdf_array_t* array);
 pdf_cmap_t* pdf_cmap_init(void);
 void pdf_cmap_free(pdf_cmap_t* cmap);
 
-typedef struct context
-{
-    pdf_stack_t* stack;
-    plutovg_canvas_t* canvas;
-    pdf_file_t* pdf;
-    pdf_page_t* page;
-    pdf_obj_t* current_obj;
+typedef struct pdf_graphics_state {
+    char currentColorSpace[256];
+    double fillColor[3];
+    double strokeColor[3];
+    double lineWidth;
+    int lineCap;
+    int lineJoin;
+    double miterLimit;
     struct {
-        char currentColorSpace[256];
-        double fillColor[3];
-        double strokeColor[3];
-    } graphicsState;
-
+        double* dashs;
+        int dash_size;
+        double offset;
+    } dashPattern;
     struct {
         double characterSpacing;
         double wordSpacing;
@@ -152,9 +152,20 @@ typedef struct context
         int textMode;
         double textRise;
         plutovg_font_face_t* fontface;
+        bool font_face_loaded;
         pdf_font_t* font;
-        float lineWidth;
+        double textLineWidth;
     } textState;
+    struct pdf_graphics_state* next;
+} pdf_graphics_state_t;
+typedef struct context
+{
+    pdf_stack_t* stack;
+    plutovg_canvas_t* canvas;
+    pdf_file_t* pdf;
+    pdf_page_t* page;
+    pdf_obj_t* current_obj;
+    pdf_graphics_state_t* state;
 } pdf_context_t;
 void render_to_png_by_plutovg(pdf_page_t* page, char* filename);
 void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
