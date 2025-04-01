@@ -137,7 +137,7 @@ pdf_font_t* PdfPage::_loadType0Font(PdfDict& font_dict)
         PdfObj* obj = pdf_file_get_obj(pdf, to_unicode_ref);
         unsigned char* data = NULL;
         int len;
-        pdf_stream_get_all(obj->stream, &data, &len);
+        obj->stream->getAll(&data, &len);
         pdf_buffer_t b1;
         b1.buffer = data;
         b1.buffer_size = len;
@@ -258,7 +258,7 @@ pdf_font_t* PdfPage::_loadType0Font(PdfDict& font_dict)
                 }
                 else
                 {
-                    pdf_stream_get_all(fontfile_obj->stream, &font->font_data, &font->font_data_length);
+                    fontfile_obj->stream->getAll(&font->font_data, &font->font_data_length);
                     fontfile_obj->font_data = font->font_data;
                     fontfile_obj->font_data_len = font->font_data_length;
                 }
@@ -281,7 +281,7 @@ pdf_font_t* PdfPage::_loadType0Font(PdfDict& font_dict)
                 }
                 else
                 {
-                    pdf_stream_get_all(fontfile_obj->stream, &font->font_data, &font->font_data_length);
+                    fontfile_obj->stream->getAll(&font->font_data, &font->font_data_length);
                     fontfile_obj->font_data = font->font_data;
                     fontfile_obj->font_data_len = font->font_data_length;
                 }
@@ -304,7 +304,7 @@ pdf_font_t* PdfPage::_loadType0Font(PdfDict& font_dict)
                 }
                 else
                 {
-                    pdf_stream_get_all(fontfile_obj->stream, &font->font_data, &font->font_data_length);
+                    fontfile_obj->stream->getAll(&font->font_data, &font->font_data_length);
                     fontfile_obj->font_data = font->font_data;
                     fontfile_obj->font_data_len = font->font_data_length;
                 }
@@ -375,7 +375,7 @@ pdf_font_t* PdfPage::_loadTruetypeFont(PdfDict& font_dict)
         PdfObj* obj = pdf_file_get_obj(pdf, to_unicode_ref);
         unsigned char* data = NULL;
         int len;
-        pdf_stream_get_all(obj->stream, &data, &len);
+        obj->stream->getAll(&data, &len);
         pdf_buffer_t b1;
         b1.buffer = data;
         b1.buffer_size = len;
@@ -448,7 +448,7 @@ pdf_font_t* PdfPage::getFont(const char* name)
     return NULL;
 }
 
-pdf_stream_t* PdfPage::getStream(int index)
+PdfStream* PdfPage::getStream(int index)
 {
     if (index > contents.size() - 1) return NULL;
 

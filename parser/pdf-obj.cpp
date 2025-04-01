@@ -10,7 +10,7 @@ PdfObj::~PdfObj()
 {
     if (stream != nullptr)
     {
-        pdf_stream_free(stream);
+        delete stream;
     }
     if (xobject != nullptr)
     {
@@ -162,7 +162,7 @@ pdf_xobject_t* PdfObj::getXobject()
             // img->data = (unsigned char*)calloc(image_size, sizeof(unsigned char));
             // //memcpy(img->data, input, img_obj->stream_len);
             // img->data_len = image_size;
-            pdf_stream_get_all(stream, &img->data, &img->data_len);
+            stream->getAll(&img->data, &img->data_len);
             if (smask_ref != -1)
             {
                 PdfObj* smask_obj = pdf_file_get_obj(pdf, smask_ref);
@@ -170,7 +170,7 @@ pdf_xobject_t* PdfObj::getXobject()
                 {
                     unsigned char* smask = NULL;
                     int smask_len = 0;
-                    pdf_stream_get_all(smask_obj->stream, &smask, &smask_len);
+                    smask_obj->stream->getAll(&smask, &smask_len);
                     if (smask != NULL)
                     {
                         int tmp_len = sizeof(unsigned char) * width * 4 * height;

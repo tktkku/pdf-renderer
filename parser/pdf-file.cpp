@@ -212,7 +212,7 @@ bool _read_xref_and_trailer(pdf_file_t* pdf, int *root_obj_ref, int *info_obj_re
 
         unsigned char* start = NULL;
         int len;
-        pdf_stream_get_all(xref_obj->stream, &start, &len);
+        xref_obj->stream->getAll(&start, &len);
 
         for (int i = 0; i < index_arr->size(); i += 2)
         {
@@ -352,7 +352,7 @@ pdf_file_t* pdf_file_read_file(const char* file_name)
                         PdfObj* embedded_obj = pdf_file_get_obj(pdf_file, ref);
                         unsigned char* embedded_file = NULL;
                         int embedded_file_len = 0;
-                        pdf_stream_get_all(embedded_obj->stream, &embedded_file, &embedded_file_len);
+                        embedded_obj->stream->getAll(&embedded_file, &embedded_file_len);
                         embedded_file_len += 1;
                     }
                 }
@@ -638,7 +638,7 @@ PdfObj* pdf_file_get_obj(pdf_file_t* pdf, int ref)
 
                 unsigned char* start = NULL;
                 int size;
-                pdf_stream_get_all(objs_obj->stream, &start, &size);
+                objs_obj->stream->getAll(&start, &size);
                 pdf_buffer_t b1;
                 b1.buffer = start;
                 b1.buffer_size = size;

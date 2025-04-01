@@ -166,13 +166,13 @@ void render_to_png_by_plutovg(PdfPage* page, char* filename)
     int numStreams = page->getStreams();
     for (int j = 0; j < numStreams; j++)
     {
-        pdf_stream_t* stream = page->getStream(j);
+        PdfStream* stream = page->getStream(j);
         if (stream == NULL)
             continue;
-        pdf_stream_open(stream);
+        stream->open();
         PdfToken* tk;
         int count = 0;
-        while ((tk = pdf_stream_get_next_token(stream)) != NULL)
+        while ((tk = stream->getNextToken()) != NULL)
         {
             const char* token = tk->getValue();
             if (token == NULL)
@@ -185,10 +185,10 @@ void render_to_png_by_plutovg(PdfPage* page, char* filename)
             //     printf("Press any key to continue...");
             //     getchar();
             // }
-            stream->parser->freeToken(tk);
+            stream->freeToken(tk);
         }
 
-        pdf_stream_close(stream);
+        stream->close();
     }
     // Annots
     if (page->annots != NULL)
@@ -228,14 +228,14 @@ void render_to_png_by_plutovg(PdfPage* page, char* filename)
                     if (obj->stream != NULL)
                     {
                         context.current_obj = obj;
-                        pdf_stream_open(obj->stream);
+                        obj->stream->open();
                         PdfToken* tk = NULL;
-                        while ((tk = pdf_stream_get_next_token(obj->stream)) != NULL)
+                        while ((tk = obj->stream->getNextToken()) != NULL)
                         {
                             _do_render_operation(&context, tk);
-                            obj->stream->parser->freeToken(tk);
+                            obj->stream->freeToken(tk);
                         }
-                        pdf_stream_close(obj->stream);
+                        obj->stream->close();
                     }
                 }
             }
@@ -319,13 +319,13 @@ void render_to_buffer_by_plutovg(PdfPage* page, unsigned char* pixels,
     int numStreams = page->getStreams();
     for (int j = 0; j < numStreams; j++)
     {
-        pdf_stream_t* stream = page->getStream(j);
+        PdfStream* stream = page->getStream(j);
         if (stream == NULL)
             continue;
-        pdf_stream_open(stream);
+        stream->open();
         PdfToken* tk;
         int count = 0;
-        while ((tk = pdf_stream_get_next_token(stream)) != NULL)
+        while ((tk = stream->getNextToken()) != NULL)
         {
             const char* token = tk->getValue();
             if (token == NULL)
@@ -338,10 +338,10 @@ void render_to_buffer_by_plutovg(PdfPage* page, unsigned char* pixels,
             //     printf("Press any key to continue...");
             //     getchar();
             // }
-            stream->parser->freeToken(tk);
+            stream->freeToken(tk);
         }
 
-        pdf_stream_close(stream);
+        stream->close();
     }
     //pdf_stack_free(stack);
     if (context.state->textState.fontface != NULL)
@@ -1381,15 +1381,15 @@ void handle_Do(pdf_context_t* context)
         {
             PdfObj* save_obj = context->current_obj;
             context->current_obj = tmp_obj;
-            pdf_stream_open(tmp_obj->stream);
+            tmp_obj->stream->open();
             PdfToken* tk = NULL;
-            while ((tk = pdf_stream_get_next_token(tmp_obj->stream)) != NULL)
+            while ((tk = tmp_obj->stream->getNextToken()) != NULL)
             {
                 _do_render_operation(context, tk);
-                tmp_obj->stream->parser->freeToken(tk);
+                tmp_obj->stream->freeToken(tk);
             }
 
-            pdf_stream_close(tmp_obj->stream);
+            tmp_obj->stream->close();
             context->current_obj = save_obj;
         }
     }

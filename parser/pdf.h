@@ -8,19 +8,17 @@
 #include <vector>
 #include <string>
 
-struct pdf_stream;
-typedef struct pdf_stream pdf_stream_t;
-
 class PdfArray;
 class PdfDict;
 struct PdfValue;
 class PdfObj;
 class PdfPage;
+class PdfStream;
+
 typedef struct pdf_file pdf_file_t;
 typedef struct pdf_resources pdf_resources_t;
 
 typedef struct pdf_font pdf_font_t;
-typedef struct pdf_stream pdf_stream_t;
 
 typedef struct pdf_image pdf_image_t;
 typedef struct pdf_form pdf_form_t;
@@ -35,16 +33,6 @@ typedef struct pdf_buffer pdf_buffer_t;
 struct pdf_cmap;
 typedef struct pdf_cmap pdf_cmap_t;
 
-
-
-
-void pdf_stream_close(pdf_stream_t* stream);
-PdfToken* pdf_stream_get_next_token(pdf_stream_t* stream);
-int pdf_stream_get_data(pdf_stream_t* stream, unsigned char* buf, int size);
-pdf_stream_t* pdf_stream_init(pdf_file_t* pdf, PdfObj* obj, int len, int offset);
-void pdf_stream_free(pdf_stream_t* stream);
-void pdf_stream_open(pdf_stream_t* stream);
-void pdf_stream_get_all(pdf_stream_t* stream, unsigned char** buffer, int* size);
 
 pdf_file_t* pdf_file_read_file(const char* file_name);
 void pdf_file_free(pdf_file_t* file);

@@ -92,9 +92,10 @@ struct PdfValue
     };
     int value_len;
     enum PdfValueType type;
-    PdfValue() 
-    : type(NUL), indirect(0)
-    {}
+    PdfValue()
+        : type(NUL), indirect(0)
+    {
+    }
     ~PdfValue();
 };
 
@@ -104,16 +105,17 @@ class PdfObj
 public:
     int seq;
     PdfValue* value;
-    pdf_stream_t* stream;
+    PdfStream* stream;
     pdf_xobject_t* xobject;
     unsigned char* font_data;
     int font_data_len;
     pdf_file_t* pdf;
 public:
     PdfObj()
-    : seq(0), value(nullptr), stream(nullptr), xobject(nullptr),
-    font_data(nullptr), font_data_len(0), pdf(nullptr)
-    {}
+        : seq(0), value(nullptr), stream(nullptr), xobject(nullptr),
+        font_data(nullptr), font_data_len(0), pdf(nullptr)
+    {
+    }
     pdf_xobject_t* getXobject();
     ~PdfObj();
 };
@@ -290,8 +292,9 @@ public:
     PdfArray* annots;
 public:
     PdfPage()
-    : pageNo(0), pdf(nullptr), rotate(0), resources(nullptr), annots(nullptr)
-    {}
+        : pageNo(0), pdf(nullptr), rotate(0), resources(nullptr), annots(nullptr)
+    {
+    }
     ~PdfPage();
     int getMediaWidth() { return media_box.width; }
     int getMediaHeight() { return media_box.height; }
@@ -299,7 +302,7 @@ public:
 
     void getExtGState(const char* name);
     int getStreams();
-    pdf_stream_t* getStream(int index);
+    PdfStream* getStream(int index);
 private:
     pdf_font_t* _loadType0Font(PdfDict& font_dict);
     pdf_font_t* _loadTruetypeFont(PdfDict& font_dict);
@@ -434,10 +437,21 @@ struct pdf_buffer
     int processed;
 };
 
-struct pdf_stream
+class PdfStream
 {
+private:
     pdf_file_t* pdf;
     PdfObj* obj;
+
+
+    PdfParser* parser;
+    PdfValue* filter;
+    int predictor;
+    int colors;
+    int bitspercomponent;
+    int columns;
+    int earlychange;
+public:
     int stream_offset;
     int stream_len;
     struct
@@ -453,13 +467,17 @@ struct pdf_stream
     } decomp;
     int processed;
     int readin_len;
-    PdfParser* parser;
-    PdfValue* filter;
-    int predictor;
-    int colors;
-    int bitspercomponent;
-    int columns;
-    int earlychange;
+public:
+    PdfStream(pdf_file_t* pdf, PdfObj* obj, int len, int offset);
+    ~PdfStream();
+    void close();
+    void open();
+
+    PdfToken* getNextToken();
+    void freeToken(PdfToken* token) { parser->freeToken(token); }
+    int getData(unsigned char* buf, int size);
+    void getAll(unsigned char** buffer, int* size);
+
 };
 
 // struct pdf_stack_node

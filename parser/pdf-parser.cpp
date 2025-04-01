@@ -805,7 +805,7 @@ void PdfParser::_readBuffer(void* source)
 }
 void PdfParser::_readStream(void* source)
 {
-    pdf_stream_t* stream = (pdf_stream_t*)source;
+    PdfStream* stream = (PdfStream*)source;
     int off = _copyRem();
     int ret = 0;
     if (stream != NULL)
@@ -813,7 +813,7 @@ void PdfParser::_readStream(void* source)
         if ((stream->decomp.cur_pos >= stream->decomp.len && stream->readin_len < stream->stream_len)
             || stream->processed < stream->stream_len)
         {
-            ret = pdf_stream_get_data(stream, this->buffer + off, this->buffer_size - off);
+            ret = stream->getData(this->buffer + off, this->buffer_size - off);
         }
     }
 
@@ -1089,10 +1089,6 @@ PdfToken* PdfParser::_getNextToken()
     }
 #endif
 }
-PdfToken* pdf_stream_get_next_token(pdf_stream_t* stream)
-{
-    return stream->parser->getNextToken();
-}
 
 PdfToken* PdfParser::getNextToken()
 {
@@ -1111,7 +1107,7 @@ PdfToken* PdfParser::getNextToken()
     {
         if (this->reader.type == STREAM_READER)
         {
-            pdf_stream_t* s = (pdf_stream_t*)this->reader.source;
+            PdfStream* s = (PdfStream*)this->reader.source;
             if (s->processed < s->stream_len)
             {
                 this->current_pos = save_cur;
@@ -1390,7 +1386,7 @@ PdfObj* PdfParser::buildObj()
                 fseek(this->pdf->pFile, offset, SEEK_SET);
             }
             //int offset = ftell(parser->pdf->pFile);
-            obj->stream = pdf_stream_init(this->pdf, obj, len, offset);
+            obj->stream = new PdfStream(this->pdf, obj, len, offset);
             fseek(this->pdf->pFile, len, SEEK_CUR);
             free(this->remain.rem);
             this->remain.rem = 0;

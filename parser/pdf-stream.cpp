@@ -4,54 +4,52 @@
 #include <string.h>
 #include <stdio.h>
 #include <assert.h>
-void pdf_stream_close(pdf_stream_t* stream)
+void PdfStream::close()
 {
-    inflateEnd(&(stream->decomp.flate));
+    inflateEnd(&(decomp.flate));
 
-    if (stream->parser)
+    if (parser)
     {
-        delete stream->parser;
-        stream->parser = NULL;
+        delete parser;
+        parser = NULL;
+    }
+}
+PdfToken* PdfStream::getNextToken()
+{
+    return parser->getNextToken();
+}
+
+PdfStream::~PdfStream()
+{
+    if (filter)
+    {
+        free(filter);
+        filter = NULL;
+    }
+
+    if (decomp.buf)
+    {
+        free(decomp.buf);
+        decomp.buf = NULL;
     }
 }
 
-void pdf_stream_free(pdf_stream_t* stream)
+PdfStream::PdfStream(pdf_file_t* pdf, PdfObj* obj, int len, int offset)
 {
-    if (stream == NULL)
-        return;
-    if (stream->filter)
-    {
-        free(stream->filter);
-        stream->filter = NULL;
-    }
-
-    if (stream->decomp.buf)
-    {
-        free(stream->decomp.buf);
-        stream->decomp.buf = NULL;
-    }
-
-    free(stream);
-    stream = NULL;
-}
-
-pdf_stream_t* pdf_stream_init(pdf_file_t* pdf, PdfObj* obj, int len, int offset)
-{
-    if (pdf == NULL || obj == NULL)
-    {
-        return NULL;
-    }
     auto& content_dict = *obj->value->dict;
-    const char* filter = content_dict["/Filter"].name;
+    const char* flt = NULL;
     PdfArray* filter_arr = NULL;
-
-    if (filter == NULL)
+    if (content_dict["/Filter"].type == NAME)
+    {
+        flt = content_dict["/Filter"].name;
+    }
+    else if (content_dict["/Filter"].type == ARRAY)
     {
         filter_arr = content_dict["/Filter"].array;
 
         if (filter_arr != NULL && filter_arr->size() == 1)
         {
-            filter = (*filter_arr)[0]->name;
+            flt = (*filter_arr)[0]->name;
         }
     }
     PdfDict* parms_dict = NULL;
@@ -107,119 +105,117 @@ pdf_stream_t* pdf_stream_init(pdf_file_t* pdf, PdfObj* obj, int len, int offset)
         if (earlychange != 0 && earlychange != 1) earlychange = 1;
     }
 
-    pdf_stream_t* s = (pdf_stream_t*)calloc(1, sizeof(pdf_stream_t));
-    s->pdf = pdf;
-    s->obj = obj;
-    s->stream_len = len;
-    s->stream_offset = offset;
-
-    s->predictor = predictor;
-    s->colors = colors;
-    s->bitspercomponent = bitspercomponent;
-    s->columns = columns;
-    s->earlychange = earlychange;
-    if (filter != NULL)
+    this->pdf = pdf;
+    this->obj = obj;
+    this->stream_len = len;
+    this->stream_offset = offset;
+    this->processed = 0;
+    this->readin_len = 0;
+    this->predictor = predictor;
+    this->colors = colors;
+    this->bitspercomponent = bitspercomponent;
+    this->columns = columns;
+    this->earlychange = earlychange;
+    if (flt != NULL)
     {
-        s->filter = new PdfValue;
-        s->filter->type = NAME;
-        s->filter->name = (char*)filter;
-        s->filter->value_len = strlen(filter);
+        this->filter = new PdfValue;
+        this->filter->type = NAME;
+        this->filter->name = (char*)flt;
+        this->filter->value_len = strlen(flt);
     }
     else if (filter_arr != NULL)
     {
-        s->filter = new PdfValue;
-        s->filter->type = ARRAY;
-        s->filter->array = filter_arr;
+        this->filter = new PdfValue;
+        this->filter->type = ARRAY;
+        this->filter->array = filter_arr;
     }
-
-    return s;
 }
-void pdf_stream_open(pdf_stream_t* stream)
+void PdfStream::open()
 {
-    if (stream == NULL || stream->pdf == NULL)
+    if (pdf == NULL)
         return;
-    stream->parser = new PdfParser(stream->pdf, STREAM_READER, stream);
-    stream->decomp.flate.avail_in = 0;
-    stream->decomp.flate.next_in = NULL;
-    stream->decomp.flate.zalloc = NULL;
-    stream->decomp.flate.zfree = NULL;
-    stream->decomp.flate.opaque = NULL;
-    inflateInit(&(stream->decomp.flate));
+    this->parser = new PdfParser(this->pdf, STREAM_READER, this);
+    this->decomp.flate.avail_in = 0;
+    this->decomp.flate.next_in = NULL;
+    this->decomp.flate.zalloc = NULL;
+    this->decomp.flate.zfree = NULL;
+    this->decomp.flate.opaque = NULL;
+    inflateInit(&(this->decomp.flate));
 
-    stream->decomp.buf = (unsigned char*)malloc(4096);
-    stream->decomp.buf_size = 4096;
-    stream->decomp.cur_pos = 0;
-    stream->decomp.len = 0;
-    fseek(stream->pdf->pFile, stream->stream_offset, SEEK_SET);
+    this->decomp.buf = (unsigned char*)malloc(4096);
+    this->decomp.buf_size = 4096;
+    this->decomp.cur_pos = 0;
+    this->decomp.len = 0;
+    fseek(this->pdf->pFile, this->stream_offset, SEEK_SET);
 }
 /**
  * -1: error
  * 0: complete
  * > 0: bytes
  */
-int pdf_stream_get_data(pdf_stream_t* stream, unsigned char* buf, int size)
+int PdfStream::getData(unsigned char* buf, int size)
 {
-    if (stream == NULL || buf == NULL || size <= 0)
+    if (buf == NULL || size <= 0)
         return -1;
     int ret = 0;
-    if (stream->filter != NULL)
+    if (this->filter != NULL)
     {
-        if (stream->filter->type == NAME)
+        if (this->filter->type == NAME)
         {
-            if (strcmp(stream->filter->name, "/FlateDecode") == 0)
+            if (strcmp(this->filter->name, "/FlateDecode") == 0)
             {
-                if (stream->decomp.cur_pos >= stream->decomp.len && stream->readin_len < stream->stream_len)
+                if (this->decomp.cur_pos >= this->decomp.len && this->readin_len < this->stream_len)
                 {
-                    memset(stream->decomp.buf, 0, stream->decomp.buf_size);
-                    int read_size = stream->stream_len - stream->processed;
-                    read_size = MIN(stream->decomp.buf_size, read_size);
-                    fseek(stream->pdf->pFile, stream->stream_offset + stream->readin_len, SEEK_SET);
-                    stream->decomp.len = stream->decomp.flate.avail_in
-                        = fread(stream->decomp.buf, 1, read_size, stream->pdf->pFile);
-                    if (stream->decomp.flate.avail_in == 0)
+                    memset(this->decomp.buf, 0, this->decomp.buf_size);
+                    int read_size = this->stream_len - this->processed;
+                    read_size = MIN(this->decomp.buf_size, read_size);
+                    fseek(this->pdf->pFile, this->stream_offset + this->readin_len, SEEK_SET);
+                    this->decomp.len = this->decomp.flate.avail_in
+                        = fread(this->decomp.buf, 1, read_size, this->pdf->pFile);
+                    if (this->decomp.flate.avail_in == 0)
                     {
                         return 0;
                     }
-                    stream->decomp.flate.next_in = stream->decomp.buf;
-                    stream->decomp.cur_pos = 0;
-                    stream->readin_len += stream->decomp.len;
+                    this->decomp.flate.next_in = this->decomp.buf;
+                    this->decomp.cur_pos = 0;
+                    this->readin_len += this->decomp.len;
                 }
-                if (stream->processed < stream->stream_len)
+                if (this->processed < this->stream_len)
                 {
-                    stream->decomp.flate.avail_out = size;
-                    stream->decomp.flate.next_out = buf;
-                    int zret = inflate(&(stream->decomp.flate), Z_NO_FLUSH);
+                    this->decomp.flate.avail_out = size;
+                    this->decomp.flate.next_out = buf;
+                    int zret = inflate(&(this->decomp.flate), Z_NO_FLUSH);
                     if (zret == Z_STREAM_ERROR || zret == Z_DATA_ERROR || zret == Z_MEM_ERROR || zret == Z_BUF_ERROR)
                     {
                         return 0;
                     }
-                    stream->decomp.cur_pos += (stream->decomp.flate.total_in - stream->processed);
-                    stream->processed = stream->decomp.flate.total_in;
-                    ret = size - stream->decomp.flate.avail_out;
+                    this->decomp.cur_pos += (this->decomp.flate.total_in - this->processed);
+                    this->processed = this->decomp.flate.total_in;
+                    ret = size - this->decomp.flate.avail_out;
                 }
             }
         }
     }
     else
     {
-        ret = fread(buf, 1, size, stream->pdf->pFile);
+        ret = fread(buf, 1, size, this->pdf->pFile);
         if (ret < 0)
         {
             return -1;
         }
-        stream->readin_len += ret;
+        this->readin_len += ret;
     }
 
     return ret;
 }
 
-void pdf_stream_get_all(pdf_stream_t* stream, unsigned char** buffer, int* size)
+void PdfStream::getAll(unsigned char** buffer, int* size)
 {
     unsigned char* start = NULL;
     int ret = 0, off = 0;
     unsigned char tmp[4096];
-    pdf_stream_open(stream);
-    while ((ret = pdf_stream_get_data(stream, tmp, sizeof(tmp))) > 0)
+    open();
+    while ((ret = getData(tmp, sizeof(tmp))) > 0)
     {
         if (start == NULL)
         {
@@ -238,9 +234,9 @@ void pdf_stream_get_all(pdf_stream_t* stream, unsigned char** buffer, int* size)
         memcpy(start + off, tmp, ret);
         off += ret;
     }
-    if (stream->predictor == 12) // PNG UP
+    if (this->predictor == 12) // PNG UP
     {
-        int stride = stream->columns * stream->colors * stream->bitspercomponent / 8;
+        int stride = this->columns * this->colors * this->bitspercomponent / 8;
         int rows = off / (stride + 1);
         char* data1 = (char*)malloc(off);
         memcpy(data1, start, off);
@@ -270,7 +266,7 @@ void pdf_stream_get_all(pdf_stream_t* stream, unsigned char** buffer, int* size)
         off = stride * rows;
         free(data1);
     }
-    pdf_stream_close(stream);
+    close();
 
     *buffer = start;
     *size = off;
