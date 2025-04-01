@@ -73,22 +73,37 @@ pdf_stream_t* pdf_stream_init(pdf_file_t* pdf, pdf_obj_t* obj, int len, int offs
         colors = 1, bitspercomponent = 8, columns = 1, earlychange = 1;
     if (parms_dict != NULL)
     {
-        predictor = (*parms_dict)["/Predictor"].number;
+        if ((*parms_dict)["/Predictor"].type == NUMBER) 
+        {
+            predictor = (*parms_dict)["/Predictor"].number;
+        }
         if (predictor < 1) predictor = 1;
 
-        colors = (*parms_dict)["/Colors"].number;
+        if ((*parms_dict)["/Colors"].type == NUMBER)
+        {
+            colors = (*parms_dict)["/Colors"].number;
+        }
         if (colors < 1 || colors > 4) colors = 1;
-
-        bitspercomponent = (*parms_dict)["/BitsPerComponent"].number;
+        
+        if ((*parms_dict)["/BitsPerComponent"].type == NUMBER)
+        {
+            bitspercomponent = (*parms_dict)["/BitsPerComponent"].number;
+        }
         if (bitspercomponent != 1
             && bitspercomponent != 4
             && bitspercomponent != 8
             && bitspercomponent != 16) bitspercomponent = 8;
 
-        columns = (*parms_dict)["/Columns"].number;
+        if ((*parms_dict)["/Columns"].type == NUMBER)
+        {
+            columns = (*parms_dict)["/Columns"].number;
+        }
         if (columns < 1) columns = 1;
 
-        earlychange = (*parms_dict)["/EarlyChange"].number;
+        if ((*parms_dict)["/EarlyChange"].type == NUMBER)
+        {
+            earlychange = (*parms_dict)["/EarlyChange"].number;
+        }
         if (earlychange != 0 && earlychange != 1) earlychange = 1;
     }
 

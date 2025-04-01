@@ -1120,14 +1120,6 @@ PdfToken* PdfParser::getNextToken()
             }
         }
     }
-    if (tk != NULL)
-    {
-        for (size_t i = 0; i < tk->token_len; i++)
-        {
-            printf("%c", tk->token[i]);
-        }
-        printf("\n");
-    }
     return tk;
 }
 pdf_cmap_t* PdfParser::buildCMap()

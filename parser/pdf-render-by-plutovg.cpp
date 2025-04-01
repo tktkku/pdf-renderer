@@ -198,7 +198,8 @@ void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
             pdf_obj_t* anno_obj = pdf_file_get_obj(page->pdf, (*page->annots)[i]->indirect);
             // pdf_dict_get_name(anno_obj->value->val.dict, "/Type");
             // pdf_dict_get_name(anno_obj->value->val.dict, "/SubType");
-            // pdf_dict_get_array(anno_obj->value->val.dict, "/Rect");
+            PdfArray* rect = (*anno_obj->value->dict)["/Rect"].array;
+            plutovg_canvas_translate(canvas, (*rect)[0]->number, (*rect)[1]->number);
             // pdf_dict_get_string(anno_obj->value->val.dict, "/Contents");
             // pdf_dict_get_dict(anno_obj->value->val.dict, "/P");
             // pdf_dict_get_string(anno_obj->value->val.dict, "/NM");

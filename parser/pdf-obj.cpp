@@ -112,7 +112,16 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj)
                 length = len_obj->value->number;
             }
         }
-        const char* color_space = img_dict["/ColorSpace"].name;
+        const char* color_space = NULL;
+        PdfArray* color_space_aar = NULL;
+        if (img_dict["/ColorSpace"].type == NAME)
+        {
+            color_space = img_dict["/ColorSpace"].name;
+        }
+        else if (img_dict["/ColorSpace"].type == ARRAY)
+        {
+            color_space_aar = img_dict["/ColorSpace"].array;
+        }
         const char* name = img_dict["/Intent"].name;
         PdfArray* mask_arr = img_dict["/Mask"].array;
         PdfArray* decode_aar = img_dict["/Decode"].array;
@@ -126,11 +135,7 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj)
         int smask_in_data = img_dict["/SMaskInData"].number;
         const char* metadata = img_dict["/Metadata"].name;
         PdfDict* oc_dict = img_dict["/OC"].dict;
-        PdfArray* color_space_aar = NULL;
-        if (color_space == NULL)
-        {
-            color_space_aar = img_dict["/ColorSpace"].array;
-        }
+
         int imageMask = img_dict["/ImageMask"].boolean;
         if (imageMask > 0)
         {
@@ -163,17 +168,40 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj)
                     {
                         int tmp_len = sizeof(unsigned char) * width * 4 * height;
                         unsigned char* tmp = (unsigned char*)malloc(tmp_len);
-                        for (int i = 0; i < height; i++)
+                        int stride = img->data_len / height;
+                        if (color_space_aar != NULL && !strcmp((*color_space_aar)[0]->name, "/Indexed"))
                         {
-                            for (int j = 0; j < width; j++)
+                            int lookup_cnt = (*color_space_aar)[2]->number;
+                            char* lookup = (*color_space_aar)[3]->string + 1;
+                            for (int i = 0; i < height; i++)
                             {
-                                int index = (i * width + j);
-                                int index1 = index * 3;
-                                int index2 = index * 4;
-                                tmp[index2    ] = img->data[index1];
-                                tmp[index2 + 1] = img->data[index1 + 1];
-                                tmp[index2 + 2] = img->data[index1 + 2];
-                                tmp[index2 + 3] = smask[index];
+                                for (int j = 0; j < width; j++)
+                                {
+                                    int index = (i * width + j);
+                                    int index1 = img->data[i * stride + j] * 3;
+                                    int index2 = index * 4;
+                                    
+                                    tmp[index2] = lookup[index1];
+                                    tmp[index2 + 1] = lookup[index1 + 1];
+                                    tmp[index2 + 2] = lookup[index1 + 2];
+                                    tmp[index2 + 3] = smask[index];
+                                }
+                            }
+                        }
+                        else
+                        {
+                            for (int i = 0; i < height; i++)
+                            {
+                                for (int j = 0; j < width; j++)
+                                {
+                                    int index = (i * width + j);
+                                    int index1 = i * stride + j * 3;
+                                    int index2 = index * 4;
+                                    tmp[index2] = img->data[index1];
+                                    tmp[index2 + 1] = img->data[index1 + 1];
+                                    tmp[index2 + 2] = img->data[index1 + 2];
+                                    tmp[index2 + 3] = smask[index];
+                                }
                             }
                         }
                         pdf_image_t t;
