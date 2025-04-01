@@ -12,7 +12,10 @@ cmake --build build
 ```
 ## Valgrind
 valgrind --tool=memcheck --leak-check=full --show-leak-kinds=all --log-file="valgrind.log" --vgdb=yes --vgdb-error=0 -s ./build/test test.pdf
-
+valgrind --tool=callgrind ./build/test test.pdf
+callgrind_annotate callgrind.out.<PID> --inclusive=yes
+kcachegrind callgrind.out.<PID>
+gprof2dot -f callgrind callgrind.out.<PID> | dot -Tpng -o profile.png
 ## License
 ```
 MIT License
