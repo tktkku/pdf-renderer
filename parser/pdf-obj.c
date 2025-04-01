@@ -142,19 +142,43 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj)
                     {
                         int tmp_len = sizeof(unsigned char) * width * 4 * height;
                         unsigned char* tmp = (unsigned char*)malloc(tmp_len);
-                        for (int i = 0; i < height; i++)
+                        int stride = img->data_len / height;
+                        if (color_space_aar != NULL && !strcmp(color_space_aar->values[0]->val.name, "/Indexed"))
                         {
-                            for (int j = 0; j < width; j++)
+                            int lookup_cnt = color_space_aar->values[2]->val.number;
+                            char* lookup = color_space_aar->values[2]->val.string + 1;
+                            for (int i = 0; i < height; i++)
                             {
-                                int index = (i * width + j);
-                                int index1 = index * 3;
-                                int index2 = index * 4;
-                                tmp[index2] = img->data[index1];
-                                tmp[index2 + 1] = img->data[index1 + 1];
-                                tmp[index2 + 2] = img->data[index1 + 2];
-                                tmp[index2 + 3] = smask[index];
+                                for (int j = 0; j < width; j++)
+                                {
+                                    int index = (i * width + j);
+                                    int index1 = img->data[i * stride + j] * 3;
+                                    int index2 = index * 4;
+                                    
+                                    tmp[index2] = lookup[index1];
+                                    tmp[index2 + 1] = lookup[index1 + 1];
+                                    tmp[index2 + 2] = lookup[index1 + 2];
+                                    tmp[index2 + 3] = smask[index];
+                                }
                             }
                         }
+                        else
+                        {
+                            for (int i = 0; i < height; i++)
+                            {
+                                for (int j = 0; j < width; j++)
+                                {
+                                    int index = (i * width + j);
+                                    int index1 = index * 3;
+                                    int index2 = index * 4;
+                                    tmp[index2] = img->data[index1];
+                                    tmp[index2 + 1] = img->data[index1 + 1];
+                                    tmp[index2 + 2] = img->data[index1 + 2];
+                                    tmp[index2 + 3] = smask[index];
+                                }
+                            }
+                        }
+                        
                         pdf_image_t t = {
                             .data = NULL,
                             .data_len = 0

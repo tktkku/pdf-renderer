@@ -317,6 +317,8 @@ struct pdf_parser
         unsigned char* rem;
         int len;
     } remain;
+    pdf_parser_token_t* cached_tokens[3];
+    int num_cached_tokens;
 };
 
 struct pdf_buffer

@@ -151,6 +151,7 @@ void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
     context.stack = stack;
     context.pdf = page->pdf;
     context.page = page;
+    context.current_obj = NULL;
     context.textState.textMode = 0;
     context.textState.textLeading = 0;
     context.textState.font = NULL;
@@ -190,7 +191,11 @@ void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
             pdf_obj_t* anno_obj = pdf_file_get_obj(page->pdf, page->annots->values[i]->val.indirect);
             pdf_dict_get_name(anno_obj->value->val.dict, "/Type");
             pdf_dict_get_name(anno_obj->value->val.dict, "/SubType");
-            pdf_dict_get_array(anno_obj->value->val.dict, "/Rect");
+            pdf_array_t* rect_aar = pdf_dict_get_array(anno_obj->value->val.dict, "/Rect");
+            if (rect_aar != NULL)
+            {
+                plutovg_canvas_translate(canvas, rect_aar->values[0]->val.number, rect_aar->values[1]->val.number);
+            }
             pdf_dict_get_string(anno_obj->value->val.dict, "/Contents");
             pdf_dict_get_dict(anno_obj->value->val.dict, "/P");
             pdf_dict_get_string(anno_obj->value->val.dict, "/NM");
@@ -285,6 +290,7 @@ void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
     context.graphicsState.fillColor[1] = 0;
     context.graphicsState.fillColor[2] = 0;
     context.stack = stack;
+    context.current_obj = NULL;
     context.pdf = page->pdf;
     context.page = page;
     context.textState.textMode = 0;
@@ -334,7 +340,7 @@ void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
 
 void _do_render_operation(pdf_context_t* context, pdf_parser_token_t* tk)
 {
-    printf("%s\n", tk->token);
+    //printf("%s\n", tk->token);
     int count = ARRAY_COUNT(handlers);
     int left = 0;
     int right = count - 1;
@@ -1189,7 +1195,7 @@ void handle_Do(pdf_context_t* context)
         }
 
         sprintf(filename, "%s.png", buf + 1);
-        plutovg_surface_write_to_png(s, filename);
+        //plutovg_surface_write_to_png(s, filename);
 
         // Scale factors to normalize image dimensions to unit space
         // plutovg_matrix_t m = { xobj->image->width, 0, 0, -xobj->image->height, 0,
@@ -1567,7 +1573,7 @@ void handle_Tj(pdf_context_t* context)
             context->graphicsState.fillColor[0],
             context->graphicsState.fillColor[1],
             context->graphicsState.fillColor[2]);
-        printf("before %.2f\n", context->textState.lineWidth);
+        //printf("before %.2f\n", context->textState.lineWidth);
         if (context->textState.font->load_succeed)
         {
             if (strstr(context->textState.font->encoding, "Identity"))
@@ -1581,7 +1587,7 @@ void handle_Tj(pdf_context_t* context)
             context->textState.lineWidth += plutovg_canvas_fill_text1(context->canvas, unicode, unicode_cnt,
                 PLUTOVG_TEXT_ENCODING_UTF16, context->textState.lineWidth, 0);
         plutovg_canvas_restore(context->canvas);
-        printf("after %.2f\n", context->textState.lineWidth);
+        //printf("after %.2f\n", context->textState.lineWidth);
     }
     else if (buf[0] == '(')
     {

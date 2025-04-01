@@ -93,7 +93,8 @@ pdf_stream_t* pdf_stream_init(pdf_file_t* pdf, pdf_obj_t* obj, int len, int offs
     s->obj = obj;
     s->stream_len = len;
     s->stream_offset = offset;
-
+    s->processed = 0;
+    s->readin_len = 0;
     s->predictor = predictor;
     s->colors = colors;
     s->bitspercomponent = bitspercomponent;

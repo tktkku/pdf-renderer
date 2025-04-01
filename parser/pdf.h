@@ -49,7 +49,7 @@ typedef struct pdf_stack_node pdf_stack_node_t;
 typedef struct pdf_stack pdf_stack_t;
 void pdf_value_free(struct pdf_value* value);
 
-pdf_stack_t* pdf_stack_init();
+pdf_stack_t* pdf_stack_init(void);
 void pdf_stack_push(pdf_stack_t* s, const void* data, size_t size);
 void pdf_stack_pop(pdf_stack_t* s, pdf_stack_node_t* data);
 void pdf_stack_free(pdf_stack_t* s);
@@ -78,7 +78,7 @@ pdf_dict_t* pdf_parser_build_dict(pdf_parser_t* parser);
 pdf_array_t* pdf_parser_build_array(pdf_parser_t* parser);
 pdf_cmap_t* pdf_parser_build_cmap(pdf_parser_t* parser);
 
-pdf_page_t* pdf_page_init();
+pdf_page_t* pdf_page_init(void);
 void pdf_page_free(pdf_page_t* page);
 int pdf_page_get_media_width(pdf_page_t* page);
 int pdf_page_get_media_height(pdf_page_t* page);
@@ -100,7 +100,7 @@ void pdf_stream_free(pdf_stream_t* stream);
 void pdf_stream_open(pdf_stream_t* stream);
 void pdf_stream_get_all(pdf_stream_t* stream, unsigned char** buffer, int* size);
 
-pdf_obj_t* pdf_obj_init();
+pdf_obj_t* pdf_obj_init(void);
 void pdf_obj_free(pdf_obj_t* obj);
 
 pdf_file_t* pdf_file_read_file(const char* file_name);
@@ -110,7 +110,7 @@ int pdf_file_get_pages(pdf_file_t* pdf);
 pdf_page_t* pdf_file_get_page(pdf_file_t* pdf, int pageNo);
 pdf_cmap_t* pdf_file_get_cmap(pdf_file_t* pdf, char* name);
 
-pdf_dict_t* pdf_dict_init();
+pdf_dict_t* pdf_dict_init(void);
 void pdf_dict_free(pdf_dict_t* dict);
 double pdf_dict_get_number(pdf_dict_t* dict, const char* name);
 int pdf_dict_get_ref(pdf_dict_t* dict, const char* name);
@@ -121,13 +121,13 @@ int pdf_dict_get_bool(pdf_dict_t* dict, const char* name);
 bool pdf_dict_add_array(pdf_dict_t* dict, const char* name, pdf_array_t* array);
 const char* pdf_dict_get_string(pdf_dict_t* dict, const char* name);
 
-pdf_font_t* pdf_font_init();
+pdf_font_t* pdf_font_init(void);
 void pdf_font_free(pdf_font_t* font);
 
-pdf_array_t* pdf_array_init();
+pdf_array_t* pdf_array_init(void);
 void pdf_array_free(pdf_array_t* array);
 
-pdf_cmap_t* pdf_cmap_init();
+pdf_cmap_t* pdf_cmap_init(void);
 void pdf_cmap_free(pdf_cmap_t* cmap);
 
 typedef struct context
