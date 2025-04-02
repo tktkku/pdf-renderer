@@ -185,7 +185,7 @@ void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
             //     printf("Press any key to continue...");
             //     getchar();
             // }
-            pdf_parser_token_free(tk);
+            pdf_parser_token_free(stream->parser, tk);
         }
 
         pdf_stream_close(stream);
@@ -237,7 +237,7 @@ void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
                         while ((tk = pdf_stream_get_next_token(obj->stream)) != NULL)
                         {
                             _do_render_operation(&context, tk);
-                            pdf_parser_token_free(tk);
+                            pdf_parser_token_free(obj->stream->parser, tk);
                         }
                         pdf_stream_close(obj->stream);
                     }
@@ -334,7 +334,7 @@ void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
             //     printf("Press any key to continue...");
             //     getchar();
             // }
-            pdf_parser_token_free(tk);
+            pdf_parser_token_free(stream->parser, tk);
         }
 
         pdf_stream_close(stream);
@@ -1107,7 +1107,7 @@ void handle_Do(pdf_context_t* context)
             while ((tk = pdf_stream_get_next_token(tmp_obj->stream)) != NULL)
             {
                 _do_render_operation(context, tk);
-                pdf_parser_token_free(tk);
+                pdf_parser_token_free(tmp_obj->stream->parser, tk);
             }
 
             pdf_stream_close(tmp_obj->stream);
@@ -1561,23 +1561,24 @@ void handle_Tj(pdf_context_t* context)
                 pdf_cmap_t* cmap = context->state->textState.font->cmap;
                 while (cmap != NULL && !found)
                 {
-                    for (int k = 0; k < cmap->unicode_map_len; k++)
+                    int nums = cvector_size(cmap->unicode_map);
+                    for (int k = 0; k < nums; k++)
                     {
-                        if (t == cmap->unicode_map[k].cid)
+                        if (t == cmap->unicode_map[k]->cid)
                         {
-                            unicode[unicode_cnt++] = cmap->unicode_map[k].unicode;
+                            unicode[unicode_cnt++] = cmap->unicode_map[k]->unicode;
                             found = true;
                             break;
                         }
                     }
-
-                    for (int k = 0; k < cmap->char_range_map_len && !found; k++)
+                    nums = cvector_size(cmap->char_range_map);
+                    for (int k = 0; k < nums && !found; k++)
                     {
-                        if (t >= cmap->char_range_map[k].srcStart &&
-                            t <= cmap->char_range_map[k].srcEnd)
+                        if (t >= cmap->char_range_map[k]->dstStart &&
+                            t <= cmap->char_range_map[k]->srcEnd)
                         {
-                            unicode[unicode_cnt++] = cmap->char_range_map[k].dstStart +
-                                (t - cmap->char_range_map[k].srcStart);
+                            unicode[unicode_cnt++] = cmap->char_range_map[k]->dstStart +
+                                (t - cmap->char_range_map[k]->srcStart);
                             found = true;
                             break;
                         }
@@ -1645,23 +1646,24 @@ void handle_Tj(pdf_context_t* context)
                 pdf_cmap_t* cmap = context->state->textState.font->cmap;
                 while (cmap != NULL && !found)
                 {
-                    for (int k = 0; k < cmap->unicode_map_len; k++)
+                    int nums = cvector_size(cmap->unicode_map);
+                    for (int k = 0; k < nums; k++)
                     {
-                        if (t == cmap->unicode_map[k].cid)
+                        if (t == cmap->unicode_map[k]->cid)
                         {
-                            unicode[unicode_cnt++] = cmap->unicode_map[k].unicode;
+                            unicode[unicode_cnt++] = cmap->unicode_map[k]->unicode;
                             found = true;
                             break;
                         }
                     }
-
-                    for (int k = 0; k < cmap->char_range_map_len && !found; k++)
+                    nums = cvector_size(cmap->char_range_map);
+                    for (int k = 0; k < nums && !found; k++)
                     {
-                        if (t >= cmap->char_range_map[k].srcStart &&
-                            t <= cmap->char_range_map[k].srcEnd)
+                        if (t >= cmap->char_range_map[k]->srcStart &&
+                            t <= cmap->char_range_map[k]->srcEnd)
                         {
-                            unicode[unicode_cnt++] = cmap->char_range_map[k].dstStart +
-                                (t - cmap->char_range_map[k].srcStart);
+                            unicode[unicode_cnt++] = cmap->char_range_map[k]->dstStart +
+                                (t - cmap->char_range_map[k]->srcStart);
                             found = true;
                             break;
                         }
@@ -1794,23 +1796,24 @@ void handle_TJ(pdf_context_t* context)
                     pdf_cmap_t* cmap = context->state->textState.font->cmap;
                     while (cmap != NULL && !found)
                     {
-                        for (int k = 0; k < cmap->unicode_map_len; k++)
+                        int nums = cvector_size(cmap->unicode_map);
+                        for (int k = 0; k < nums; k++)
                         {
-                            if (t == cmap->unicode_map[k].cid)
+                            if (t == cmap->unicode_map[k]->cid)
                             {
-                                unicode[unicode_cnt++] = cmap->unicode_map[k].unicode;
+                                unicode[unicode_cnt++] = cmap->unicode_map[k]->unicode;
                                 found = true;
                                 break;
                             }
                         }
-
-                        for (int k = 0; k < cmap->char_range_map_len && !found; k++)
+                        nums = cvector_size(cmap->char_range_map);
+                        for (int k = 0; k < nums && !found; k++)
                         {
-                            if (t >= cmap->char_range_map[k].srcStart &&
-                                t <= cmap->char_range_map[k].srcEnd)
+                            if (t >= cmap->char_range_map[k]->srcStart &&
+                                t <= cmap->char_range_map[k]->srcEnd)
                             {
-                                unicode[unicode_cnt++] = cmap->char_range_map[k].dstStart +
-                                    (t - cmap->char_range_map[k].srcStart);
+                                unicode[unicode_cnt++] = cmap->char_range_map[k]->dstStart +
+                                    (t - cmap->char_range_map[k]->srcStart);
                                 found = true;
                                 break;
                             }
@@ -1876,23 +1879,24 @@ void handle_TJ(pdf_context_t* context)
                     pdf_cmap_t* cmap = context->state->textState.font->cmap;
                     while (cmap != NULL && !found)
                     {
-                        for (int k = 0; k < cmap->unicode_map_len; k++)
+                        int nums = cvector_size(cmap->unicode_map);
+                        for (int k = 0; k < nums; k++)
                         {
-                            if (t == cmap->unicode_map[k].cid)
+                            if (t == cmap->unicode_map[k]->cid)
                             {
-                                unicode[unicode_cnt++] = cmap->unicode_map[k].unicode;
+                                unicode[unicode_cnt++] = cmap->unicode_map[k]->unicode;
                                 found = true;
                                 break;
                             }
                         }
-
-                        for (int k = 0; k < cmap->char_range_map_len && !found; k++)
+                        nums = cvector_size(cmap->char_range_map);
+                        for (int k = 0; k < nums && !found; k++)
                         {
-                            if (t >= cmap->char_range_map[k].srcStart &&
-                                t <= cmap->char_range_map[k].srcEnd)
+                            if (t >= cmap->char_range_map[k]->srcStart &&
+                                t <= cmap->char_range_map[k]->srcEnd)
                             {
-                                unicode[unicode_cnt++] = cmap->char_range_map[k].dstStart +
-                                    (t - cmap->char_range_map[k].srcStart);
+                                unicode[unicode_cnt++] = cmap->char_range_map[k]->dstStart +
+                                    (t - cmap->char_range_map[k]->srcStart);
                                 found = true;
                                 break;
                             }

@@ -1,6 +1,6 @@
 #ifndef _PDF_H_
 #define _PDF_H_
-#include "plutovg.h"
+#include "../plutovg/include/plutovg.h"
 #include <stdbool.h>
 #include <stddef.h>
 typedef struct pdf_parser_token pdf_parser_token_t;
@@ -55,7 +55,6 @@ void pdf_stack_pop(pdf_stack_t* s, pdf_stack_node_t* data);
 void pdf_stack_free(pdf_stack_t* s);
 void pdf_stack_show(pdf_stack_t* s);
 
-void pdf_parser_token_free(pdf_parser_token_t* token);
 /**
  * buf: start position
  * size: size of the buffer
@@ -70,8 +69,9 @@ typedef void (*pdf_parser_read_func)(pdf_parser_t* parser, void* source);
  */
 pdf_parser_t* pdf_parser_init(pdf_file_t* pdf, pdf_parser_reader_type_t type, void* source);
 void pdf_parser_free(pdf_parser_t* parser);
-pdf_parser_token_t* pdf_parser_token_init(const unsigned char* start, pdf_parser_token_type_t type, int len);
+pdf_parser_token_t* pdf_parser_token_init(pdf_parser_t* parser, const unsigned char* start, pdf_parser_token_type_t type, int len);
 const char* pdf_parser_token_get_token(pdf_parser_token_t* token);
+void pdf_parser_token_free(pdf_parser_t* parser, pdf_parser_token_t* token);
 pdf_parser_token_t* pdf_parser_next_token(pdf_parser_t* parser);
 pdf_obj_t* pdf_parser_build_obj(pdf_parser_t* parser);
 pdf_dict_t* pdf_parser_build_dict(pdf_parser_t* parser);

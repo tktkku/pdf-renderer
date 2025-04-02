@@ -7,7 +7,7 @@ pdf_dict_t* pdf_dict_init()
     pdf_dict_t* dict = (pdf_dict_t*)malloc(sizeof(pdf_dict_t));
     if (dict == NULL) 
         return NULL;
-
+    dict->pairs = NULL;
     return dict;
 }
 void pdf_dict_free(pdf_dict_t* dict)
@@ -16,24 +16,20 @@ void pdf_dict_free(pdf_dict_t* dict)
     {
         return;
     }
-
-    if (dict->pairs)
+    int nums = cvector_size(dict->pairs);
+    for (int i = 0; i < nums; i++)
     {
-        for (int i = 0; i < dict->num_pairs; i++)
+        if (dict->pairs[i]->name)
         {
-            if (dict->pairs[i]->name)
-            {
-                free(dict->pairs[i]->name);
-                dict->pairs[i]->name = NULL;
-            }
-            pdf_value_free(dict->pairs[i]->value);
-            dict->pairs[i]->value = NULL;
-            free(dict->pairs[i]);
-            dict->pairs[i] = NULL;
+            free(dict->pairs[i]->name);
+            dict->pairs[i]->name = NULL;
         }
-        free(dict->pairs);
-        dict->pairs = NULL;
+        pdf_value_free(dict->pairs[i]->value);
+        dict->pairs[i]->value = NULL;
+        free(dict->pairs[i]);
+        //dict->pairs[i] = NULL;
     }
+    cvector_free(dict->pairs);
 
     free(dict);
     dict = NULL;
@@ -42,8 +38,8 @@ void pdf_dict_free(pdf_dict_t* dict)
 double pdf_dict_get_number(pdf_dict_t* dict, const char* name)
 {
     if (dict == NULL || name == NULL) return 0.0;
-
-    for (int i = 0; i < dict->num_pairs; i++)
+    int nums = cvector_size(dict->pairs);
+    for (int i = 0; i < nums; i++)
     {
         if (strcmp(dict->pairs[i]->name, name) == 0)
         {
@@ -53,7 +49,7 @@ double pdf_dict_get_number(pdf_dict_t* dict, const char* name)
             }
         }
     }
-    
+
     return -1.0;
 }
 
@@ -62,8 +58,8 @@ int pdf_dict_get_ref(pdf_dict_t* dict, const char* name)
     if (dict == NULL || name == NULL) return -1;
 
     if (dict->pairs == NULL) return -1;
-
-    for (int i = 0; i < dict->num_pairs; i++)
+    int nums = cvector_size(dict->pairs);
+    for (int i = 0; i < nums; i++)
     {
         if (strcmp(dict->pairs[i]->name, name) == 0)
         {
@@ -73,15 +69,15 @@ int pdf_dict_get_ref(pdf_dict_t* dict, const char* name)
             }
         }
     }
-    
+
     return -1;
 }
 
 pdf_array_t* pdf_dict_get_array(pdf_dict_t* dict, const char* name)
 {
     if (dict == NULL || name == NULL) return 0;
-
-    for (int i = 0; i < dict->num_pairs; i++)
+    int nums = cvector_size(dict->pairs);
+    for (int i = 0; i < nums; i++)
     {
         if (strcmp(dict->pairs[i]->name, name) == 0)
         {
@@ -97,9 +93,9 @@ pdf_array_t* pdf_dict_get_array(pdf_dict_t* dict, const char* name)
 
 pdf_dict_t* pdf_dict_get_dict(pdf_dict_t* dict, const char* name)
 {
-    if (dict == NULL || name == NULL ) return NULL;
-
-    for (int i = 0; i < dict->num_pairs; i++)
+    if (dict == NULL || name == NULL) return NULL;
+    int nums = cvector_size(dict->pairs);
+    for (int i = 0; i < nums; i++)
     {
         if (strcmp(dict->pairs[i]->name, name) == 0)
         {
@@ -109,15 +105,15 @@ pdf_dict_t* pdf_dict_get_dict(pdf_dict_t* dict, const char* name)
             }
         }
     }
-    
+
     return NULL;
 }
 
 const char* pdf_dict_get_name(pdf_dict_t* dict, const char* name)
 {
-    if (dict == NULL || name == NULL ) return NULL;
-
-    for (int i = 0; i < dict->num_pairs; i++)
+    if (dict == NULL || name == NULL) return NULL;
+    int nums = cvector_size(dict->pairs);
+    for (int i = 0; i < nums; i++)
     {
         if (strcmp(dict->pairs[i]->name, name) == 0)
         {
@@ -133,9 +129,9 @@ const char* pdf_dict_get_name(pdf_dict_t* dict, const char* name)
 
 const char* pdf_dict_get_string(pdf_dict_t* dict, const char* name)
 {
-    if (dict == NULL || name == NULL ) return NULL;
-
-    for (int i = 0; i < dict->num_pairs; i++)
+    if (dict == NULL || name == NULL) return NULL;
+    int nums = cvector_size(dict->pairs);
+    for (int i = 0; i < nums; i++)
     {
         if (strcmp(dict->pairs[i]->name, name) == 0)
         {
@@ -151,9 +147,9 @@ const char* pdf_dict_get_string(pdf_dict_t* dict, const char* name)
 
 int pdf_dict_get_bool(pdf_dict_t* dict, const char* name)
 {
-    if (dict == NULL || name == NULL ) return -1;
-
-    for (int i = 0; i < dict->num_pairs; i++)
+    if (dict == NULL || name == NULL) return -1;
+    int nums = cvector_size(dict->pairs);
+    for (int i = 0; i < nums; i++)
     {
         if (strcmp(dict->pairs[i]->name, name) == 0)
         {
@@ -171,13 +167,6 @@ bool pdf_dict_add_array(pdf_dict_t* dict, const char* name, pdf_array_t* array)
 {
     if (dict == NULL || name == NULL) return false;
 
-    pdf_dict_pair_t** t = (pdf_dict_pair_t**)realloc(dict->pairs, (dict->num_pairs + 1) * sizeof(pdf_dict_pair_t*));
-    if (t == NULL)
-    {
-        return false;
-    }
-    dict->pairs = t;
-
     pdf_dict_pair_t* p = (pdf_dict_pair_t*)malloc(sizeof(pdf_dict_pair_t));
     int len = strlen(name);
     p->name = (char*)malloc(len + 1);
@@ -188,8 +177,6 @@ bool pdf_dict_add_array(pdf_dict_t* dict, const char* name, pdf_array_t* array)
     p->value->type = ARRAY;
     p->value->val.array = array;
 
-    dict->pairs[dict->num_pairs] = p;
-    dict->num_pairs++;
-
+    cvector_push_back(dict->pairs, p);
     return true;
 }

@@ -4,7 +4,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <zlib.h>
+#include "zlib.h"
+//#define CVECTOR_LINEAR_GROWTH
+#include "cvector.h"
 #define ARRAY_COUNT(a) (sizeof(a) / sizeof(a[0]))
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 enum pdf_parser_token_type
@@ -107,8 +109,7 @@ struct pdf_dict_pair
 
 struct pdf_dict
 {
-    int num_pairs;
-    pdf_dict_pair_t** pairs;
+    cvector_vector_type(pdf_dict_pair_t*) pairs;
 };
 
 struct pdf_array
@@ -177,12 +178,15 @@ struct pdf_cmap
 {
     char name[256];
     bool worldwide;
-    int unicode_map_len;
-    pdf_unicode_map_t* unicode_map;
-    int char_range_map_len;
-    pdf_char_range_map_t* char_range_map;
-    int code_range_map_len;
-    pdf_code_range_map_t* code_range_map;
+    // int unicode_map_len;
+    // pdf_unicode_map_t* unicode_map;
+    cvector_vector_type(pdf_unicode_map_t*) unicode_map;
+    // int char_range_map_len;
+    // pdf_char_range_map_t* char_range_map;
+    cvector_vector_type(pdf_char_range_map_t*) char_range_map;
+    // int code_range_map_len;
+    // pdf_code_range_map_t* code_range_map;
+    cvector_vector_type(pdf_code_range_map_t*) code_range_map;
     struct pdf_cmap* next;
 };
 
@@ -191,16 +195,19 @@ struct pdf_file
     FILE* pFile;
     long data_len;
     long current_index;
-    int num_read_objs;
-    pdf_obj_t** read_objs;
+    //int num_read_objs;
+    // pdf_obj_t** read_objs;
+    cvector_vector_type(pdf_obj_t*) read_objs;
     int root_obj_ref;
     int info_obj_ref;
-    xref_table_t* xref_table;
+    // xref_table_t* xref_table;
+    cvector_vector_type(xref_t*) xref_table;
     pdf_obj_t** pages;
     int num_pages;
 
     pdf_cmap_t* cmaps;
     int num_cmaps;
+    pdf_parser_token_t* freed_tokens;
 };
 
 struct pdf_resources

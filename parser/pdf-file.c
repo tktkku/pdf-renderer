@@ -55,39 +55,37 @@ bool _check_version(pdf_file_t* pdf)
     return true;
 }
 
-xref_table_t* _read_xref_table(pdf_file_t* pdf)
+bool _read_xref_table(pdf_file_t* pdf)
 {
     char buffer[1024] = { 0 };
     int start_index = 0, num = 0;
 
     _read_line(pdf, buffer, sizeof(buffer)); // n n
     char* token = strtok(buffer, " ");
-    if (token == NULL) return NULL;
+    if (token == NULL) return false;
     start_index = atoi(token);
     token = strtok(NULL, " ");
-    if (token == NULL) return NULL;
+    if (token == NULL) return false;
     num = atoi(token);
-
-    xref_table_t* table = (xref_table_t*)malloc(sizeof(xref_table_t));
-    table->size = num;
-    table->xrefs = (xref_t*)malloc(sizeof(xref_t) * num);
 
     int seq = start_index;
     for (int i = 0; i < num; i++, seq++)
     {
-        table->xrefs[i].sequence = seq;
+        xref_t* xref = (xref_t*)malloc(sizeof(xref_t));
+        xref->sequence = seq;
 
         _read_line(pdf, buffer, sizeof(buffer));
         token = strtok(buffer, " ");
-        table->xrefs[i].type = UNCOMPRESSED;
-        table->xrefs[i].uncompressed.offset = strtol(token, NULL, 10);
+        xref->type = UNCOMPRESSED;
+        xref->uncompressed.offset = strtol(token, NULL, 10);
         token = strtok(NULL, " ");
-        table->xrefs[i].generation = atoi(token);
+        xref->generation = atoi(token);
         token = strtok(NULL, " ");
-        table->xrefs[i].inuse = *token;
+        xref->inuse = *token;
+        cvector_push_back(pdf->xref_table, xref);
     }
 
-    return table;
+    return true;
 }
 
 bool _read_xref_and_trailer(pdf_file_t* pdf)
@@ -114,8 +112,6 @@ bool _read_xref_and_trailer(pdf_file_t* pdf)
 
     if (strcmp(buffer, "xref") == 0)
     {
-        pdf->xref_table = NULL;
-
         while (true)
         {
             ret = _read_line(pdf, buffer, sizeof(buffer)); // n n
@@ -124,50 +120,23 @@ bool _read_xref_and_trailer(pdf_file_t* pdf)
                 break;
             }
             fseek(pdf->pFile, -(ret + 1), SEEK_CUR);
-            xref_table_t* table = _read_xref_table(pdf);
-            if (table == NULL)
+            if (!_read_xref_table(pdf))
             {
-                if (pdf->xref_table)
-                {
-                    free(pdf->xref_table->xrefs);
-                    free(pdf->xref_table);
-                }
                 return false;
             }
-            if (pdf->xref_table == NULL)
-            {
-                pdf->xref_table = table;
-            }
-            else
-            {
-                xref_t* t = (xref_t*)realloc(pdf->xref_table->xrefs, (pdf->xref_table->size + table->size) * sizeof(xref_t));
-                if (t == NULL)
-                {
-                    free(table->xrefs);
-                    free(table);
 
-                    free(pdf->xref_table->xrefs);
-                    free(pdf->xref_table);
-                    return false;
-                }
-                pdf->xref_table->xrefs = t;
-                memcpy(pdf->xref_table->xrefs + pdf->xref_table->size, table->xrefs, table->size * sizeof(xref_t));
-                pdf->xref_table->size += table->size;
-                free(table->xrefs);
-                free(table);
-            }
         }
         // read trailer
         pdf_parser_t* parser = pdf_parser_init(pdf, FILE_READER, pdf->pFile);
         pdf_parser_token_t* tk = pdf_parser_next_token(parser);
         if (tk == NULL || tk->type != TOKEN_DICT_BEG)
         {
-            pdf_parser_token_free(tk);
+            pdf_parser_token_free(parser, tk);
             tk = NULL;
             pdf_parser_free(parser);
             return false;
         }
-        pdf_parser_token_free(tk);
+        pdf_parser_token_free(parser, tk);
         tk = NULL;
         pdf_dict_t* trailer = pdf_parser_build_dict(parser);
         if (trailer == NULL)
@@ -186,22 +155,10 @@ bool _read_xref_and_trailer(pdf_file_t* pdf)
                 pdf->current_index = pre_offset;
                 fseek(pdf->pFile, pre_offset, SEEK_SET);
                 _read_line(pdf, buffer, sizeof(buffer));// xref skip this line
-                xref_table_t* table = _read_xref_table(pdf);
-                xref_t* t = (xref_t*)realloc(pdf->xref_table->xrefs, (pdf->xref_table->size + table->size) * sizeof(xref_t));
-                if (t == NULL)
+                if (!_read_xref_table(pdf))
                 {
-                    free(table->xrefs);
-                    free(table);
-
-                    free(pdf->xref_table->xrefs);
-                    free(pdf->xref_table);
                     return false;
                 }
-                pdf->xref_table->xrefs = t;
-                memcpy(pdf->xref_table->xrefs + pdf->xref_table->size, table->xrefs, table->size * sizeof(xref_t));
-                pdf->xref_table->size += table->size;
-                free(table->xrefs);
-                free(table);
             }
         }
         pdf_dict_free(trailer);
@@ -251,9 +208,6 @@ bool _read_xref_and_trailer(pdf_file_t* pdf)
         unsigned char* start = NULL;
         int len;
         pdf_stream_get_all(xref_obj->stream, &start, &len);
-        pdf->xref_table = (xref_table_t*)malloc(sizeof(xref_table_t));
-        pdf->xref_table->size = 0;
-        pdf->xref_table->xrefs = NULL;
 
         for (int i = 0; i < index_arr->num_elements; i += 2)
         {
@@ -262,7 +216,6 @@ bool _read_xref_and_trailer(pdf_file_t* pdf)
 
             int seq = start_index;
 
-            xref_t* xref = (xref_t*)malloc(sizeof(xref_t) * num);
             for (int j = 0; j < num; j++)
             {
                 int type = 0;
@@ -286,54 +239,38 @@ bool _read_xref_and_trailer(pdf_file_t* pdf)
                     part3 = part3 | *start;
                     start += 1;
                 }
-                xref[j].sequence = seq;
+                xref_t* xref = (xref_t*)malloc(sizeof(xref_t));
+                xref->sequence = seq;
                 if (type == 0) // free objects
                 {
                     // object-ref generation
-                    xref[j].type = COMPRESSED;
-                    xref[j].compressed.ref = part2;
-                    xref[j].compressed.index = 0;
-                    xref[j].generation = part3;
-                    xref[j].inuse = 'f';
+                    xref->type = COMPRESSED;
+                    xref->compressed.ref = part2;
+                    xref->compressed.index = 0;
+                    xref->generation = part3;
+                    xref->inuse = 'f';
                 }
                 else if (type == 1) // not be compressed objects
                 {
                     // offset generation
-                    xref[j].type = UNCOMPRESSED;
-                    xref[j].uncompressed.offset = part2;
-                    xref[j].generation = part3;
-                    xref[j].inuse = 'n';
+                    xref->type = UNCOMPRESSED;
+                    xref->uncompressed.offset = part2;
+                    xref->generation = part3;
+                    xref->inuse = 'n';
                 }
                 else if (type == 2) // compressed objects
                 {
                     // object-ref index
                     // generation shall be 0
-                    xref[j].type = COMPRESSED;
-                    xref[j].compressed.ref = part2;
-                    xref[j].compressed.index = part3;
-                    xref[j].generation = 0;
-                    xref[j].inuse = 'n';
+                    xref->type = COMPRESSED;
+                    xref->compressed.ref = part2;
+                    xref->compressed.index = part3;
+                    xref->generation = 0;
+                    xref->inuse = 'n';
                 }
 
                 seq++;
-            }
-            if (pdf->xref_table->xrefs == NULL)
-            {
-                pdf->xref_table->xrefs = xref;
-                pdf->xref_table->size = num;
-            }
-            else
-            {
-                xref_t* t = (xref_t*)realloc(pdf->xref_table->xrefs, (pdf->xref_table->size + num) * sizeof(xref_t));
-                if (t == NULL)
-                {
-                    pdf_obj_free(xref_obj);
-                    return false;
-                }
-                pdf->xref_table->xrefs = t;
-                memcpy(pdf->xref_table->xrefs + pdf->xref_table->size, xref, num * sizeof(xref_t));
-                free(xref);
-                pdf->xref_table->size += num;
+                cvector_push_back(pdf->xref_table, xref);
             }
         }
 
@@ -364,7 +301,8 @@ pdf_file_t* pdf_file_read_file(const char* file_name)
     pdf_file->pFile = file;
     pdf_file->data_len = file_size;
     pdf_file->current_index = 0;
-
+    pdf_file->xref_table = NULL;
+    pdf_file->read_objs = NULL;
     if (!_check_version(pdf_file))
     {
         pdf_file_free(pdf_file);
@@ -596,48 +534,17 @@ pdf_page_t* pdf_file_get_page(pdf_file_t* pdf, int pageNo)
     return page;
 }
 
-bool _add_to_obj_table(pdf_file_t* pdf, pdf_obj_t* obj)
-{
-    if (pdf == NULL || obj == NULL)
-        return false;
-
-    pdf->num_read_objs++;
-    if (pdf->read_objs == NULL)
-    {
-        pdf->read_objs = (pdf_obj_t**)malloc(sizeof(pdf_obj_t*));
-        *(pdf->read_objs) = obj;
-    }
-    else
-    {
-        pdf_obj_t** o = (pdf_obj_t**)realloc(pdf->read_objs, pdf->num_read_objs * sizeof(pdf_obj_t*));
-        if (o == NULL)
-        {
-            return false;
-        }
-
-        pdf->read_objs = o;
-        pdf->read_objs[pdf->num_read_objs - 1] = obj;
-    }
-
-    return true;
-}
 pdf_obj_t* _get_obj_from_table(pdf_file_t* pdf, int ref)
 {
     if (pdf == NULL || ref < 0)
         return NULL;
-
-    if (pdf->num_read_objs == 0 || pdf->read_objs == NULL)
-        return NULL;
-
-    if (pdf->num_read_objs > 0 && pdf->read_objs != NULL)
+    int nums = cvector_size(pdf->read_objs);
+    for (int i = 0; i < nums; i++)
     {
-        for (int i = 0; i < pdf->num_read_objs; i++)
+        if (pdf->read_objs[i]->seq == ref)
         {
-            if (pdf->read_objs[i]->seq == ref)
-            {
-                pdf->read_objs[i]->pdf = pdf;
-                return pdf->read_objs[i];
-            }
+            pdf->read_objs[i]->pdf = pdf;
+            return pdf->read_objs[i];
         }
     }
 
@@ -660,13 +567,14 @@ pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, int ref)
         return NULL;
     }
     int offset = -1;
-    for (int i = 0; i < pdf->xref_table->size; i++)
+    int num_xref = cvector_size(pdf->xref_table);
+    for (int i = 0; i < num_xref; i++)
     {
-        if (pdf->xref_table->xrefs[i].sequence == ref)
+        if (pdf->xref_table[i]->sequence == ref)
         {
-            if (pdf->xref_table->xrefs[i].type == UNCOMPRESSED)
+            if (pdf->xref_table[i]->type == UNCOMPRESSED)
             {
-                offset = pdf->xref_table->xrefs[i].uncompressed.offset;
+                offset = pdf->xref_table[i]->uncompressed.offset;
                 if (offset == -1)
                 {
                     return NULL;
@@ -676,27 +584,28 @@ pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, int ref)
                 pdf_parser_token_t* tk = pdf_parser_next_token(parser);
                 if (tk == NULL || tk->type != TOKEN_OBJ_BEG)
                 {
-                    pdf_parser_token_free(tk);
+                    pdf_parser_token_free(parser, tk);
                     pdf_parser_free(parser);
                     return NULL;
                 }
                 pdf_obj_t* obj = pdf_parser_build_obj(parser);
                 if (obj == NULL)
                 {
-                    pdf_parser_token_free(tk);
+                    pdf_parser_token_free(parser, tk);
                     pdf_parser_free(parser);
                     return NULL;
                 }
                 obj->seq = ref;
                 obj->pdf = pdf;
-                _add_to_obj_table(pdf, obj);
-                pdf_parser_token_free(tk);
+                //_add_to_obj_table(pdf, obj);
+                cvector_push_back(pdf->read_objs, obj);
+                pdf_parser_token_free(parser, tk);
                 pdf_parser_free(parser);
                 return obj;
             }
             else
             {
-                int obj_ref = pdf->xref_table->xrefs[i].compressed.ref;
+                int obj_ref = pdf->xref_table[i]->compressed.ref;
                 pdf_obj_t* objs_obj = pdf_file_get_obj(pdf, obj_ref);
                 if (objs_obj == NULL)
                 {
@@ -721,12 +630,12 @@ pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, int ref)
                 {
                     tk = pdf_parser_next_token(parser);
                     int seq = atoi(tk->token);
-                    pdf_parser_token_free(tk);
+                    pdf_parser_token_free(parser, tk);
                     tk = NULL;
 
                     tk = pdf_parser_next_token(parser);
                     int offset = atoi(tk->token);
-                    pdf_parser_token_free(tk);
+                    pdf_parser_token_free(parser, tk);
                     tk = NULL;
 
                     unsigned char* p1 = start + first_offset + offset;
@@ -752,7 +661,7 @@ pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, int ref)
                         if (obj_dict == NULL)
                         {
                             pdf_parser_free(val_parser);
-                            pdf_parser_token_free(tk1);
+                            pdf_parser_token_free(parser, tk1);
                             return NULL;
                         }
 
@@ -765,7 +674,7 @@ pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, int ref)
                         if (array == NULL)
                         {
                             pdf_parser_free(val_parser);
-                            pdf_parser_token_free(tk1);
+                            pdf_parser_token_free(parser, tk1);
                             return NULL;
                         }
                         obj->value->type = ARRAY;
@@ -774,13 +683,14 @@ pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, int ref)
                     else
                     {
                         pdf_parser_free(val_parser);
-                        pdf_parser_token_free(tk1);
+                        pdf_parser_token_free(parser, tk1);
                         return NULL;
                     }
-                    pdf_parser_token_free(tk1);
+                    pdf_parser_token_free(parser, tk1);
                     pdf_parser_free(val_parser);
 
-                    _add_to_obj_table(pdf, obj);
+                    // _add_to_obj_table(pdf, obj);
+                    cvector_push_back(pdf->read_objs, obj);
                 }
                 pdf_parser_free(parser);
 
@@ -809,7 +719,7 @@ pdf_cmap_t* pdf_file_get_cmap(pdf_file_t* pdf, char* name)
         }
     }
     FILE* f = NULL;
-    char filename[256] = {0};
+    char filename[256] = { 0 };
     sprintf(filename, "./CMaps%s", name);
     f = fopen(filename, "r");
     if (f == NULL)
@@ -832,7 +742,7 @@ pdf_cmap_t* pdf_file_get_cmap(pdf_file_t* pdf, char* name)
         .processed = 0
     };
     pdf_parser_t* parser = pdf_parser_init(pdf, BUFFER_READER, &b1);
-    pdf_cmap_t *cmap = pdf_parser_build_cmap(parser);
+    pdf_cmap_t* cmap = pdf_parser_build_cmap(parser);
     pdf_parser_free(parser);
     free(filedata);
     cmap->worldwide = true;
@@ -860,34 +770,24 @@ pdf_cmap_t* pdf_file_get_cmap(pdf_file_t* pdf, char* name)
 void pdf_file_free(pdf_file_t* file)
 {
     if (file == NULL) return;
-
-    if (file->xref_table)
+    int nums = cvector_size(file->xref_table);
+    for (int i = 0; i < nums; i++)
     {
-        if (file->xref_table->xrefs)
-        {
-            free(file->xref_table->xrefs);
-            file->xref_table->xrefs = NULL;
-        }
-
-        free(file->xref_table);
-        file->xref_table = NULL;
+        free(file->xref_table[i]);
     }
+    cvector_free(file->xref_table);
 
     if (file->pages)
     {
         free(file->pages);
         file->pages = NULL;
     }
-
-    if (file->num_read_objs > 0 && file->read_objs != NULL)
+    nums = cvector_size(file->read_objs);
+    for (int i = 0; i < nums; i++)
     {
-        for (int i = 0; i < file->num_read_objs; i++)
-        {
-            pdf_obj_free(file->read_objs[i]);
-        }
-        free(file->read_objs);
-        file->read_objs = NULL;
+        pdf_obj_free(file->read_objs[i]);
     }
+    cvector_free(file->read_objs);
     if (file->cmaps)
     {
         pdf_cmap_t* p = file->cmaps;
@@ -900,6 +800,19 @@ void pdf_file_free(pdf_file_t* file)
         }
         pdf_cmap_free(file->cmaps);
         file->cmaps = NULL;
+    }
+    if (file->freed_tokens)
+    {
+        pdf_parser_token_t* p = file->freed_tokens;
+        pdf_parser_token_t* q = file->freed_tokens->next;
+        while (q != NULL)
+        {
+            p->next = q->next;
+            pdf_parser_token_free(NULL, q);
+            q = p->next;
+        }
+        pdf_parser_token_free(NULL, file->freed_tokens);
+        file->freed_tokens = NULL;
     }
     if (file->pFile)
     {

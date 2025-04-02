@@ -5,9 +5,10 @@ add_compile_options(-Wall)
 set(CMAKE_BUILD_TYPE Debug)
 set(BUILD_SHARED_LIBS OFF)
 
-add_subdirectory(parser)
+add_subdirectory(c-vector)
 add_subdirectory(plutovg)
 add_subdirectory(zlib)
+add_subdirectory(parser)
 
 add_executable(test test.c)
 target_link_libraries(test pdf-parser)
