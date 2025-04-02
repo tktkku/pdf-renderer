@@ -95,6 +95,19 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj)
         int width = pdf_dict_get_number(img_dict, "/Width");
         int height = pdf_dict_get_number(img_dict, "/Height");
         int length = pdf_dict_get_number(img_dict, "/Length");
+        if (length == -1)
+        {
+            int ref = pdf_dict_get_ref(img_dict, "/Length");
+            if (ref != -1)
+            {
+                pdf_obj_t* l_obj = pdf_file_get_obj(obj->pdf, ref);
+                if (l_obj)
+                {
+                    length = l_obj->value->val.number;
+                }
+            }
+        }
+        if (length <= 0) return NULL;
         const char* color_space = pdf_dict_get_name(img_dict, "/ColorSpace");
         const char* name = pdf_dict_get_name(img_dict, "/Intent");
         pdf_array_t* mask_arr = pdf_dict_get_array(img_dict, "/Mask");

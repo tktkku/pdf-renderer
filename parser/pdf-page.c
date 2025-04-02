@@ -262,6 +262,13 @@ pdf_font_t* pdf_page_get_font(pdf_page_t* page, const char* name)
     {
         pdf_obj_t* obj = pdf_file_get_obj(page->pdf, font_descriptor_ref);
         font->font_descriptor = obj->value->val.dict;
+    }
+    else
+    {
+        font->font_descriptor = pdf_dict_get_dict(font->descendant_font_dict, "/FontDescriptor");
+    }
+    if (font->font_descriptor != NULL)
+    {
         font->type = pdf_dict_get_name(font->font_descriptor, "/Type");
         font->basefont = pdf_dict_get_name(font->font_descriptor, "/FontName");
         font->font_weight = pdf_dict_get_number(font->font_descriptor, "/FontWeight");

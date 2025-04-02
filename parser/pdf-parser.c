@@ -365,6 +365,7 @@ pdf_parser_t* pdf_parser_init(pdf_file_t* pdf, pdf_parser_reader_type_t type, vo
     parser->num_cached_tokens = 0;
     parser->reader.type = type;
     parser->reader.source = source;
+    parser->pause_read = false;
     switch (type)
     {
         case BUFFER_READER:
@@ -792,6 +793,7 @@ void _pdf_parser_read_file(pdf_parser_t* parser, void* source)
     }
     int end_i = off + ret - 1;
     _pdf_parser_split(parser, end_i);
+    parser->pause_read = false;
 }
 void _pdf_parser_read_buffer(pdf_parser_t* parser, void* source)
 {
@@ -814,6 +816,7 @@ void _pdf_parser_read_buffer(pdf_parser_t* parser, void* source)
 
     int end_i = off + ret - 1;
     _pdf_parser_split(parser, end_i);
+    parser->pause_read = false;
 }
 void _pdf_parser_read_stream(pdf_parser_t* parser, void* source)
 {
@@ -835,6 +838,7 @@ void _pdf_parser_read_stream(pdf_parser_t* parser, void* source)
 
     int end_i = off + ret - 1;
     _pdf_parser_split(parser, end_i);
+    parser->pause_read = false;
 }
 
 pdf_parser_token_t* _pdf_next_token(pdf_parser_t* parser)
@@ -843,7 +847,7 @@ pdf_parser_token_t* _pdf_next_token(pdf_parser_t* parser)
         return NULL;
     unsigned char** start = &(parser->current_pos);
     unsigned char* end = parser->splite_pos;
-    while (*start < end && parser->num_cached_tokens < 3)
+    while (!parser->pause_read && *start < end && parser->num_cached_tokens < 3)
     {
         pdf_parser_token_t* tk = _pdf_parser_next_one_token(parser, *start, end);
         if (tk == NULL)
@@ -856,6 +860,10 @@ pdf_parser_token_t* _pdf_next_token(pdf_parser_t* parser)
             *start += tk->steps;
             pdf_parser_token_free(parser, tk);
             continue;
+        }
+        else if (tk->type == TOKEN_STREAM_BEG)
+        {
+            parser->pause_read = true;
         }
         parser->cached_tokens[parser->num_cached_tokens++] = tk;
         *start += tk->steps;

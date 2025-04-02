@@ -1221,7 +1221,7 @@ void handle_Do(pdf_context_t* context)
         }
 
         sprintf(filename, "%s.png", buf + 1);
-        //plutovg_surface_write_to_png(s, filename);
+        // plutovg_surface_write_to_png(s, filename);
 
         // Scale factors to normalize image dimensions to unit space
         // plutovg_matrix_t m = { xobj->image->width, 0, 0, -xobj->image->height, 0,
@@ -1321,7 +1321,7 @@ void handle_Tz(pdf_context_t* context)
     node.data = buf;
     pdf_stack_pop(context->stack, &node);
     float h = strtof(buf, NULL);
-    plutovg_canvas_scale(context->canvas, h / 100.0, 1.0);
+    //plutovg_canvas_scale(context->canvas, h / 100.0, 1.0);
     context->state->textState.horizontalScaling = h;
 }
 

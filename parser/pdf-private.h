@@ -326,6 +326,7 @@ struct pdf_parser
     } remain;
     pdf_parser_token_t* cached_tokens[3];
     int num_cached_tokens;
+    bool pause_read;
 };
 
 struct pdf_buffer
