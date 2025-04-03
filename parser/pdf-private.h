@@ -267,6 +267,9 @@ struct pdf_font
     unsigned int font_data_length;
     pdf_cmap_t* cmap;
     bool load_succeed;
+    int first_char;
+    int last_char;
+    pdf_array_t* widths;
 };
 
 struct pdf_image

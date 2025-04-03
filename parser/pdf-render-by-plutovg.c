@@ -13,7 +13,7 @@
 typedef void (*OPERATION_HANDLER)(pdf_context_t* context);
 
 typedef struct {
-    char* operation;
+    const char* operation;
     OPERATION_HANDLER handler;
 } handler_entry;
 
@@ -179,7 +179,7 @@ void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
                 continue;
             // printf("%s\n", token);
             _do_render_operation(&context, tk);
-            // if (strcmp(token, "S") == 0)
+            // if (!strcmp(token, "Tj") || !strcmp(token, "TJ"))
             // {
             //     plutovg_surface_write_to_png(surface, "test.png");
             //     printf("Press any key to continue...");
@@ -1090,7 +1090,7 @@ void handle_Do(pdf_context_t* context)
         plutovg_matrix_init(&m, xobj->form->matrix[0], xobj->form->matrix[1],
             xobj->form->matrix[2], xobj->form->matrix[3],
             xobj->form->matrix[4], xobj->form->matrix[5]);
-            
+
         plutovg_canvas_transform(context->canvas, &m);
         plutovg_canvas_move_to(context->canvas, 0, 0);
         plutovg_canvas_rect(context->canvas, xobj->form->bbox[0],
@@ -1232,10 +1232,10 @@ void handle_Do(pdf_context_t* context)
         float scale_y = 1.f / xobj->image->height;
 
         // Transformation matrix to scale and flip the image vertically
-        plutovg_matrix_t m = { scale_x,  0, 
-                                0, -scale_y, 
+        plutovg_matrix_t m = { scale_x,  0,
+                                0, -scale_y,
                                 0, xobj->image->height * scale_y };
-        
+
         plutovg_canvas_set_texture(context->canvas, s, PLUTOVG_TEXTURE_TYPE_PLAIN,
             1.0f, &m);
         plutovg_canvas_paint(context->canvas);
@@ -1369,32 +1369,50 @@ void handle_Tf(pdf_context_t* context)
     context->state->textState.font_face_loaded = false;
     if (strcmp(font->subtype, "/TrueType") == 0)
     {
-        if (strcmp(font->basefont, "/SimSun") == 0)
+        if (font->font_data == NULL)
         {
-            context->state->textState.fontface = plutovg_font_face_load_from_file("fonts/SimSun.ttf", 0);
-            context->state->textState.font_face_loaded = true;
-        }
-    }
-    else if (font->font_data == NULL)
-    {
-        // FT_New_Face(context->ft_library, "fonts/SimSun.ttf", 0, &face);
-        context->state->textState.fontface = plutovg_font_face_load_from_file("fonts/SimSun.ttf", 0);
-        context->state->textState.font_face_loaded = true;
-    }
-    else
-    {
-        // FT_New_Memory_Face(context->ft_library, font->font_data,
-        // font->font_data_length, 0, &face);
-        if ((context->state->textState.fontface = plutovg_font_face_load_from_data(
-            font->font_data, font->font_data_length, 0, NULL, NULL)) == NULL)
-        {
-            context->state->textState.font_face_loaded = false;
-            context->state->textState.fontface = plutovg_font_face_load_from_data1(
-                font->font_data, font->font_data_length, 0, NULL, NULL);
+            if (strcmp(font->basefont, "/SimSun") == 0)
+            {
+                context->state->textState.fontface = plutovg_font_face_load_from_file("fonts/SimSun.ttf", 0);
+                context->state->textState.font_face_loaded = true;
+            }
+            else
+            {
+                // FT_New_Face(context->ft_library, "fonts/SimSun.ttf", 0, &face);
+                context->state->textState.fontface = plutovg_font_face_load_from_file("fonts/SimSun.ttf", 0);
+                context->state->textState.font_face_loaded = true;
+            }
         }
         else
         {
+            context->state->textState.fontface = plutovg_font_face_load_from_data(
+                font->font_data, font->font_data_length, 0, NULL, NULL);
             context->state->textState.font_face_loaded = true;
+        }
+    }
+    else
+    {
+        if (font->font_data == NULL)
+        {
+            // FT_New_Face(context->ft_library, "fonts/SimSun.ttf", 0, &face);
+            context->state->textState.fontface = plutovg_font_face_load_from_file("fonts/SimSun.ttf", 0);
+            context->state->textState.font_face_loaded = true;
+        }
+        else
+        {
+            // FT_New_Memory_Face(context->ft_library, font->font_data,
+            // font->font_data_length, 0, &face);
+            if ((context->state->textState.fontface = plutovg_font_face_load_from_data(
+                font->font_data, font->font_data_length, 0, NULL, NULL)) == NULL)
+            {
+                context->state->textState.font_face_loaded = false;
+                context->state->textState.fontface = plutovg_font_face_load_from_data1(
+                    font->font_data, font->font_data_length, 0, NULL, NULL);
+            }
+            else
+            {
+                context->state->textState.font_face_loaded = true;
+            }
         }
     }
 
@@ -1629,50 +1647,59 @@ void handle_Tj(pdf_context_t* context)
     {
         int unicode_cnt = 0;
         uint16_t unicode[1024] = { 0 };
-        if (strstr(context->state->textState.font->encoding, "Identity") 
-        || strcmp(context->state->textState.font->encoding, "/WinAnsiEncoding") == 0)
+        if (!strcmp(context->state->textState.font->subtype, "/TrueType"))
         {
-            for (int i = 1; i < node.size; i += 2)
+            for (int i = 1; i < node.size; i++)
             {
-                unicode[unicode_cnt++] = ((buf[i] << 8) & 0xFF00) | (buf[i + 1] & 0x00FF);
+                unicode[unicode_cnt++] = buf[i];
             }
         }
         else
         {
-            for (int i = 1; i < node.size; i += 2)
+            if (strstr(context->state->textState.font->encoding, "Identity"))
             {
-                uint16_t t = ((buf[i] << 8) & 0xFF00) | (buf[i + 1] & 0x00FF);
-                bool found = false;
-                pdf_cmap_t* cmap = context->state->textState.font->cmap;
-                while (cmap != NULL && !found)
+                for (int i = 1; i < node.size; i += 2)
                 {
-                    int nums = cvector_size(cmap->unicode_map);
-                    for (int k = 0; k < nums; k++)
-                    {
-                        if (t == cmap->unicode_map[k]->cid)
-                        {
-                            unicode[unicode_cnt++] = cmap->unicode_map[k]->unicode;
-                            found = true;
-                            break;
-                        }
-                    }
-                    nums = cvector_size(cmap->char_range_map);
-                    for (int k = 0; k < nums && !found; k++)
-                    {
-                        if (t >= cmap->char_range_map[k]->srcStart &&
-                            t <= cmap->char_range_map[k]->srcEnd)
-                        {
-                            unicode[unicode_cnt++] = cmap->char_range_map[k]->dstStart +
-                                (t - cmap->char_range_map[k]->srcStart);
-                            found = true;
-                            break;
-                        }
-                    }
-                    cmap = cmap->next;
+                    unicode[unicode_cnt++] = ((buf[i] << 8) & 0xFF00) | (buf[i + 1] & 0x00FF);
                 }
-                if (!found)
+            }
+            else
+            {
+                for (int i = 1; i < node.size; i += 2)
                 {
-                    unicode[unicode_cnt++] = t;
+                    uint16_t t = ((buf[i] << 8) & 0xFF00) | (buf[i + 1] & 0x00FF);
+                    bool found = false;
+                    pdf_cmap_t* cmap = context->state->textState.font->cmap;
+                    while (cmap != NULL && !found)
+                    {
+                        int nums = cvector_size(cmap->unicode_map);
+                        for (int k = 0; k < nums; k++)
+                        {
+                            if (t == cmap->unicode_map[k]->cid)
+                            {
+                                unicode[unicode_cnt++] = cmap->unicode_map[k]->unicode;
+                                found = true;
+                                break;
+                            }
+                        }
+                        nums = cvector_size(cmap->char_range_map);
+                        for (int k = 0; k < nums && !found; k++)
+                        {
+                            if (t >= cmap->char_range_map[k]->srcStart &&
+                                t <= cmap->char_range_map[k]->srcEnd)
+                            {
+                                unicode[unicode_cnt++] = cmap->char_range_map[k]->dstStart +
+                                    (t - cmap->char_range_map[k]->srcStart);
+                                found = true;
+                                break;
+                            }
+                        }
+                        cmap = cmap->next;
+                    }
+                    if (!found)
+                    {
+                        unicode[unicode_cnt++] = t;
+                    }
                 }
             }
         }
@@ -1699,7 +1726,7 @@ void handle_Tj(pdf_context_t* context)
         if (context->state->textState.font->load_succeed)
         {
             if (strstr(context->state->textState.font->encoding, "Identity")
-            || strcmp(context->state->textState.font->encoding, "/WinAnsiEncoding") == 0)
+                || strcmp(context->state->textState.font->encoding, "/WinAnsiEncoding") == 0)
                 context->state->textState.textLineWidth += plutovg_canvas_fill_text1(context->canvas, unicode, unicode_cnt,
                     PLUTOVG_TEXT_ENCODING_UTF16, context->state->textState.textLineWidth, 0);
             else
@@ -1767,11 +1794,16 @@ void handle_TJ(pdf_context_t* context)
             pdf_stack_push(tmp_stack, buf, strlen(buf));
         }
     }
+    if (context->state->textState.font == NULL)
+    {
+        pdf_stack_free(tmp_stack);
+        return;
+    }
     memset(buf, 0, sizeof(buf));
     while (tmp_stack->top != NULL)
     {
         pdf_stack_pop(tmp_stack, &node);
-        if (buf[0] == '<' && context->state->textState.font)
+        if (buf[0] == '<')
         {
             float x, y;
             plutovg_canvas_get_current_point(context->canvas, &x, &y);
@@ -1779,50 +1811,53 @@ void handle_TJ(pdf_context_t* context)
             int buf_len = 0;
             int unicode_cnt = 0;
             uint16_t unicode[1024] = { 0 };
-            if (strstr(context->state->textState.font->encoding, "Identity"))
+
             {
-                for (char* p = &buf[1]; *p != '\0'; p += 4)
+                if (strstr(context->state->textState.font->encoding, "Identity"))
                 {
-                    uint16_t t = _hex_str_to_16bit(p);
-                    unicode[unicode_cnt++] = t;
-                }
-            }
-            else
-            {
-                for (char* p = &buf[1]; *p != '\0'; p += 4)
-                {
-                    uint16_t t = _hex_str_to_16bit(p);
-                    bool found = false;
-                    pdf_cmap_t* cmap = context->state->textState.font->cmap;
-                    while (cmap != NULL && !found)
+                    for (char* p = &buf[1]; *p != '\0'; p += 4)
                     {
-                        int nums = cvector_size(cmap->unicode_map);
-                        for (int k = 0; k < nums; k++)
-                        {
-                            if (t == cmap->unicode_map[k]->cid)
-                            {
-                                unicode[unicode_cnt++] = cmap->unicode_map[k]->unicode;
-                                found = true;
-                                break;
-                            }
-                        }
-                        nums = cvector_size(cmap->char_range_map);
-                        for (int k = 0; k < nums && !found; k++)
-                        {
-                            if (t >= cmap->char_range_map[k]->srcStart &&
-                                t <= cmap->char_range_map[k]->srcEnd)
-                            {
-                                unicode[unicode_cnt++] = cmap->char_range_map[k]->dstStart +
-                                    (t - cmap->char_range_map[k]->srcStart);
-                                found = true;
-                                break;
-                            }
-                        }
-                        cmap = cmap->next;
-                    }
-                    if (!found)
-                    {
+                        uint16_t t = _hex_str_to_16bit(p);
                         unicode[unicode_cnt++] = t;
+                    }
+                }
+                else
+                {
+                    for (char* p = &buf[1]; *p != '\0'; p += 4)
+                    {
+                        uint16_t t = _hex_str_to_16bit(p);
+                        bool found = false;
+                        pdf_cmap_t* cmap = context->state->textState.font->cmap;
+                        while (cmap != NULL && !found)
+                        {
+                            int nums = cvector_size(cmap->unicode_map);
+                            for (int k = 0; k < nums; k++)
+                            {
+                                if (t == cmap->unicode_map[k]->cid)
+                                {
+                                    unicode[unicode_cnt++] = cmap->unicode_map[k]->unicode;
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            nums = cvector_size(cmap->char_range_map);
+                            for (int k = 0; k < nums && !found; k++)
+                            {
+                                if (t >= cmap->char_range_map[k]->srcStart &&
+                                    t <= cmap->char_range_map[k]->srcEnd)
+                                {
+                                    unicode[unicode_cnt++] = cmap->char_range_map[k]->dstStart +
+                                        (t - cmap->char_range_map[k]->srcStart);
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            cmap = cmap->next;
+                        }
+                        if (!found)
+                        {
+                            unicode[unicode_cnt++] = t;
+                        }
                     }
                 }
             }
@@ -1863,49 +1898,59 @@ void handle_TJ(pdf_context_t* context)
         {
             int unicode_cnt = 0;
             uint16_t unicode[1024] = { 0 };
-            if (strstr(context->state->textState.font->encoding, "Identity"))
+            if (!strcmp(context->state->textState.font->subtype, "/TrueType"))
             {
-                for (int i = 1; i < node.size; i += 2)
+                for (int i = 1; i < node.size; i++)
                 {
-                    unicode[unicode_cnt++] = ((buf[i] << 8) & 0xFF00) | (buf[i + 1] & 0x00FF);
+                    unicode[unicode_cnt++] = buf[i];
                 }
             }
             else
             {
-                for (int i = 1; i < node.size; i += 2)
+                if (strstr(context->state->textState.font->encoding, "Identity"))
                 {
-                    uint16_t t = ((buf[i] << 8) & 0xFF00) | (buf[i + 1] & 0x00FF);
-                    bool found = false;
-                    pdf_cmap_t* cmap = context->state->textState.font->cmap;
-                    while (cmap != NULL && !found)
+                    for (int i = 1; i < node.size; i += 2)
                     {
-                        int nums = cvector_size(cmap->unicode_map);
-                        for (int k = 0; k < nums; k++)
-                        {
-                            if (t == cmap->unicode_map[k]->cid)
-                            {
-                                unicode[unicode_cnt++] = cmap->unicode_map[k]->unicode;
-                                found = true;
-                                break;
-                            }
-                        }
-                        nums = cvector_size(cmap->char_range_map);
-                        for (int k = 0; k < nums && !found; k++)
-                        {
-                            if (t >= cmap->char_range_map[k]->srcStart &&
-                                t <= cmap->char_range_map[k]->srcEnd)
-                            {
-                                unicode[unicode_cnt++] = cmap->char_range_map[k]->dstStart +
-                                    (t - cmap->char_range_map[k]->srcStart);
-                                found = true;
-                                break;
-                            }
-                        }
-                        cmap = cmap->next;
+                        unicode[unicode_cnt++] = ((buf[i] << 8) & 0xFF00) | (buf[i + 1] & 0x00FF);
                     }
-                    if (!found)
+                }
+                else
+                {
+                    for (int i = 1; i < node.size; i += 2)
                     {
-                        unicode[unicode_cnt++] = t;
+                        uint16_t t = ((buf[i] << 8) & 0xFF00) | (buf[i + 1] & 0x00FF);
+                        bool found = false;
+                        pdf_cmap_t* cmap = context->state->textState.font->cmap;
+                        while (cmap != NULL && !found)
+                        {
+                            int nums = cvector_size(cmap->unicode_map);
+                            for (int k = 0; k < nums; k++)
+                            {
+                                if (t == cmap->unicode_map[k]->cid)
+                                {
+                                    unicode[unicode_cnt++] = cmap->unicode_map[k]->unicode;
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            nums = cvector_size(cmap->char_range_map);
+                            for (int k = 0; k < nums && !found; k++)
+                            {
+                                if (t >= cmap->char_range_map[k]->srcStart &&
+                                    t <= cmap->char_range_map[k]->srcEnd)
+                                {
+                                    unicode[unicode_cnt++] = cmap->char_range_map[k]->dstStart +
+                                        (t - cmap->char_range_map[k]->srcStart);
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            cmap = cmap->next;
+                        }
+                        if (!found)
+                        {
+                            unicode[unicode_cnt++] = t;
+                        }
                     }
                 }
             }
@@ -1951,7 +1996,7 @@ void handle_TJ(pdf_context_t* context)
             context->state->textState.textLineWidth -= (a * (context->state->textState.fontSize / 1000.0));
         }
     }
-    
+
     pdf_stack_free(tmp_stack);
 }
 

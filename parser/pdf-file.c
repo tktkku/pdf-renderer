@@ -30,7 +30,7 @@ int _read_line(pdf_file_t* pdf, char* buf, int size)
                     break;
                 }
             }
-
+            cnt++;
             break;
         }
         else
@@ -76,11 +76,14 @@ bool _read_xref_table(pdf_file_t* pdf)
 
         _read_line(pdf, buffer, sizeof(buffer));
         token = strtok(buffer, " ");
+        if (token == NULL) return false;
         xref->type = UNCOMPRESSED;
         xref->uncompressed.offset = strtol(token, NULL, 10);
         token = strtok(NULL, " ");
+        if (token == NULL) return false;
         xref->generation = atoi(token);
         token = strtok(NULL, " ");
+        if (token == NULL) return false;
         xref->inuse = *token;
         cvector_push_back(pdf->xref_table, xref);
     }
@@ -115,11 +118,13 @@ bool _read_xref_and_trailer(pdf_file_t* pdf)
         while (true)
         {
             ret = _read_line(pdf, buffer, sizeof(buffer)); // n n
-            if (strcmp(buffer, "trailer") == 0)
+            if (memcmp(buffer, "trailer", 7) == 0)
             {
+                if (ret != 7)
+                    fseek(pdf->pFile, -ret+7, SEEK_CUR);
                 break;
             }
-            fseek(pdf->pFile, -(ret + 1), SEEK_CUR);
+            fseek(pdf->pFile, -(ret), SEEK_CUR);
             if (!_read_xref_table(pdf))
             {
                 return false;

@@ -18,27 +18,88 @@ double get_wall_time(void)
 }
 int main(int argc, char* argv[])
 {
-    if (argc < 2)
+    const char* filename = NULL;
+    char* pages = NULL;
+    for (int i = 1; i < argc; )
     {
-        exit(EXIT_FAILURE);
+        if (!strcmp(argv[i], "-f"))
+        {
+            i++;
+            filename = argv[i];
+            i++;
+        }
+        else if (!strcmp(argv[i], "-p"))
+        {
+            i++;
+            pages = strdup(argv[i]);
+            i++;
+        }
+        else
+        {
+            i++;
+        }
+    }
+    if (filename == NULL)
+    {
+        filename = argv[1];
     }
     //setbuf(stdout, NULL);
     setlocale(LC_CTYPE, "zh_CN.UTF-8");
- 
+
     double wall_start, wall_end;
     wall_start = get_wall_time();
-    pdf_file_t* pdf = pdf_file_read_file(argv[1]);
+    pdf_file_t* pdf = pdf_file_read_file(filename);
     int num_pages = pdf_file_get_pages(pdf);
-    for (int i = 0; i < num_pages; i++)
-    {
-        pdf_page_t* page = pdf_file_get_page(pdf, i);
-        if (page == NULL)
-            continue;
-        char filename[256] = {0};
-        sprintf(filename, "page%d.png", i);
-        render_to_png_by_plutovg(page, filename);
 
-        pdf_page_free(page);
+    if (pages == NULL)
+    {
+        for (int i = 0; i < num_pages; i++)
+        {
+            pdf_page_t* page = pdf_file_get_page(pdf, i);
+            if (page == NULL)
+                continue;
+            char filename[256] = { 0 };
+            sprintf(filename, "page%d.png", i);
+            render_to_png_by_plutovg(page, filename);
+
+            pdf_page_free(page);
+        }
+    }
+    else
+    {
+        char* token;
+        char* rest = pages;
+        while ((token = strtok_r(rest, ",", &rest)) != NULL)
+        {
+            char* dash = strchr(token, '-');
+            int start = 0;
+            int end = 0;
+            if (dash)
+            {
+                *dash = '\0';
+                start = atoi(token);
+                end = atoi(dash + 1);
+            }
+            else
+            {
+                start = atoi(token);
+                end = start;
+            }
+
+            for (int i = start; i <= end; i++)
+            {
+                pdf_page_t* page = pdf_file_get_page(pdf, i);
+                if (page == NULL)
+                    continue;
+                char filename[256] = { 0 };
+                sprintf(filename, "page%d.png", i);
+                render_to_png_by_plutovg(page, filename);
+
+                pdf_page_free(page);
+            }
+        }
+
+        free(pages);
     }
 
     pdf_file_free(pdf);
