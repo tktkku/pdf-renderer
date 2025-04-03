@@ -40,7 +40,7 @@ void _write_png_callback(void* context, void* data, int size)
 {
     pdf_image_t* img = (pdf_image_t*)context;
 
-    unsigned char* t = (unsigned char*)realloc(img->data, img->data + size);
+    unsigned char* t = (unsigned char*)realloc(img->data, img->data_len + size);
     if (t == NULL)
     {
         free(img->data);
@@ -109,15 +109,15 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj)
         }
         if (length <= 0) return NULL;
         const char* color_space = pdf_dict_get_name(img_dict, "/ColorSpace");
-        const char* name = pdf_dict_get_name(img_dict, "/Intent");
-        pdf_array_t* mask_arr = pdf_dict_get_array(img_dict, "/Mask");
-        pdf_array_t* decode_aar = pdf_dict_get_array(img_dict, "/Decode");
-        int interpolate = pdf_dict_get_bool(img_dict, "/Interpolate");
-        pdf_array_t* alter_aar = pdf_dict_get_array(img_dict, "/Alternates");
+        //const char* name = pdf_dict_get_name(img_dict, "/Intent");
+        //pdf_array_t* mask_arr = pdf_dict_get_array(img_dict, "/Mask");
+        //pdf_array_t* decode_aar = pdf_dict_get_array(img_dict, "/Decode");
+        //int interpolate = pdf_dict_get_bool(img_dict, "/Interpolate");
+        //pdf_array_t* alter_aar = pdf_dict_get_array(img_dict, "/Alternates");
         int smask_ref = pdf_dict_get_ref(img_dict, "/SMask");
-        int smask_in_data = pdf_dict_get_number(img_dict, "/SMaskInData");
-        const char* metadata = pdf_dict_get_name(img_dict, "/Metadata");
-        pdf_dict_t* oc_dict = pdf_dict_get_dict(img_dict, "/OC");
+        //int smask_in_data = pdf_dict_get_number(img_dict, "/SMaskInData");
+        //const char* metadata = pdf_dict_get_name(img_dict, "/Metadata");
+        //pdf_dict_t* oc_dict = pdf_dict_get_dict(img_dict, "/OC");
         pdf_array_t* color_space_aar = NULL;
         if (color_space == NULL)
         {
@@ -158,7 +158,7 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj)
                         int stride = img->data_len / height;
                         if (color_space_aar != NULL && !strcmp(color_space_aar->values[0]->val.name, "/Indexed"))
                         {
-                            int lookup_cnt = color_space_aar->values[2]->val.number;
+                            //int lookup_cnt = color_space_aar->values[2]->val.number;
                             char* lookup = color_space_aar->values[3]->val.string + 1;
                             for (int i = 0; i < height; i++)
                             {

@@ -1,0 +1,10 @@
+#include "render.h"
+void handle_ri(pdf_context_t* context)
+{
+    // set color rendering intent
+    // intent
+    char buf[1024] = { 0 };
+    pdf_stack_node_t node;
+    node.data = buf;
+    pdf_stack_pop(context->stack, &node);
+}

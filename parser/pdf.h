@@ -1,6 +1,6 @@
 #ifndef _PDF_H_
 #define _PDF_H_
-#include "../plutovg/include/plutovg.h"
+#include "plutovg.h"
 #include <stdbool.h>
 #include <stddef.h>
 typedef struct pdf_parser_token pdf_parser_token_t;

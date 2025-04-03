@@ -50,33 +50,33 @@ void pdf_page_get_ext_gstate(pdf_page_t* page, const char* name)
             return;
         }
     }
-    const char* Type = pdf_dict_get_name(ext_gstate, "/Type");// shall be ExtGState
-    double LW = pdf_dict_get_number(ext_gstate, "/LW"); // line width
-    int LC = pdf_dict_get_number(ext_gstate, "/LC"); // line cap
-    int LJ = pdf_dict_get_number(ext_gstate, "/LJ"); // line join
-    double ML = pdf_dict_get_number(ext_gstate, "/ML"); // miter limit
-    pdf_array_t* D = pdf_dict_get_array(ext_gstate, "/D"); // dash pattern
-    const char* RI = pdf_dict_get_name(ext_gstate, "/RI");
-    int OP = pdf_dict_get_bool(ext_gstate, "/OP"); // whether to apply overprint
-    int op = pdf_dict_get_bool(ext_gstate, "/op");
-    int OPM = pdf_dict_get_number(ext_gstate, "/OPM");
-    pdf_array_t* Font = pdf_dict_get_array(ext_gstate, "/Font");
-    void* BG;
-    void* BG2;
-    void* UCR;
-    void* UCR2;
-    void* TR;
-    void* TR2;
-    void* HT;
-    double FL = pdf_dict_get_number(ext_gstate, "/FL");
-    double SM = pdf_dict_get_number(ext_gstate, "/SM");
-    int SA = pdf_dict_get_bool(ext_gstate, "/SA");
-    void* BM;
-    void* SMask;
-    double CA = pdf_dict_get_number(ext_gstate, "/CA");
-    double ca = pdf_dict_get_number(ext_gstate, "/ca");
-    int AIS = pdf_dict_get_bool(ext_gstate, "/AIS");
-    int TK = pdf_dict_get_bool(ext_gstate, "/TK");
+    //const char* Type = pdf_dict_get_name(ext_gstate, "/Type");// shall be ExtGState
+    //double LW = pdf_dict_get_number(ext_gstate, "/LW"); // line width
+    //int LC = pdf_dict_get_number(ext_gstate, "/LC"); // line cap
+    //int LJ = pdf_dict_get_number(ext_gstate, "/LJ"); // line join
+    //double ML = pdf_dict_get_number(ext_gstate, "/ML"); // miter limit
+    //pdf_array_t* D = pdf_dict_get_array(ext_gstate, "/D"); // dash pattern
+    //const char* RI = pdf_dict_get_name(ext_gstate, "/RI");
+    //int OP = pdf_dict_get_bool(ext_gstate, "/OP"); // whether to apply overprint
+    //int op = pdf_dict_get_bool(ext_gstate, "/op");
+    //int OPM = pdf_dict_get_number(ext_gstate, "/OPM");
+    //pdf_array_t* Font = pdf_dict_get_array(ext_gstate, "/Font");
+    // void* BG;
+    // void* BG2;
+    // void* UCR;
+    // void* UCR2;
+    // void* TR;
+    // void* TR2;
+    // void* HT;
+    // double FL = pdf_dict_get_number(ext_gstate, "/FL");
+    // double SM = pdf_dict_get_number(ext_gstate, "/SM");
+    // int SA = pdf_dict_get_bool(ext_gstate, "/SA");
+    // void* BM;
+    // void* SMask;
+    // double CA = pdf_dict_get_number(ext_gstate, "/CA");
+    // double ca = pdf_dict_get_number(ext_gstate, "/ca");
+    // int AIS = pdf_dict_get_bool(ext_gstate, "/AIS");
+    // int TK = pdf_dict_get_bool(ext_gstate, "/TK");
 }
 
 uint16_t _hex_str_to_16bit(char hexStr[4])
@@ -207,18 +207,18 @@ pdf_font_t* _load_type0_font(pdf_page_t* page, pdf_dict_t* font_dict)
         return NULL;
     }
 
-    font->type = pdf_dict_get_name(font->descendant_font_dict, "/Type"); // Font
-    font->subtype = pdf_dict_get_name(font->descendant_font_dict, "/Subtype"); // CIDFontType0 CIDFontType2
+    font->type = (char*)pdf_dict_get_name(font->descendant_font_dict, "/Type"); // Font
+    font->subtype = (char*)pdf_dict_get_name(font->descendant_font_dict, "/Subtype"); // CIDFontType0 CIDFontType2
     // for CIDFontType0, it shall be the value of the CIDFontName entry
     // for CIDFontType2, 
-    font->basefont = pdf_dict_get_name(font->descendant_font_dict, "/BaseFont");
+    font->basefont = (char*)pdf_dict_get_name(font->descendant_font_dict, "/BaseFont");
     font->cid_system_info_ref = pdf_dict_get_ref(font->descendant_font_dict, "/CIDSystemInfo");
     if (font->cid_system_info_ref != -1)
     {
-        pdf_obj_t* obj = pdf_file_get_obj(page->pdf, font->cid_system_info_ref);
-        char* registry = pdf_dict_get_string(obj->value->val.dict, "/Registry");
-        char* ordering = pdf_dict_get_string(obj->value->val.dict, "/Ordering");
-        int supplement = pdf_dict_get_number(obj->value->val.dict, "/Supplement");
+        // pdf_obj_t* obj = pdf_file_get_obj(page->pdf, font->cid_system_info_ref);
+        // char* registry = pdf_dict_get_string(obj->value->val.dict, "/Registry");
+        // char* ordering = pdf_dict_get_string(obj->value->val.dict, "/Ordering");
+        // int supplement = pdf_dict_get_number(obj->value->val.dict, "/Supplement");
     }
     int font_descriptor_ref = pdf_dict_get_ref(font->descendant_font_dict, "/FontDescriptor");
     if (font_descriptor_ref != -1)
@@ -233,7 +233,7 @@ pdf_font_t* _load_type0_font(pdf_page_t* page, pdf_dict_t* font_dict)
     if (font->font_descriptor != NULL)
     {
         // font->type = pdf_dict_get_name(font->font_descriptor, "/Type");
-        font->basefont = pdf_dict_get_name(font->font_descriptor, "/FontName");
+        font->basefont = (char*)pdf_dict_get_name(font->font_descriptor, "/FontName");
         font->font_weight = pdf_dict_get_number(font->font_descriptor, "/FontWeight");
         font->flags = pdf_dict_get_number(font->font_descriptor, "/Flags");
         font->italic_angle = pdf_dict_get_number(font->font_descriptor, "/ItalicAngle");
@@ -313,10 +313,10 @@ pdf_font_t* _load_type0_font(pdf_page_t* page, pdf_dict_t* font_dict)
     if (font->dw == -1)
         font->dw = 1000;
     font->w_aar = pdf_dict_get_array(font->descendant_font_dict, "/W");
-    pdf_array_t* dw2_aar = pdf_dict_get_array(font->descendant_font_dict, "/DW2");
-    pdf_array_t* w2_aar = pdf_dict_get_array(font->descendant_font_dict, "/W2");
+    //pdf_array_t* dw2_aar = pdf_dict_get_array(font->descendant_font_dict, "/DW2");
+    //pdf_array_t* w2_aar = pdf_dict_get_array(font->descendant_font_dict, "/W2");
     // shall be Identity
-    font->cid_to_gid_map = pdf_dict_get_name(font->descendant_font_dict, "/CIDToGIDMap");
+    font->cid_to_gid_map = (unsigned char*)pdf_dict_get_name(font->descendant_font_dict, "/CIDToGIDMap");
     if (font->cid_to_gid_map == NULL)
     {
         font->cid_to_gid_map_ref = pdf_dict_get_ref(font->descendant_font_dict, "/CIDToGIDMap");
@@ -375,7 +375,7 @@ pdf_font_t* _load_truetype_font(pdf_page_t* page, pdf_dict_t* font_dict)
     if (font->font_descriptor != NULL)
     {
         // font->type = pdf_dict_get_name(font->font_descriptor, "/Type");
-        font->basefont = pdf_dict_get_name(font->font_descriptor, "/FontName");
+        font->basefont = (char*)pdf_dict_get_name(font->font_descriptor, "/FontName");
         font->font_weight = pdf_dict_get_number(font->font_descriptor, "/FontWeight");
         font->flags = pdf_dict_get_number(font->font_descriptor, "/Flags");
         font->italic_angle = pdf_dict_get_number(font->font_descriptor, "/ItalicAngle");
@@ -459,7 +459,7 @@ pdf_font_t* pdf_page_get_font(pdf_page_t* page, const char* name)
 
     pdf_dict_t* font_dict = font_obj->value->val.dict;
 
-    char* type = pdf_dict_get_name(font_dict, "/Type"); // Font
+    char* type = (char*)pdf_dict_get_name(font_dict, "/Type"); // Font
     if (!type)
     {
         return NULL;

@@ -351,7 +351,7 @@ pdf_file_t* pdf_file_read_file(const char* file_name)
                         pdf_dict_t* ef_dict = pdf_dict_get_dict(embedded_obj2->value->val.dict, "/EF");
                         int ref = pdf_dict_get_ref(ef_dict, "/UF");
                         pdf_obj_t* embedded_obj = pdf_file_get_obj(pdf_file, ref);
-                        char* embedded_file = NULL;
+                        unsigned char* embedded_file = NULL;
                         int embedded_file_len = 0;
                         pdf_stream_get_all(embedded_obj->stream, &embedded_file, &embedded_file_len);
                         embedded_file_len += 1;
@@ -733,7 +733,7 @@ pdf_cmap_t* pdf_file_get_cmap(pdf_file_t* pdf, char* name)
     fseek(f, 0, SEEK_END);
     int filesize = ftell(f);
     rewind(f);
-    char* filedata = (char*)malloc(filesize);
+    unsigned char* filedata = (unsigned char*)malloc(filesize);
     if (filedata == NULL)
     {
         fclose(f);

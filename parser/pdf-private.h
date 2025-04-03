@@ -95,7 +95,7 @@ struct pdf_obj
     pdf_obj_value_t* value;
     pdf_stream_t* stream;
     pdf_xobject_t* xobject;
-    char* font_data;
+    unsigned char* font_data;
     int font_data_len;
     pdf_file_t* pdf;
 };
@@ -261,10 +261,10 @@ struct pdf_font
     int cid_system_info_ref;
     int dw;
     pdf_array_t* w_aar;
-    char* cid_to_gid_map;
+    unsigned char* cid_to_gid_map;
     int cid_to_gid_map_ref;
-    void* font_data;
-    unsigned int font_data_length;
+    unsigned char* font_data;
+    int font_data_length;
     pdf_cmap_t* cmap;
     bool load_succeed;
     int first_char;

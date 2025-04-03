@@ -8,7 +8,6 @@ set(PARSER_SOURCES
     pdf-file.c
     pdf-font.c
     pdf-obj.c
-    pdf-render-by-plutovg.c
     pdf-page.c
     pdf-parser.c
     pdf-stack.c
@@ -16,7 +15,7 @@ set(PARSER_SOURCES
     pdf-private.h
     pdf.h
 )
-set(PARSER_DEP zlibstatic plutovg)
+set(PARSER_DEP zlibstatic)
 if(NOT WIN32)
     set(PARSER_DEP ${PARSER_DEP} m)
 endif()
