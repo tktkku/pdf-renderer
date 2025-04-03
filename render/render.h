@@ -115,3 +115,4 @@ const static handler_entry handlers[] = {
     {"w", handle_w},          {"y", handle_y} };
 void _do_render_operation(pdf_context_t* context, pdf_parser_token_t* tk);
 void stroke(pdf_context_t* context);
+void _do_text_render(pdf_context_t* context, char* buf, int len);
