@@ -53,9 +53,9 @@ int main(int argc, char* argv[])
 
     if (pages == NULL)
     {
-        for (int i = 0; i < num_pages; i++)
+        for (int i = 1; i <= num_pages; i++)
         {
-            pdf_page_t* page = pdf_file_get_page(pdf, i);
+            pdf_page_t* page = pdf_file_get_page(pdf, i - 1);
             if (page == NULL)
                 continue;
             char filename[256] = { 0 };
@@ -86,9 +86,13 @@ int main(int argc, char* argv[])
                 end = start;
             }
 
+            if (start - 1 < 0) start = 1; 
+            if (start > num_pages) start = num_pages;
+            if (end - 1 < 0) end = 1; 
+            if (end > num_pages) end = num_pages;
             for (int i = start; i <= end; i++)
             {
-                pdf_page_t* page = pdf_file_get_page(pdf, i);
+                pdf_page_t* page = pdf_file_get_page(pdf, i - 1);
                 if (page == NULL)
                     continue;
                 char filename[256] = { 0 };

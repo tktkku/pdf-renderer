@@ -158,8 +158,18 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj)
                         int stride = img->data_len / height;
                         if (color_space_aar != NULL && !strcmp(color_space_aar->values[0]->val.name, "/Indexed"))
                         {
-                            //int lookup_cnt = color_space_aar->values[2]->val.number;
-                            char* lookup = color_space_aar->values[3]->val.string + 1;
+                            int lookup_cnt = color_space_aar->values[2]->val.number;
+                            unsigned char* lookup = NULL;
+                            if (color_space_aar->values[3]->type == INDIRECT)
+                            {
+                                int ref = color_space_aar->values[3]->val.indirect;
+                                pdf_obj_t* lookup_obj = pdf_file_get_obj(obj->pdf, ref);
+                                pdf_stream_get_all(lookup_obj->stream, &lookup, &lookup_cnt);
+                            }
+                            else
+                            {
+                                lookup = (unsigned char*)(color_space_aar->values[3]->val.string + 1);
+                            }
                             for (int i = 0; i < height; i++)
                             {
                                 for (int j = 0; j < width; j++)
@@ -167,13 +177,14 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj)
                                     int index = (i * width + j);
                                     int index1 = img->data[i * stride + j] * 3;
                                     int index2 = index * 4;
-                                    
+
                                     tmp[index2] = lookup[index1];
                                     tmp[index2 + 1] = lookup[index1 + 1];
                                     tmp[index2 + 2] = lookup[index1 + 2];
                                     tmp[index2 + 3] = smask[index];
                                 }
                             }
+                            free(lookup);
                         }
                         else
                         {
@@ -191,7 +202,7 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj)
                                 }
                             }
                         }
-                        
+
                         pdf_image_t t = {
                             .data = NULL,
                             .data_len = 0
@@ -208,9 +219,68 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj)
                             img->data = t.data;
                             img->data_len = t.data_len;
                         }
+                        free(smask);
                         free(tmp);
                     }
                 }
+            }
+            else if (color_space_aar != NULL && !strcmp(color_space_aar->values[0]->val.name, "/Indexed"))
+            {
+                int stride = img->data_len / height;
+                int tmp_len = sizeof(unsigned char) * width * 3 * height;
+                unsigned char* tmp = (unsigned char*)malloc(tmp_len);
+                int lookup_cnt = color_space_aar->values[2]->val.number;
+                unsigned char* lookup = NULL;
+                if (color_space_aar->values[3]->type == INDIRECT)
+                {
+                    int ref = color_space_aar->values[3]->val.indirect;
+                    pdf_obj_t* lookup_obj = pdf_file_get_obj(obj->pdf, ref);
+                    pdf_stream_get_all(lookup_obj->stream, &lookup, &lookup_cnt);
+                }
+                else
+                {
+                    lookup = (unsigned char*)(color_space_aar->values[3]->val.string + 1);
+                }
+                if (bits_per_component == 8)
+                {
+                    for (int i = 0; i < height; i++)
+                    {
+                        for (int j = 0; j < width; j++)
+                        {
+                            int index = (i * width + j);
+                            int index1 = img->data[i * stride + j] * 3;
+                            int index2 = index * 3;
+
+                            tmp[index2] = lookup[index1];
+                            tmp[index2 + 1] = lookup[index1 + 1];
+                            tmp[index2 + 2] = lookup[index1 + 2];
+                        }
+                    }
+                }
+                else if (bits_per_component == 4)
+                {
+                    for (int i = 0; i < height; i++)
+                    {
+                        for (int j = 0; j < stride; j++)
+                        {
+                            int val = img->data[i * stride + j];
+                            int valh = ((val >> 4) & 0x0F) * 3;
+                            int vall = ((val) & 0x0F) * 3;
+                            int index = (i * width + j * 2) * 3;
+                            tmp[index] = lookup[valh];
+                            tmp[index + 1] = lookup[valh + 1];
+                            tmp[index + 2] = lookup[valh + 2];
+                            tmp[index + 3] = lookup[vall];
+                            tmp[index + 4] = lookup[vall + 1];
+                            tmp[index + 5] = lookup[vall + 2];
+                        }
+                    }
+                }
+                free(lookup);
+                free(img->data);
+                img->data = tmp;
+                img->data_len = tmp_len;
+                img->bits_per_color = 8;
             }
             pdf_xobject_t* xobj = (pdf_xobject_t*)malloc(sizeof(pdf_xobject_t));
             xobj->type = XOBJ_IMAGE;

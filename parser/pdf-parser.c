@@ -617,7 +617,10 @@ NOT_OPERATOR:
                 }
             }
         }
-
+        if (left_par != right_par)
+        {
+            return NULL;
+        }
         tk = pdf_parser_token_init(parser, start, TOKEN_STRING, len);
         tk->token[tk->token_len - 1] = '\0';
         tk->token_len--;
@@ -852,8 +855,19 @@ pdf_parser_token_t* _pdf_next_token(pdf_parser_t* parser)
         pdf_parser_token_t* tk = _pdf_parser_next_one_token(parser, *start, end);
         if (tk == NULL)
         {
+            if (parser->reader.type == STREAM_READER)
+            {
+                pdf_stream_t* s = (pdf_stream_t*)parser->reader.source;
+                if (s->processed < s->stream_len)
+                {
+                    parser->reader.read(parser, parser->reader.source);
+                    tk = _pdf_parser_next_one_token(parser, *start, end);
+                    if (tk == NULL) break;
+                }
+            }
             break;
         }
+
         if (tk->type == TOKEN_SPACE || tk->type == TOKEN_COMMENT || tk->type == TOKEN_NEWLINE)
         {
             // ignored
@@ -900,7 +914,14 @@ pdf_parser_token_t* _pdf_next_token(pdf_parser_t* parser)
                 + parser->cached_tokens[0]->token_len
                 + parser->cached_tokens[1]->token_len
                 + 2;// add 2 spaces
-            token->token = (char*)malloc(token->token_len + 1);
+            if (token->token_len <= MAX_FIXED_TOKEN_LEN)
+            {
+                token->token = (char*)malloc(MAX_FIXED_TOKEN_LEN + 1);
+            }
+            else
+            {
+                token->token = (char*)malloc(token->token_len + 1);
+            }
             int off = 0;
             memcpy(token->token, tk->token, tk->token_len);
             off += tk->token_len;
@@ -938,25 +959,25 @@ pdf_parser_token_t* pdf_parser_next_token(pdf_parser_t* parser)
     if (parser->pdf->pFile == NULL)
         return NULL;
 
-    unsigned char* save_cur = parser->current_pos;
+    // unsigned char* save_cur = parser->current_pos;
     if (parser->current_pos >= parser->splite_pos)
     {
         parser->reader.read(parser, parser->reader.source);
     }
     pdf_parser_token_t* tk = _pdf_next_token(parser);
-    if (tk == NULL)
-    {
-        if (parser->reader.type == STREAM_READER)
-        {
-            pdf_stream_t* s = (pdf_stream_t*)parser->reader.source;
-            if (s->processed < s->stream_len)
-            {
-                parser->current_pos = save_cur;
-                parser->reader.read(parser, parser->reader.source);
-                tk = _pdf_next_token(parser);
-            }
-        }
-    }
+    // if (tk == NULL)
+    // {
+    //     if (parser->reader.type == STREAM_READER)
+    //     {
+    //         pdf_stream_t* s = (pdf_stream_t*)parser->reader.source;
+    //         if (s->processed < s->stream_len)
+    //         {
+    //             parser->current_pos = save_cur;
+    //             parser->reader.read(parser, parser->reader.source);
+    //             tk = _pdf_next_token(parser);
+    //         }
+    //     }
+    // }
     return tk;
 }
 pdf_cmap_t* pdf_parser_build_cmap(pdf_parser_t* parser)

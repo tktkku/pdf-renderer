@@ -3,6 +3,7 @@
 #include "plutovg.h"
 #include <stdbool.h>
 #include <stddef.h>
+#include "cvector.h"
 typedef struct pdf_parser_token pdf_parser_token_t;
 typedef enum pdf_parser_token_type pdf_parser_token_type_t;
 
@@ -158,6 +159,12 @@ typedef struct pdf_graphics_state {
     } textState;
     struct pdf_graphics_state* next;
 } pdf_graphics_state_t;
+typedef struct
+{
+    int ref;
+    pdf_font_t* font;
+    plutovg_font_face_t* fontface;
+} pdf_font_cache_t;
 typedef struct context
 {
     pdf_stack_t* stack;
@@ -166,6 +173,7 @@ typedef struct context
     pdf_page_t* page;
     pdf_obj_t* current_obj;
     pdf_graphics_state_t* state;
+    cvector_vector_type(pdf_font_cache_t*) fontcache;
 } pdf_context_t;
 void render_to_png_by_plutovg(pdf_page_t* page, char* filename);
 void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,

@@ -161,6 +161,7 @@ pdf_font_t* _load_type0_font(pdf_page_t* page, pdf_dict_t* font_dict)
         pdf_cmap_t* cmap = pdf_parser_build_cmap(parser);
         cmap->worldwide = false;
         font->to_unicode_map = cmap;
+        free(data);
     }
     // CIDFonts
     font->descendant_font_dict = NULL;
@@ -361,6 +362,7 @@ pdf_font_t* _load_truetype_font(pdf_page_t* page, pdf_dict_t* font_dict)
         pdf_cmap_t* cmap = pdf_parser_build_cmap(parser);
         cmap->worldwide = false;
         font->to_unicode_map = cmap;
+        free(data);
     }
     int font_descriptor_ref = pdf_dict_get_ref(font_dict, "/FontDescriptor");
     if (font_descriptor_ref != -1)

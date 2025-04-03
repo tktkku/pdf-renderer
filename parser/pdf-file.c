@@ -278,7 +278,7 @@ bool _read_xref_and_trailer(pdf_file_t* pdf)
                 cvector_push_back(pdf->xref_table, xref);
             }
         }
-
+        free(start);
         pdf_obj_free(xref_obj);
         return true;
     }
@@ -355,6 +355,7 @@ pdf_file_t* pdf_file_read_file(const char* file_name)
                         int embedded_file_len = 0;
                         pdf_stream_get_all(embedded_obj->stream, &embedded_file, &embedded_file_len);
                         embedded_file_len += 1;
+                        free(embedded_file);
                     }
                 }
                 
@@ -697,6 +698,7 @@ pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, int ref)
                     // _add_to_obj_table(pdf, obj);
                     cvector_push_back(pdf->read_objs, obj);
                 }
+                free(start);  
                 pdf_parser_free(parser);
 
                 return _get_obj_from_table(pdf, ref);

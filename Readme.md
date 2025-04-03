@@ -11,6 +11,7 @@ cmake --build build
 ./build/test tiger.pdf
 ```
 ## Valgrind
+valgrind --leak-check=full --track-origins=yes --log-file="valgrind.log" ./build/test ./test.pdf
 valgrind --tool=memcheck --leak-check=full --show-leak-kinds=all --log-file="valgrind.log" --vgdb=yes --vgdb-error=0 -s ./build/test test.pdf
 valgrind --tool=callgrind ./build/test test.pdf
 callgrind_annotate callgrind.out.<PID> --inclusive=yes

@@ -64,7 +64,7 @@ void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
                 continue;
             // printf("%s\n", token);
             _do_render_operation(&context, tk);
-            // if (!strcmp(token, "Tj") || !strcmp(token, "TJ"))
+            // if (!strcmp(token, "528.1"))
             // {
             //     plutovg_surface_write_to_png(surface, "test.png");
             //     printf("Press any key to continue...");
@@ -417,10 +417,9 @@ void _do_text_render(pdf_context_t* context, char* buf, int len)
         context->state->fillColor[0],
         context->state->fillColor[1],
         context->state->fillColor[2]);
-    if (context->state->textState.font->load_succeed)
+    if (context->state->textState.font_face_loaded)
     {
-        if (strstr(context->state->textState.font->encoding, "Identity")
-            || strcmp(context->state->textState.font->encoding, "/WinAnsiEncoding") == 0)
+        if (strstr(context->state->textState.font->encoding, "Identity"))
             context->state->textState.textLineWidth += plutovg_canvas_fill_text1(context->canvas, unicode, unicode_cnt,
                 PLUTOVG_TEXT_ENCODING_UTF16, context->state->textState.textLineWidth, 0);
         else
