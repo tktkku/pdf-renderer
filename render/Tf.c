@@ -11,6 +11,9 @@ void handle_Tf(pdf_context_t* context)
     pdf_stack_pop(context->stack, &node);
     int ref = pdf_dict_get_ref(context->page->resources->font_dict, buf);
     if (ref == -1)
+    {
+        ref = pdf_dict_get_ref(context->current_obj, buf);
+    }
         return NULL;
     for (int i = 0; i < cvector_size(context->fontcache); i++)
     {

@@ -63,7 +63,7 @@ void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
             const char* token = pdf_parser_token_get_token(tk);
             if (token == NULL)
                 continue;
-            // printf("%s\n", token);
+            printf("%s\n", token);
             _do_render_operation(&context, tk);
             // if (!strcmp(token, "528.1"))
             // {

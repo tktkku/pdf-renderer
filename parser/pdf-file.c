@@ -285,7 +285,31 @@ bool _read_xref_and_trailer(pdf_file_t* pdf)
 
     return false;
 }
+void _read_pages(pdf_file_t* pdf, pdf_obj_t* pages_obj);
+void _read_pages(pdf_file_t* pdf, pdf_obj_t* pages_obj)
+{
+    if (pdf == NULL || pages_obj == NULL) return;
 
+    char* type = pdf_dict_get_name(pages_obj->value->val.dict, "/Type");
+    int count = pdf_dict_get_number(pages_obj->value->val.dict, "/Count");
+    pdf_array_t* kids_arr = pdf_dict_get_array(pages_obj->value->val.dict, "/Kids");
+    if (kids_arr == NULL) return;
+    for (int i = 0; i < kids_arr->num_elements; i++)
+    {
+        int ref = kids_arr->values[i]->val.indirect;
+        pdf_obj_t* obj = pdf_file_get_obj(pdf, ref);
+        if (obj == NULL) continue;
+        type = pdf_dict_get_name(obj->value->val.dict, "/Type");
+        if (!strcmp(type, "/Pages"))
+        {
+            _read_pages(pdf, obj);
+        }
+        else
+        {
+            cvector_push_back(pdf->pages, obj);
+        }
+    } 
+}
 pdf_file_t* pdf_file_read_file(const char* file_name)
 {
     if (file_name == NULL)
@@ -308,6 +332,7 @@ pdf_file_t* pdf_file_read_file(const char* file_name)
     pdf_file->current_index = 0;
     pdf_file->xref_table = NULL;
     pdf_file->read_objs = NULL;
+    pdf_file->pages = NULL;
     if (!_check_version(pdf_file))
     {
         pdf_file_free(pdf_file);
@@ -378,27 +403,14 @@ pdf_file_t* pdf_file_read_file(const char* file_name)
         return NULL;
     }
 
-    pdf_file->num_pages = pdf_dict_get_number(pages_obj->value->val.dict, "/Count");
-    pdf_file->pages = (pdf_obj_t**)malloc(sizeof(pdf_obj_t*) * pdf_file->num_pages);
-    pdf_array_t* kids_arr = pdf_dict_get_array(pages_obj->value->val.dict, "/Kids");
-    for (int i = 0; i < pdf_file->num_pages; i++)
-    {
-        ref = kids_arr->values[i]->val.indirect;
-        pdf_obj_t* page_obj = pdf_file_get_obj(pdf_file, ref);
-        if (page_obj == NULL)
-        {
-            pdf_file_free(pdf_file);
-            return NULL;
-        }
-        pdf_file->pages[i] = page_obj;
-    }
+    _read_pages(pdf_file, pages_obj);
 
     return pdf_file;
 }
 int pdf_file_get_pages(pdf_file_t* pdf)
 {
     if (pdf == NULL) return 0;
-    return pdf->num_pages;
+    return cvector_size(pdf->pages);
 }
 pdf_page_t* pdf_file_get_page(pdf_file_t* pdf, int pageNo)
 {
@@ -784,11 +796,7 @@ void pdf_file_free(pdf_file_t* file)
     }
     cvector_free(file->xref_table);
 
-    if (file->pages)
-    {
-        free(file->pages);
-        file->pages = NULL;
-    }
+    cvector_free(file->pages);
     nums = cvector_size(file->read_objs);
     for (int i = 0; i < nums; i++)
     {

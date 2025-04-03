@@ -201,8 +201,9 @@ struct pdf_file
     int info_obj_ref;
     // xref_table_t* xref_table;
     cvector_vector_type(xref_t*) xref_table;
-    pdf_obj_t** pages;
-    int num_pages;
+    //pdf_obj_t** pages;
+    //int num_pages;
+    cvector_vector_type(pdf_obj_t*) pages;
 
     pdf_cmap_t* cmaps;
     int num_cmaps;
