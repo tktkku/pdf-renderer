@@ -48,6 +48,7 @@ void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
     context.state->textState.font = NULL;
     context.state->textState.fontface = NULL;
     context.current_obj = NULL;
+    context.fontcache = NULL;
     int numStreams = pdf_page_get_streams(page);
     for (int j = 0; j < numStreams; j++)
     {
@@ -137,15 +138,15 @@ void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
     }
     pdf_stack_free(stack);
     plutovg_surface_write_to_png(surface, filename);
-    if (context.state->textState.fontface != NULL)
+    int nums = cvector_size(context.fontcache);
+    for (int i = 0; i < nums; i++) 
     {
+        pdf_font_free(context.fontcache[i]->font);
         plutovg_canvas_set_font_face(context.canvas, NULL);
-        plutovg_font_face_destroy(context.state->textState.fontface);
+        plutovg_font_face_destroy(context.fontcache[i]->fontface);
+        free(context.fontcache[i]);
     }
-    if (context.state->textState.font != NULL)
-    {
-        pdf_font_free(context.state->textState.font);
-    }
+    cvector_free(context.fontcache);
     plutovg_canvas_destroy(canvas);
     plutovg_surface_destroy(surface);
     free(pixels);

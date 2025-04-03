@@ -1,9 +1,11 @@
 #ifndef _PDF_H_
 #define _PDF_H_
-#include "plutovg.h"
+
 #include <stdbool.h>
 #include <stddef.h>
-#include "cvector.h"
+#include "plutovg.h"
+//#define CVECTOR_LINEAR_GROWTH
+#include "../c-vector/cvector.h"
 typedef struct pdf_parser_token pdf_parser_token_t;
 typedef enum pdf_parser_token_type pdf_parser_token_type_t;
 

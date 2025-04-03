@@ -5,8 +5,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include "zlib.h"
-//#define CVECTOR_LINEAR_GROWTH
-#include "cvector.h"
+
 #define ARRAY_COUNT(a) (sizeof(a) / sizeof(a[0]))
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 enum pdf_parser_token_type
