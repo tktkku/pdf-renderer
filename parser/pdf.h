@@ -28,7 +28,7 @@ struct pdf_array;
 typedef struct pdf_array pdf_array_t;
 
 typedef struct pdf_file pdf_file_t;
-typedef struct pdf_resources pdf_resources_t;
+//typedef struct pdf_resources pdf_resources_t;
 typedef struct pdf_page pdf_page_t;
 typedef struct pdf_font pdf_font_t;
 typedef struct pdf_stream pdf_stream_t;
@@ -87,10 +87,7 @@ int pdf_page_get_media_width(pdf_page_t* page);
 int pdf_page_get_media_height(pdf_page_t* page);
 pdf_font_t* pdf_page_get_font(pdf_page_t* page, const char* name);
 
-void pdf_page_get_ext_gstate(pdf_page_t* page, const char* name);
-
-pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj);
-void pdf_page_xobject_free(pdf_xobject_t* xobject);
+pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj, const char* name);
 
 int pdf_page_get_streams(pdf_page_t* page);
 pdf_stream_t* pdf_page_get_stream(pdf_page_t* page, int index);
@@ -105,6 +102,7 @@ void pdf_stream_get_all(pdf_stream_t* stream, unsigned char** buffer, int* size)
 
 pdf_obj_t* pdf_obj_init(void);
 void pdf_obj_free(pdf_obj_t* obj);
+pdf_font_t* pdf_obj_get_font(pdf_obj_t* obj, const char* name);
 
 pdf_file_t* pdf_file_read_file(const char* file_name);
 void pdf_file_free(pdf_file_t* file);

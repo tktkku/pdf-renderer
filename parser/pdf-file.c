@@ -290,7 +290,7 @@ void _read_pages(pdf_file_t* pdf, pdf_obj_t* pages_obj)
 {
     if (pdf == NULL || pages_obj == NULL) return;
 
-    char* type = pdf_dict_get_name(pages_obj->value->val.dict, "/Type");
+    const char* type = pdf_dict_get_name(pages_obj->value->val.dict, "/Type");
     int count = pdf_dict_get_number(pages_obj->value->val.dict, "/Count");
     pdf_array_t* kids_arr = pdf_dict_get_array(pages_obj->value->val.dict, "/Kids");
     if (kids_arr == NULL) return;
@@ -443,62 +443,63 @@ pdf_page_t* pdf_file_get_page(pdf_file_t* pdf, int pageNo)
     pdf_array_t* crop_arr = pdf_dict_get_array(page_obj_dict, "/CropBox");
     pdf_array_t* media_arr = pdf_dict_get_array(page_obj_dict, "/MediaBox");
 
-    int res_ref = pdf_dict_get_ref(page_obj_dict, "/Resources");
-    pdf_dict_t* tmp_dict = NULL;
-    if (res_ref == -1)
-    {
-        pdf_dict_t* res_dict = pdf_dict_get_dict(page_obj_dict, "/Resources");
-        if (res_dict == NULL)
-            return NULL;
-        tmp_dict = res_dict;
-    }
-    else
-    {
-        pdf_obj_t* res_obj = pdf_file_get_obj(pdf, res_ref);
-        if (res_obj == NULL)
-            return NULL;
-        tmp_dict = res_obj->value->val.dict;
-    }
+    // int res_ref = pdf_dict_get_ref(page_obj_dict, "/Resources");
+    // pdf_dict_t* tmp_dict = NULL;
+    // if (res_ref == -1)
+    // {
+    //     pdf_dict_t* res_dict = pdf_dict_get_dict(page_obj_dict, "/Resources");
+    //     if (res_dict == NULL)
+    //         return NULL;
+    //     tmp_dict = res_dict;
+    // }
+    // else
+    // {
+    //     pdf_obj_t* res_obj = pdf_file_get_obj(pdf, res_ref);
+    //     if (res_obj == NULL)
+    //         return NULL;
+    //     tmp_dict = res_obj->value->val.dict;
+    // }
     pdf_page_t* page = pdf_page_init();
     page->annots = annots_aar;
     page->pageNo = pageNo;
-    if (tmp_dict != NULL)
-    {
-        page->resources = (pdf_resources_t*)malloc(sizeof(pdf_resources_t));
-        page->resources->ext_gstate = pdf_dict_get_dict(tmp_dict, "/ExtGState");
-        if (page->resources->ext_gstate == NULL)
-        {
-            int ext_ref = pdf_dict_get_ref(tmp_dict, "/ExtGState");
-            if (ext_ref != -1)
-            {
-                pdf_obj_t* ext_obj = pdf_file_get_obj(pdf, ext_ref);
-                if (ext_obj != NULL)
-                {
-                    page->resources->ext_gstate = ext_obj->value->val.dict;
-                }
-            }
-        }
-        page->resources->font_dict = pdf_dict_get_dict(tmp_dict, "/Font");
-        if (page->resources->font_dict == NULL)
-        {
-            int font_ref = pdf_dict_get_ref(tmp_dict, "/Font");
-            if (font_ref != -1)
-            {
-                pdf_obj_t* font_obj = pdf_file_get_obj(pdf, font_ref);
-                page->resources->font_dict = font_obj->value->val.dict;
-            }
-        }
-        page->resources->xobject_dict = pdf_dict_get_dict(tmp_dict, "/XObject");
-        if (page->resources->xobject_dict == NULL)
-        {
-            int xobj_ref = pdf_dict_get_ref(tmp_dict, "/XObject");
-            if (xobj_ref != -1)
-            {
-                pdf_obj_t* xobj_obj = pdf_file_get_obj(pdf, xobj_ref);
-                page->resources->xobject_dict = xobj_obj->value->val.dict;
-            }
-        }
-    }
+    page->obj = page_obj;
+    // if (tmp_dict != NULL)
+    // {
+    //     page->resources = (pdf_resources_t*)malloc(sizeof(pdf_resources_t));
+    //     page->resources->ext_gstate = pdf_dict_get_dict(tmp_dict, "/ExtGState");
+    //     if (page->resources->ext_gstate == NULL)
+    //     {
+    //         int ext_ref = pdf_dict_get_ref(tmp_dict, "/ExtGState");
+    //         if (ext_ref != -1)
+    //         {
+    //             pdf_obj_t* ext_obj = pdf_file_get_obj(pdf, ext_ref);
+    //             if (ext_obj != NULL)
+    //             {
+    //                 page->resources->ext_gstate = ext_obj->value->val.dict;
+    //             }
+    //         }
+    //     }
+    //     page->resources->font_dict = pdf_dict_get_dict(tmp_dict, "/Font");
+    //     if (page->resources->font_dict == NULL)
+    //     {
+    //         int font_ref = pdf_dict_get_ref(tmp_dict, "/Font");
+    //         if (font_ref != -1)
+    //         {
+    //             pdf_obj_t* font_obj = pdf_file_get_obj(pdf, font_ref);
+    //             page->resources->font_dict = font_obj->value->val.dict;
+    //         }
+    //     }
+    //     page->resources->xobject_dict = pdf_dict_get_dict(tmp_dict, "/XObject");
+    //     if (page->resources->xobject_dict == NULL)
+    //     {
+    //         int xobj_ref = pdf_dict_get_ref(tmp_dict, "/XObject");
+    //         if (xobj_ref != -1)
+    //         {
+    //             pdf_obj_t* xobj_obj = pdf_file_get_obj(pdf, xobj_ref);
+    //             page->resources->xobject_dict = xobj_obj->value->val.dict;
+    //         }
+    //     }
+    // }
 
     if (contents_ref == -1)
     {
@@ -568,7 +569,19 @@ pdf_obj_t* _get_obj_from_table(pdf_file_t* pdf, int ref)
 
     return NULL;
 }
-
+void _fill_resources(pdf_obj_t* obj)
+{
+    if (obj->value == NULL || obj->value->type != DICT) return;
+    pdf_dict_t* resources = pdf_dict_get_dict(obj->value->val.dict, "/Resources");
+    obj->resources.extgstate_dict = pdf_dict_get_dict(resources, "/ExtGState");
+    obj->resources.colorspace_dict = pdf_dict_get_dict(resources, "/ColorSpace");
+    obj->resources.pattern_dict = pdf_dict_get_dict(resources, "/Pattern");
+    obj->resources.shading_dict = pdf_dict_get_dict(resources, "/Shading");
+    obj->resources.xobject_dict = pdf_dict_get_dict(resources, "/XObject");
+    obj->resources.font_dict = pdf_dict_get_dict(resources, "/Font");
+    obj->resources.procset_arr = pdf_dict_get_array(resources, "/ProcSet");
+    obj->resources.properties_dict = pdf_dict_get_dict(resources, "/Properties");
+}
 pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, int ref)
 {
     if (pdf == NULL || ref < 0)
@@ -615,6 +628,7 @@ pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, int ref)
                 }
                 obj->seq = ref;
                 obj->pdf = pdf;
+                _fill_resources(obj);
                 //_add_to_obj_table(pdf, obj);
                 cvector_push_back(pdf->read_objs, obj);
                 pdf_parser_token_free(parser, tk);
@@ -706,7 +720,7 @@ pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, int ref)
                     }
                     pdf_parser_token_free(parser, tk1);
                     pdf_parser_free(val_parser);
-
+                    _fill_resources(obj);
                     // _add_to_obj_table(pdf, obj);
                     cvector_push_back(pdf->read_objs, obj);
                 }

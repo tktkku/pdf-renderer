@@ -93,9 +93,20 @@ struct pdf_obj
     int seq;
     pdf_obj_value_t* value;
     pdf_stream_t* stream;
-    pdf_xobject_t* xobject;
-    unsigned char* font_data;
-    int font_data_len;
+    struct
+    {
+        pdf_dict_t* extgstate_dict;
+        pdf_dict_t* colorspace_dict;
+        pdf_dict_t* pattern_dict;
+        pdf_dict_t* shading_dict;
+        pdf_dict_t* xobject_dict;
+        pdf_dict_t* font_dict;
+        pdf_array_t* procset_arr;
+        pdf_dict_t* properties_dict;
+    } resources;
+    // pdf_xobject_t* xobject;
+    // unsigned char* font_data;
+    // int font_data_len;
     pdf_file_t* pdf;
 };
 
@@ -210,29 +221,30 @@ struct pdf_file
     pdf_parser_token_t* freed_tokens;
 };
 
-struct pdf_resources
-{
-    pdf_dict_t* ext_gstate;
-    pdf_dict_t* color_space;
-    pdf_dict_t* pattern;
-    pdf_dict_t* shading;
-    pdf_dict_t* xobject_dict;
-    pdf_dict_t* font_dict;
-    pdf_array_t* proc_set;
-    pdf_dict_t* properties;
-};
+// struct pdf_resources
+// {
+//     pdf_dict_t* ext_gstate;
+//     pdf_dict_t* color_space;
+//     pdf_dict_t* pattern;
+//     pdf_dict_t* shading;
+//     pdf_dict_t* xobject_dict;
+//     pdf_dict_t* font_dict;
+//     pdf_array_t* proc_set;
+//     pdf_dict_t* properties;
+// };
 
 struct pdf_page
 {
     int pageNo;
     pdf_file_t* pdf;
+    pdf_obj_t* obj;
     rect_d_t crop_box;
     rect_d_t media_box;
     pdf_obj_t** contents;
     int num_contents;
     int cur_content_index;
     int rotate;
-    pdf_resources_t* resources;
+    //pdf_resources_t* resources;
     pdf_array_t* annots;
 };
 
@@ -301,6 +313,7 @@ struct pdf_xobject
         pdf_form_t* form;
         pdf_image_t* image;
     };
+    pdf_obj_t* obj;
 };
 enum pdf_parser_reader_type {
     BUFFER_READER,

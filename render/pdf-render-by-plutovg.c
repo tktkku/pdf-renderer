@@ -47,7 +47,7 @@ void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
     context.state->textState.textLeading = 0;
     context.state->textState.font = NULL;
     context.state->textState.fontface = NULL;
-    context.current_obj = NULL;
+    context.current_obj = page->obj;
     context.fontcache = NULL;
     int numStreams = pdf_page_get_streams(page);
     for (int j = 0; j < numStreams; j++)
@@ -63,7 +63,7 @@ void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
             const char* token = pdf_parser_token_get_token(tk);
             if (token == NULL)
                 continue;
-            printf("%s\n", token);
+            // printf("%s\n", token);
             _do_render_operation(&context, tk);
             // if (!strcmp(token, "528.1"))
             // {
@@ -138,15 +138,15 @@ void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
     }
     pdf_stack_free(stack);
     plutovg_surface_write_to_png(surface, filename);
-    int nums = cvector_size(context.fontcache);
-    for (int i = 0; i < nums; i++) 
-    {
-        pdf_font_free(context.fontcache[i]->font);
-        plutovg_canvas_set_font_face(context.canvas, NULL);
-        plutovg_font_face_destroy(context.fontcache[i]->fontface);
-        free(context.fontcache[i]);
-    }
-    cvector_free(context.fontcache);
+    // int nums = cvector_size(context.fontcache);
+    // for (int i = 0; i < nums; i++) 
+    // {
+    //     pdf_font_free(context.fontcache[i]->font);
+    //     plutovg_canvas_set_font_face(context.canvas, NULL);
+    //     plutovg_font_face_destroy(context.fontcache[i]->fontface);
+    //     free(context.fontcache[i]);
+    // }
+    // cvector_free(context.fontcache);
     plutovg_canvas_destroy(canvas);
     plutovg_surface_destroy(surface);
     free(pixels);
@@ -186,7 +186,6 @@ void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
     context.state->fillColor[1] = 0;
     context.state->fillColor[2] = 0;
     context.stack = stack;
-    context.current_obj = NULL;
     context.pdf = page->pdf;
     context.page = page;
     context.state->lineWidth = 1.0;
@@ -197,7 +196,7 @@ void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
     context.state->textState.textLeading = 0;
     context.state->textState.font = NULL;
     context.state->textState.fontface = NULL;
-    context.current_obj = NULL;
+    context.current_obj = page->obj;
     int numStreams = pdf_page_get_streams(page);
     for (int j = 0; j < numStreams; j++)
     {
@@ -241,7 +240,9 @@ void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
 
 void _do_render_operation(pdf_context_t* context, pdf_parser_token_t* tk)
 {
-    //printf("%s\n", tk->token);
+#if 1
+    printf("%s\n", tk->token);
+#endif
     int count = ARRAY_COUNT(handlers);
     int left = 0;
     int right = count - 1;

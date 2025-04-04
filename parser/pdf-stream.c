@@ -121,6 +121,8 @@ void pdf_stream_open(pdf_stream_t* stream)
     if (stream == NULL || stream->pdf == NULL)
         return;
     stream->parser = pdf_parser_init(stream->pdf, STREAM_READER, stream);
+    stream->processed = 0;
+    stream->readin_len = 0;
     stream->decomp.flate.avail_in = 0;
     stream->decomp.flate.next_in = NULL;
     stream->decomp.flate.zalloc = NULL;

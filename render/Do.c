@@ -10,30 +10,27 @@ void handle_Do(pdf_context_t* context)
     node.data = buf;
     pdf_stack_pop(context->stack, &node);
 
-    pdf_obj_t* tmp_obj = NULL;
+    //pdf_obj_t* tmp_obj = NULL;
     pdf_xobject_t* xobj = NULL;
     if (context->current_obj != NULL)
     {
-        pdf_dict_t* tmp_dict = pdf_dict_get_dict(context->current_obj->value->val.dict, "/Resources");
-        tmp_dict = pdf_dict_get_dict(tmp_dict, "/XObject");
-        int ref = pdf_dict_get_ref(tmp_dict, buf);
-        tmp_obj = pdf_file_get_obj(context->page->pdf, ref);
-        xobj = pdf_obj_get_xobject(tmp_obj);
+        // pdf_dict_t* tmp_dict = pdf_dict_get_dict(context->current_obj->value->val.dict, "/Resources");
+        // tmp_dict = pdf_dict_get_dict(tmp_dict, "/XObject");
+        // int ref = pdf_dict_get_ref(tmp_dict, buf);
+        // tmp_obj = pdf_file_get_obj(context->page->pdf, ref);
+        xobj = pdf_obj_get_xobject(context->current_obj, buf);
     }
-
-    if (xobj == NULL)
+    else
     {
-        int ref = pdf_dict_get_ref(context->page->resources->xobject_dict, buf);
-        if (ref != -1)
-        {
-            tmp_obj = pdf_file_get_obj(context->page->pdf, ref);
-            xobj = pdf_obj_get_xobject(tmp_obj);
-            if (xobj == NULL)
-                return;
-        }
-        else
-            return;
+        return NULL;
     }
+    // if (xobj == NULL)
+    // {
+        
+    // }
+    //xobj = pdf_obj_get_xobject(context->page->obj, buf);
+    if (xobj == NULL)
+        return;
     plutovg_canvas_save(context->canvas);
     if (xobj->type == XOBJ_FORM)
     {
@@ -49,19 +46,19 @@ void handle_Do(pdf_context_t* context)
             xobj->form->bbox[3]);
         plutovg_canvas_clip(context->canvas);
 
-        if (tmp_obj->stream != NULL)
+        if (xobj->obj->stream != NULL)
         {
             pdf_obj_t* save_obj = context->current_obj;
-            context->current_obj = tmp_obj;
-            pdf_stream_open(tmp_obj->stream);
+            context->current_obj = xobj->obj;
+            pdf_stream_open(xobj->obj->stream);
             pdf_parser_token_t* tk = NULL;
-            while ((tk = pdf_stream_get_next_token(tmp_obj->stream)) != NULL)
+            while ((tk = pdf_stream_get_next_token(xobj->obj->stream)) != NULL)
             {
                 _do_render_operation(context, tk);
-                pdf_parser_token_free(tmp_obj->stream->parser, tk);
+                pdf_parser_token_free(xobj->obj->stream->parser, tk);
             }
 
-            pdf_stream_close(tmp_obj->stream);
+            pdf_stream_close(xobj->obj->stream);
             context->current_obj = save_obj;
         }
     }

@@ -10,5 +10,5 @@ void handle_gs(pdf_context_t* context)
     pdf_stack_node_t node;
     node.data = buf;
     pdf_stack_pop(context->stack, &node);
-    pdf_page_get_ext_gstate(context->page, buf);
+    // pdf_page_get_ext_gstate(context->page, buf);
 }
