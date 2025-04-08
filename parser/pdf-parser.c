@@ -296,20 +296,20 @@ pdf_parser_token_t* pdf_parser_token_init(pdf_parser_t* parser, const unsigned c
 {
     if (parser == NULL || start == NULL || len == 0) return NULL;
     pdf_parser_token_t* tk = NULL;
-    if (len <= MAX_FIXED_TOKEN_LEN)
-    {
-        if (parser->pdf->freed_tokens != NULL)
-        {
-            tk = parser->pdf->freed_tokens;
-            parser->pdf->freed_tokens = parser->pdf->freed_tokens->next;
-        }
-        else
-        {
-            tk = (pdf_parser_token_t*)malloc(sizeof(pdf_parser_token_t));
-            tk->token = malloc(MAX_FIXED_TOKEN_LEN + 1);
-        }
-    }
-    else
+    // if (len <= MAX_FIXED_TOKEN_LEN)
+    // {
+    //     if (parser->pdf->freed_tokens != NULL)
+    //     {
+    //         tk = parser->pdf->freed_tokens;
+    //         parser->pdf->freed_tokens = parser->pdf->freed_tokens->next;
+    //     }
+    //     else
+    //     {
+    //         tk = (pdf_parser_token_t*)malloc(sizeof(pdf_parser_token_t));
+    //         tk->token = malloc(MAX_FIXED_TOKEN_LEN + 1);
+    //     }
+    // }
+    // else
     {
         tk = (pdf_parser_token_t*)malloc(sizeof(pdf_parser_token_t));
         tk->token = (char*)malloc(len + 1);
@@ -326,12 +326,12 @@ pdf_parser_token_t* pdf_parser_token_init(pdf_parser_t* parser, const unsigned c
 void pdf_parser_token_free(pdf_parser_t* parser, pdf_parser_token_t* token)
 {
     if (token == NULL) return;
-    if (token->token_len <= MAX_FIXED_TOKEN_LEN && parser != NULL)
-    {
-        token->next = parser->pdf->freed_tokens;
-        parser->pdf->freed_tokens = token;
-    }
-    else
+    // if (token->token_len <= MAX_FIXED_TOKEN_LEN && parser != NULL)
+    // {
+    //     token->next = parser->pdf->freed_tokens;
+    //     parser->pdf->freed_tokens = token;
+    // }
+    // else
     {
         if (token->token)
         {
@@ -399,6 +399,14 @@ void pdf_parser_free(pdf_parser_t* parser)
     if (parser->remain.len > 0)
     {
         free(parser->remain.rem);
+    }
+    if (parser->num_cached_tokens > 0)
+    {
+        for (int i = 0; i < parser->num_cached_tokens; i++)
+        {
+            pdf_parser_token_free(parser, parser->cached_tokens[i]);
+            parser->cached_tokens[i] = NULL;
+        }
     }
     free(parser);
     parser = NULL;

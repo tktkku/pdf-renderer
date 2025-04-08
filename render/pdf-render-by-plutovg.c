@@ -138,15 +138,21 @@ void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
     }
     pdf_stack_free(stack);
     plutovg_surface_write_to_png(surface, filename);
-    // int nums = cvector_size(context.fontcache);
-    // for (int i = 0; i < nums; i++) 
-    // {
-    //     pdf_font_free(context.fontcache[i]->font);
-    //     plutovg_canvas_set_font_face(context.canvas, NULL);
-    //     plutovg_font_face_destroy(context.fontcache[i]->fontface);
-    //     free(context.fontcache[i]);
-    // }
-    // cvector_free(context.fontcache);
+    for (int i = 0; i < cvector_size(context.fontcache); i++)
+    {
+        pdf_font_cache_t* fontcache = context.fontcache[i];
+        // if (fontcache->font != NULL)
+        // {
+        //     pdf_font_free(fontcache->font);
+        // }
+        if (fontcache->fontface != NULL)
+        {
+            plutovg_font_face_destroy(fontcache->fontface);
+        }
+        free(fontcache);
+    }
+    cvector_free(context.fontcache);
+    free(context.state);
     plutovg_canvas_destroy(canvas);
     plutovg_surface_destroy(surface);
     free(pixels);
@@ -240,47 +246,52 @@ void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
 
 void _do_render_operation(pdf_context_t* context, pdf_parser_token_t* tk)
 {
-#if 1
+#if 0
     printf("%s\n", tk->token);
 #endif
-    int count = ARRAY_COUNT(handlers);
-    int left = 0;
-    int right = count - 1;
-    while (left <= right)
+    if (tk->type != TOKEN_OPERATOR)
     {
-        int mid = left + (right - left) / 2;
-        int cmp = strcmp(handlers[mid].operation, tk->token);
-
-        if (cmp == 0)
+        // did not match any operation
+        // push data to stack
+        pdf_stack_push(context->stack, tk->token, tk->token_len);
+    }
+    else
+    {
+        int count = ARRAY_COUNT(handlers);
+        int left = 0;
+        int right = count - 1;
+        while (left <= right)
         {
-            if (handlers[mid].handler != NULL)
+            int mid = left + (right - left) / 2;
+            int cmp = strcmp(handlers[mid].operation, tk->token);
+
+            if (cmp == 0)
             {
-                if (strchr("fFbBW", tk->token[0]) != NULL)
+                if (handlers[mid].handler != NULL)
                 {
-                    if (tk->token[1] == '\0')
-                        plutovg_canvas_set_fill_rule(context->canvas,
-                            PLUTOVG_FILL_RULE_NON_ZERO);
-                    else if (tk->token[1] == '*')
-                        plutovg_canvas_set_fill_rule(context->canvas,
-                            PLUTOVG_FILL_RULE_EVEN_ODD);
+                    if (strchr("fFbBW", tk->token[0]) != NULL)
+                    {
+                        if (tk->token[1] == '\0')
+                            plutovg_canvas_set_fill_rule(context->canvas,
+                                PLUTOVG_FILL_RULE_NON_ZERO);
+                        else if (tk->token[1] == '*')
+                            plutovg_canvas_set_fill_rule(context->canvas,
+                                PLUTOVG_FILL_RULE_EVEN_ODD);
+                    }
+                    handlers[mid].handler(context);
+                    return;
                 }
-                handlers[mid].handler(context);
-                return;
+            }
+            else if (cmp < 0)
+            {
+                left = mid + 1;
+            }
+            else
+            {
+                right = mid - 1;
             }
         }
-        else if (cmp < 0)
-        {
-            left = mid + 1;
-        }
-        else
-        {
-            right = mid - 1;
-        }
     }
-
-    // did not match any operation
-    // push data to stack
-    pdf_stack_push(context->stack, tk->token, tk->token_len);
 }
 
 void _do_text_render(pdf_context_t* context, char* buf, int len)

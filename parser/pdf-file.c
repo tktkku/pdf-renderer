@@ -213,7 +213,7 @@ bool _read_xref_and_trailer(pdf_file_t* pdf)
         unsigned char* start = NULL;
         int len;
         pdf_stream_get_all(xref_obj->stream, &start, &len);
-
+        unsigned char* origin = start;
         for (int i = 0; i < index_arr->num_elements; i += 2)
         {
             int start_index = index_arr->values[i]->val.number;
@@ -278,7 +278,7 @@ bool _read_xref_and_trailer(pdf_file_t* pdf)
                 cvector_push_back(pdf->xref_table, xref);
             }
         }
-        free(start);
+        free(origin);
         pdf_obj_free(xref_obj);
         return true;
     }
@@ -656,6 +656,7 @@ pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, int ref)
                     .buffer_size = size,
                     .processed = 0
                 };
+                unsigned char* origin = start;
                 pdf_parser_t* parser = pdf_parser_init(pdf, BUFFER_READER, &b1);
                 pdf_parser_token_t* tk = NULL;
                 for (int j = 0; j < num_pairs; j++)
@@ -724,7 +725,7 @@ pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, int ref)
                     // _add_to_obj_table(pdf, obj);
                     cvector_push_back(pdf->read_objs, obj);
                 }
-                free(start);  
+                free(origin);  
                 pdf_parser_free(parser);
 
                 return _get_obj_from_table(pdf, ref);
@@ -830,19 +831,19 @@ void pdf_file_free(pdf_file_t* file)
         pdf_cmap_free(file->cmaps);
         file->cmaps = NULL;
     }
-    if (file->freed_tokens)
-    {
-        pdf_parser_token_t* p = file->freed_tokens;
-        pdf_parser_token_t* q = file->freed_tokens->next;
-        while (q != NULL)
-        {
-            p->next = q->next;
-            pdf_parser_token_free(NULL, q);
-            q = p->next;
-        }
-        pdf_parser_token_free(NULL, file->freed_tokens);
-        file->freed_tokens = NULL;
-    }
+    // if (file->freed_tokens)
+    // {
+    //     pdf_parser_token_t* p = file->freed_tokens;
+    //     pdf_parser_token_t* q = file->freed_tokens->next;
+    //     while (q != NULL)
+    //     {
+    //         p->next = q->next;
+    //         pdf_parser_token_free(NULL, q);
+    //         q = p->next;
+    //     }
+    //     pdf_parser_token_free(NULL, file->freed_tokens);
+    //     file->freed_tokens = NULL;
+    // }
     if (file->pFile)
     {
         fclose(file->pFile);

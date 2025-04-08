@@ -14,14 +14,25 @@ void handle_Tf(pdf_context_t* context)
     context->state->textState.fontSize = fontsize;
     if (font == NULL)
         return;
-    else
+    
+    for (int i = 0; i < cvector_size(context->fontcache); i++)
     {
-        // pdf_font_free(context->state->textState.font);
-        context->state->textState.font = font;
-        plutovg_canvas_set_font_face(context->canvas, NULL);
-        // plutovg_font_face_destroy(context->state->textState.fontface);
-        context->state->textState.fontface = NULL;
+        pdf_font_cache_t* cache = context->fontcache[i];
+        if (cache->font == font)
+        {
+            context->state->textState.fontface = cache->fontface;
+            context->state->textState.font_face_loaded = cache->loaded;
+            context->state->textState.font = font;
+            plutovg_canvas_set_font(context->canvas, context->state->textState.fontface, fontsize);
+            return;
+        }
     }
+    
+    // plutovg_font_face_destroy(context->state->textState.fontface);
+    // plutovg_canvas_set_font_face(context->canvas, NULL);
+    // context->state->textState.fontface = NULL;
+    context->state->textState.font = font;
+    
 
     // repair font
     // repair_cmap(context->font);
@@ -77,7 +88,12 @@ void handle_Tf(pdf_context_t* context)
             }
         }
     }
-
+    pdf_font_cache_t* cache = (pdf_font_cache_t*)malloc(sizeof(pdf_font_cache_t));
+    cache->font = font;
+    cache->fontface = plutovg_font_face_reference(context->state->textState.fontface);
+    cache->loaded = context->state->textState.font_face_loaded;
+    cvector_push_back(context->fontcache, cache);
+    // set font face
     plutovg_canvas_set_font(context->canvas, context->state->textState.fontface, fontsize);
     // set font matrix
     // plutovg_matrix_init_scale(&context->fontMatrixPlutovg, fontsize, fontsize);

@@ -103,9 +103,10 @@ struct pdf_obj
         pdf_array_t* procset_arr;
         pdf_dict_t* properties_dict;
     } resources;
-    // pdf_xobject_t* xobject;
-    // unsigned char* font_data;
-    // int font_data_len;
+    pdf_xobject_t* xobject;
+    pdf_font_t* font;
+    unsigned char* font_data;
+    int font_data_len;
     pdf_file_t* pdf;
 };
 
@@ -217,7 +218,7 @@ struct pdf_file
 
     pdf_cmap_t* cmaps;
     int num_cmaps;
-    pdf_parser_token_t* freed_tokens;
+    //pdf_parser_token_t* freed_tokens;
 };
 
 // struct pdf_resources

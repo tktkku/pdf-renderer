@@ -23,14 +23,41 @@ void pdf_obj_free(pdf_obj_t* obj)
     {
         pdf_stream_free(obj->stream);
     }
-    // if (obj->xobject != NULL)
-    // {
-    //     pdf_page_xobject_free(obj->xobject);
-    // }
-    // if (obj->font_data != NULL)
-    // {
-    //     free(obj->font_data);
-    // }
+    if (obj->xobject != NULL)
+    {
+        if (obj->xobject->type == XOBJ_IMAGE)
+        {
+            if (obj->xobject->image)
+            {
+                if (obj->xobject->image->data)
+                {
+                    free(obj->xobject->image->data);
+                    obj->xobject->image->data = NULL;
+                }
+    
+                free(obj->xobject->image);
+                obj->xobject->image = NULL;
+            }
+    
+        }
+        else if (obj->xobject->type == XOBJ_FORM)
+        {
+            if (obj->xobject->form)
+            {
+                free(obj->xobject->form);
+                obj->xobject->form = NULL;
+            }
+        }
+        free(obj->xobject);
+    }
+    if (obj->font != NULL)
+    {
+        pdf_font_free(obj->font);
+    }
+    if (obj->font_data != NULL)
+    {
+        free(obj->font_data);
+    }
     pdf_value_free(obj->value);
     obj->value = NULL;
     free(obj);
@@ -81,12 +108,13 @@ pdf_font_t* _load_type0_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
         b1.buffer = data;
         b1.buffer_size = len;
         b1.processed = 0;
+        unsigned char* origin = data;
         pdf_parser_t* parser = pdf_parser_init(obj->pdf, BUFFER_READER, &b1);
 
         pdf_cmap_t* cmap = pdf_parser_build_cmap(parser);
         cmap->worldwide = false;
         font->to_unicode_map = cmap;
-        free(data);
+        free(origin);
     }
     // CIDFonts
     font->descendant_font_dict = NULL;
@@ -176,16 +204,16 @@ pdf_font_t* _load_type0_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
             pdf_obj_t* fontfile_obj = pdf_file_get_obj(obj->pdf, font->fontfile1_ref);
             if (fontfile_obj != NULL)
             {
-                // if (fontfile_obj->font_data != NULL && fontfile_obj->font_data_len != 0)
-                // {
-                //     font->font_data = fontfile_obj->font_data;
-                //     font->font_data_length = fontfile_obj->font_data_len;
-                // }
-                // else
+                if (fontfile_obj->font_data != NULL && fontfile_obj->font_data_len != 0)
+                {
+                    font->font_data = fontfile_obj->font_data;
+                    font->font_data_length = fontfile_obj->font_data_len;
+                }
+                else
                 {
                     pdf_stream_get_all(fontfile_obj->stream, &font->font_data, &font->font_data_length);
-                    // fontfile_obj->font_data = font->font_data;
-                    // fontfile_obj->font_data_len = font->font_data_length;
+                    fontfile_obj->font_data = font->font_data;
+                    fontfile_obj->font_data_len = font->font_data_length;
                 }
             }
         }
@@ -195,16 +223,16 @@ pdf_font_t* _load_type0_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
             pdf_obj_t* fontfile_obj = pdf_file_get_obj(obj->pdf, font->fontfile2_ref);
             if (fontfile_obj != NULL)
             {
-                // if (fontfile_obj->font_data != NULL && fontfile_obj->font_data_len != 0)
-                // {
-                //     font->font_data = fontfile_obj->font_data;
-                //     font->font_data_length = fontfile_obj->font_data_len;
-                // }
-                // else
+                if (fontfile_obj->font_data != NULL && fontfile_obj->font_data_len != 0)
+                {
+                    font->font_data = fontfile_obj->font_data;
+                    font->font_data_length = fontfile_obj->font_data_len;
+                }
+                else
                 {
                     pdf_stream_get_all(fontfile_obj->stream, &font->font_data, &font->font_data_length);
-                    // fontfile_obj->font_data = font->font_data;
-                    // fontfile_obj->font_data_len = font->font_data_length;
+                    fontfile_obj->font_data = font->font_data;
+                    fontfile_obj->font_data_len = font->font_data_length;
                 }
             }
         }
@@ -214,16 +242,16 @@ pdf_font_t* _load_type0_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
             pdf_obj_t* fontfile_obj = pdf_file_get_obj(obj->pdf, font->fontfile3_ref);
             if (fontfile_obj != NULL)
             {
-                // if (fontfile_obj->font_data != NULL && fontfile_obj->font_data_len != 0)
-                // {
-                //     font->font_data = fontfile_obj->font_data;
-                //     font->font_data_length = fontfile_obj->font_data_len;
-                // }
-                // else
+                if (fontfile_obj->font_data != NULL && fontfile_obj->font_data_len != 0)
+                {
+                    font->font_data = fontfile_obj->font_data;
+                    font->font_data_length = fontfile_obj->font_data_len;
+                }
+                else
                 {
                     pdf_stream_get_all(fontfile_obj->stream, &font->font_data, &font->font_data_length);
-                    // fontfile_obj->font_data = font->font_data;
-                    // fontfile_obj->font_data_len = font->font_data_length;
+                    fontfile_obj->font_data = font->font_data;
+                    fontfile_obj->font_data_len = font->font_data_length;
                 }
             }
         }
@@ -282,12 +310,13 @@ pdf_font_t* _load_truetype_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
         b1.buffer = data;
         b1.buffer_size = len;
         b1.processed = 0;
+        unsigned char* origin = data;
         pdf_parser_t* parser = pdf_parser_init(obj->pdf, BUFFER_READER, &b1);
 
         pdf_cmap_t* cmap = pdf_parser_build_cmap(parser);
         cmap->worldwide = false;
         font->to_unicode_map = cmap;
-        free(data);
+        free(origin);
     }
     int font_descriptor_ref = pdf_dict_get_ref(font_dict, "/FontDescriptor");
     if (font_descriptor_ref != -1)
@@ -319,16 +348,16 @@ pdf_font_t* _load_truetype_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
             pdf_obj_t* fontfile_obj = pdf_file_get_obj(obj->pdf, font->fontfile1_ref);
             if (fontfile_obj != NULL)
             {
-                // if (fontfile_obj->font_data != NULL && fontfile_obj->font_data_len != 0)
-                // {
-                //     font->font_data = fontfile_obj->font_data;
-                //     font->font_data_length = fontfile_obj->font_data_len;
-                // }
-                // else
+                if (fontfile_obj->font_data != NULL && fontfile_obj->font_data_len != 0)
+                {
+                    font->font_data = fontfile_obj->font_data;
+                    font->font_data_length = fontfile_obj->font_data_len;
+                }
+                else
                 {
                     pdf_stream_get_all(fontfile_obj->stream, &font->font_data, &font->font_data_length);
-                    // fontfile_obj->font_data = font->font_data;
-                    // fontfile_obj->font_data_len = font->font_data_length;
+                    fontfile_obj->font_data = font->font_data;
+                    fontfile_obj->font_data_len = font->font_data_length;
                 }
             }
         }
@@ -338,16 +367,16 @@ pdf_font_t* _load_truetype_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
             pdf_obj_t* fontfile_obj = pdf_file_get_obj(obj->pdf, font->fontfile2_ref);
             if (fontfile_obj != NULL)
             {
-                // if (fontfile_obj->font_data != NULL && fontfile_obj->font_data_len != 0)
-                // {
-                //     font->font_data = fontfile_obj->font_data;
-                //     font->font_data_length = fontfile_obj->font_data_len;
-                // }
-                // else
+                if (fontfile_obj->font_data != NULL && fontfile_obj->font_data_len != 0)
+                {
+                    font->font_data = fontfile_obj->font_data;
+                    font->font_data_length = fontfile_obj->font_data_len;
+                }
+                else
                 {
                     pdf_stream_get_all(fontfile_obj->stream, &font->font_data, &font->font_data_length);
-                    // fontfile_obj->font_data = font->font_data;
-                    // fontfile_obj->font_data_len = font->font_data_length;
+                    fontfile_obj->font_data = font->font_data;
+                    fontfile_obj->font_data_len = font->font_data_length;
                 }
             }
         }
@@ -357,16 +386,16 @@ pdf_font_t* _load_truetype_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
             pdf_obj_t* fontfile_obj = pdf_file_get_obj(obj->pdf, font->fontfile3_ref);
             if (fontfile_obj != NULL)
             {
-                // if (fontfile_obj->font_data != NULL && fontfile_obj->font_data_len != 0)
-                // {
-                //     font->font_data = fontfile_obj->font_data;
-                //     font->font_data_length = fontfile_obj->font_data_len;
-                // }
-                // else
+                if (fontfile_obj->font_data != NULL && fontfile_obj->font_data_len != 0)
+                {
+                    font->font_data = fontfile_obj->font_data;
+                    font->font_data_length = fontfile_obj->font_data_len;
+                }
+                else
                 {
                     pdf_stream_get_all(fontfile_obj->stream, &font->font_data, &font->font_data_length);
-                    // fontfile_obj->font_data = font->font_data;
-                    // fontfile_obj->font_data_len = font->font_data_length;
+                    fontfile_obj->font_data = font->font_data;
+                    fontfile_obj->font_data_len = font->font_data_length;
                 }
             }
         }
@@ -382,7 +411,10 @@ pdf_font_t* pdf_obj_get_font(pdf_obj_t* obj, const char* name)
     pdf_obj_t* font_obj = pdf_file_get_obj(obj->pdf, ref);
     if (font_obj == NULL)
         return NULL;
-
+    else if (font_obj->font != NULL)
+    {
+        return font_obj->font;
+    }
     pdf_dict_t* font_dict = font_obj->value->val.dict;
 
     char* type = (char*)pdf_dict_get_name(font_dict, "/Type"); // Font
@@ -402,7 +434,7 @@ pdf_font_t* pdf_obj_get_font(pdf_obj_t* obj, const char* name)
 
     if (!strcmp(subtype, "/TrueType"))
     {
-        return _load_truetype_font(obj, font_dict);
+        font_obj->font = _load_truetype_font(obj, font_dict);
     }
     else if (!strcmp(subtype, "/Type1"))
     {
@@ -410,9 +442,9 @@ pdf_font_t* pdf_obj_get_font(pdf_obj_t* obj, const char* name)
     }
     else if (!strcmp(subtype, "/Type0"))
     {
-        return _load_type0_font(obj, font_dict);
+        font_obj->font = _load_type0_font(obj, font_dict);
     }
-    return NULL;
+    return font_obj->font;
 }
 
 pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj, const char* name)
@@ -429,6 +461,10 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj, const char* name)
     {
         xobject = pdf_file_get_obj(obj->pdf, ref);
         if (xobject == NULL) return NULL;
+        else if (xobject->xobject != NULL)
+        {
+            return xobject->xobject;
+        }
         xobject_dict = xobject->value->val.dict;
     }
     else
@@ -663,6 +699,7 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj, const char* name)
             xobj->type = XOBJ_IMAGE;
             xobj->image = img;
             // obj->xobject = xobj;
+            xobject->xobject = xobj;
             return xobj;
         }
         else if (strcmp(filter, "/DCTDecode") == 0)
@@ -686,8 +723,10 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj, const char* name)
             img->data_len = length;
 
             pdf_xobject_t* xobj = (pdf_xobject_t*)malloc(sizeof(pdf_xobject_t));
+            xobj->obj = xobject;
             xobj->type = XOBJ_IMAGE;
             xobj->image = img;
+            xobject->xobject = xobj;
             return xobj;
         }
         else if (strcmp(filter, "/JPXDecode") == 0)
@@ -715,6 +754,7 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj, const char* name)
             xobj->form->bbox[i] = bbox_aar->values[i]->val.number;
         }
         // obj->xobject = xobj;
+        xobject->xobject = xobj;
         return xobj;
     }
     return NULL;

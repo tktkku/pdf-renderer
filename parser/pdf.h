@@ -159,9 +159,9 @@ typedef struct pdf_graphics_state {
 } pdf_graphics_state_t;
 typedef struct
 {
-    int ref;
     pdf_font_t* font;
     plutovg_font_face_t* fontface;
+    bool loaded;
 } pdf_font_cache_t;
 typedef struct context
 {
