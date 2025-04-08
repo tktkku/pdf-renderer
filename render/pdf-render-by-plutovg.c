@@ -6,6 +6,17 @@ void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
     int stride = width * 4;
     unsigned char* pixels = (unsigned char*)malloc(stride * height);
     memset(pixels, 0xFF, stride * height);
+    render_to_buffer_by_plutovg(page, pixels, width, height, stride);
+    plutovg_surface_t* surface =
+        plutovg_surface_create_for_data(pixels, width, height, stride);
+    plutovg_surface_write_to_png(surface, filename);
+    plutovg_surface_destroy(surface);
+    free(pixels);
+}
+
+void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
+    int width, int height, int stride)
+{
     pdf_stack_t* stack = pdf_stack_init();
 
     pdf_context_t context;
@@ -65,7 +76,7 @@ void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
                 continue;
             // printf("%s\n", token);
             _do_render_operation(&context, tk);
-            // if (!strcmp(token, "528.1"))
+            // if (!strcmp(tk->token, "Tf"))
             // {
             //     plutovg_surface_write_to_png(surface, "test.png");
             //     printf("Press any key to continue...");
@@ -137,7 +148,6 @@ void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
         }
     }
     pdf_stack_free(stack);
-    plutovg_surface_write_to_png(surface, filename);
     for (int i = 0; i < cvector_size(context.fontcache); i++)
     {
         pdf_font_cache_t* fontcache = context.fontcache[i];
@@ -153,93 +163,6 @@ void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
     }
     cvector_free(context.fontcache);
     free(context.state);
-    plutovg_canvas_destroy(canvas);
-    plutovg_surface_destroy(surface);
-    free(pixels);
-}
-
-void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
-    int width, int height, int stride)
-{
-    pdf_stack_t* stack = pdf_stack_init();
-
-    pdf_context_t context;
-
-    plutovg_surface_t* surface =
-        plutovg_surface_create_for_data(pixels, width, height, stride);
-    // plutovg_surface_t* surface = plutovg_surface_create(width, height);
-    plutovg_canvas_t* canvas = plutovg_canvas_create(surface);
-    plutovg_canvas_save(canvas);
-    plutovg_canvas_set_rgb(canvas, 1, 1, 1);
-    plutovg_canvas_paint(canvas);
-    plutovg_canvas_set_rgb(canvas, 0, 0, 0);
-    plutovg_canvas_set_line_width(canvas, 0.5);
-    plutovg_canvas_set_miter_limit(canvas, 10.0);
-
-    plutovg_canvas_restore(canvas);
-
-    // Flip the Y-axis
-    plutovg_canvas_translate(canvas, 0, height);
-    plutovg_canvas_scale(canvas, PIXELS_PER_POINT, -PIXELS_PER_POINT);
-    context.canvas = canvas;
-    context.state = (pdf_graphics_state_t*)malloc(sizeof(pdf_graphics_state_t));
-    memset(context.state, 0, sizeof(pdf_graphics_state_t));
-    strcpy(context.state->currentColorSpace, "DeviceGray");
-    context.state->strokeColor[0] = 0;
-    context.state->strokeColor[1] = 0;
-    context.state->strokeColor[2] = 0;
-    context.state->fillColor[0] = 0;
-    context.state->fillColor[1] = 0;
-    context.state->fillColor[2] = 0;
-    context.stack = stack;
-    context.pdf = page->pdf;
-    context.page = page;
-    context.state->lineWidth = 1.0;
-    context.state->lineCap = 0;
-    context.state->lineJoin = 0;
-    context.state->miterLimit = 10.0;
-    context.state->textState.textMode = 0;
-    context.state->textState.textLeading = 0;
-    context.state->textState.font = NULL;
-    context.state->textState.fontface = NULL;
-    context.current_obj = page->obj;
-    int numStreams = pdf_page_get_streams(page);
-    for (int j = 0; j < numStreams; j++)
-    {
-        pdf_stream_t* stream = pdf_page_get_stream(page, j);
-        if (stream == NULL)
-            continue;
-        pdf_stream_open(stream);
-        pdf_parser_token_t* tk;
-        //int count = 0;
-        while ((tk = pdf_stream_get_next_token(stream)) != NULL)
-        {
-            const char* token = pdf_parser_token_get_token(tk);
-            if (token == NULL)
-                continue;
-            // printf("%s\n", token);
-            _do_render_operation(&context, tk);
-            // if (strcmp(token, "f") == 0)
-            // {
-            //     plutovg_surface_write_to_png(surface, "test.png");
-            //     printf("Press any key to continue...");
-            //     getchar();
-            // }
-            pdf_parser_token_free(stream->parser, tk);
-        }
-
-        pdf_stream_close(stream);
-    }
-    pdf_stack_free(stack);
-    if (context.state->textState.fontface != NULL)
-    {
-        plutovg_canvas_set_font_face(context.canvas, NULL);
-        plutovg_font_face_destroy(context.state->textState.fontface);
-    }
-    if (context.state->textState.font != NULL)
-    {
-        pdf_font_free(context.state->textState.font);
-    }
     plutovg_canvas_destroy(canvas);
     plutovg_surface_destroy(surface);
 }
@@ -293,7 +216,33 @@ void _do_render_operation(pdf_context_t* context, pdf_parser_token_t* tk)
         }
     }
 }
-
+uint16_t _get_unicode_from_cmap(pdf_cmap_t* cmap, uint16_t code)
+{
+    bool found = false;
+    while (cmap != NULL && !found)
+    {
+        int nums = cvector_size(cmap->unicode_map);
+        for (int k = 0; k < nums; k++)
+        {
+            if (code == cmap->unicode_map[k]->cid)
+            {
+                return cmap->unicode_map[k]->unicode;
+            }
+        }
+        nums = cvector_size(cmap->char_range_map);
+        for (int k = 0; k < nums && !found; k++)
+        {
+            if (code >= cmap->char_range_map[k]->dstStart &&
+                code <= cmap->char_range_map[k]->srcEnd)
+            {
+                return cmap->char_range_map[k]->dstStart +
+                    (code - cmap->char_range_map[k]->srcStart);
+            }
+        }
+        cmap = cmap->next;
+    }
+    return code;
+}
 void _do_text_render(pdf_context_t* context, char* buf, int len)
 {
     float x, y;
@@ -316,40 +265,16 @@ void _do_text_render(pdf_context_t* context, char* buf, int len)
             for (char* p = &buf[1]; *p != '\0'; p += 4)
             {
                 uint16_t t = _hex_str_to_16bit(p);
-                bool found = false;
-                pdf_cmap_t* cmap = context->state->textState.font->cmap;
-                while (cmap != NULL && !found)
-                {
-                    int nums = cvector_size(cmap->unicode_map);
-                    for (int k = 0; k < nums; k++)
-                    {
-                        if (t == cmap->unicode_map[k]->cid)
-                        {
-                            unicode[unicode_cnt++] = cmap->unicode_map[k]->unicode;
-                            found = true;
-                            break;
-                        }
-                    }
-                    nums = cvector_size(cmap->char_range_map);
-                    for (int k = 0; k < nums && !found; k++)
-                    {
-                        if (t >= cmap->char_range_map[k]->dstStart &&
-                            t <= cmap->char_range_map[k]->srcEnd)
-                        {
-                            unicode[unicode_cnt++] = cmap->char_range_map[k]->dstStart +
-                                (t - cmap->char_range_map[k]->srcStart);
-                            found = true;
-                            break;
-                        }
-                    }
-                    cmap = cmap->next;
-                }
-                if (!found)
-                {
-                    unicode[unicode_cnt++] = t;
-                }
+                unicode[unicode_cnt++] = _get_unicode_from_cmap(context->state->textState.font->cmap, t);
             }
         }
+        // for (char* p = &buf[1]; *p != '\0'; p += 4)
+        // {
+        //     uint16_t t = _hex_str_to_16bit(p);
+        //     wchar_t w = _get_unicode_from_cmap(context->state->textState.font->to_unicode_map, t);
+        //     printf("%lc", w);
+        // }
+        // printf("\n");
     }
     else if (buf[0] == '(')
     {
@@ -374,38 +299,7 @@ void _do_text_render(pdf_context_t* context, char* buf, int len)
                 for (int i = 1; i < len; i += 2)
                 {
                     uint16_t t = ((buf[i] << 8) & 0xFF00) | (buf[i + 1] & 0x00FF);
-                    bool found = false;
-                    pdf_cmap_t* cmap = context->state->textState.font->cmap;
-                    while (cmap != NULL && !found)
-                    {
-                        int nums = cvector_size(cmap->unicode_map);
-                        for (int k = 0; k < nums; k++)
-                        {
-                            if (t == cmap->unicode_map[k]->cid)
-                            {
-                                unicode[unicode_cnt++] = cmap->unicode_map[k]->unicode;
-                                found = true;
-                                break;
-                            }
-                        }
-                        nums = cvector_size(cmap->char_range_map);
-                        for (int k = 0; k < nums && !found; k++)
-                        {
-                            if (t >= cmap->char_range_map[k]->srcStart &&
-                                t <= cmap->char_range_map[k]->srcEnd)
-                            {
-                                unicode[unicode_cnt++] = cmap->char_range_map[k]->dstStart +
-                                    (t - cmap->char_range_map[k]->srcStart);
-                                found = true;
-                                break;
-                            }
-                        }
-                        cmap = cmap->next;
-                    }
-                    if (!found)
-                    {
-                        unicode[unicode_cnt++] = t;
-                    }
+                    unicode[unicode_cnt++] = _get_unicode_from_cmap(context->state->textState.font->cmap, t);
                 }
             }
         }
