@@ -572,7 +572,21 @@ pdf_obj_t* _get_obj_from_table(pdf_file_t* pdf, int ref)
 void _fill_resources(pdf_obj_t* obj)
 {
     if (obj->value == NULL || obj->value->type != DICT) return;
-    pdf_dict_t* resources = pdf_dict_get_dict(obj->value->val.dict, "/Resources");
+    int ref = pdf_dict_get_ref(obj->value->val.dict, "/Resources");
+    pdf_dict_t* resources = NULL;
+    if (ref == -1)
+    {
+        resources = pdf_dict_get_dict(obj->value->val.dict, "/Resources");
+    }
+    else
+    {
+        pdf_obj_t* res_obj = pdf_file_get_obj(obj->pdf, ref);
+        if (res_obj == NULL)
+            return;
+        resources = res_obj->value->val.dict;
+    }
+    if (resources == NULL)
+        return;
     obj->resources.extgstate_dict = pdf_dict_get_dict(resources, "/ExtGState");
     obj->resources.colorspace_dict = pdf_dict_get_dict(resources, "/ColorSpace");
     obj->resources.pattern_dict = pdf_dict_get_dict(resources, "/Pattern");
