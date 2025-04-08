@@ -1,5 +1,4 @@
-#ifndef _PDF_COMMON_H_
-#define _PDF_COMMON_H_
+#pragma once
 #include "pdf.h"
 #include <stdbool.h>
 #include <stdint.h>
@@ -399,5 +398,3 @@ void _pdf_parser_read_buffer(pdf_parser_t* parser, void* source);
 void _pdf_parser_read_stream(pdf_parser_t* parser, void* source);
 uint16_t _hex_str_to_16bit(char hexStr[4]);
 uint8_t _hex_str_to_8bit(char hexStr[2]);
-
-#endif

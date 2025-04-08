@@ -1,9 +1,0 @@
-#include "render.h"
-void handle_sh(pdf_context_t* context)
-{
-    // name
-    char buf[1024] = { 0 };
-    pdf_stack_node_t node;
-    node.data = buf;
-    pdf_stack_pop(context->stack, &node);
-}

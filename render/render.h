@@ -1,3 +1,4 @@
+#pragma once
 #include "pdf-private.h"
 #include "pdf.h"
 #include <stdbool.h>

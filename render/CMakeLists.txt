@@ -1,77 +1,8 @@
 project(render LANGUAGES C)
 
 set(RENDER_SOURCES
-    apostrophe.c
-    b_star.c
-    B_star.c
-    b.c
-    B.c
-    BDC.c
-    BI.c
-    BMC.c
-    BT.c
-    c.c
-    cm.c
-    cs.c
-    CS.c
-    d.c
-    d0.c
-    d1.c
     Do.c
-    DP.c
-    EI.c
-    EMC.c
-    ET.c
-    F_f.c
-    f_star.c
-    g.c
-    G.c
-    gs.c
-    h.c
-    i.c
-    ID.c
-    j.c
-    J.c
-    k.c
-    K.c
-    l.c
-    m.c
-    M.c
-    MP.c
-    n.c
-    q.c
-    Q.c
-    quotation.c
-    re.c
-    rg.c
-    RG.c
-    ri.c
-    s.c
-    S.c
-    sc.c
-    SC.c
-    scn.c
-    SCN.c
-    sh.c
-    T_star.c
-    Tc.c
-    Td.c
-    TD.c
     Tf.c
-    Tj.c
-    TJ.c
-    TL.c
-    Tm.c
-    Tr.c
-    Ts.c
-    Tw.c
-    Tz.c
-    v.c
-    W_star.c
-    w.c
-    W.c
-    y.c
-    stroke.c
     pdf-render-by-plutovg.c
     render.h
 )

@@ -1,6 +1,4 @@
-#ifndef _PDF_H_
-#define _PDF_H_
-
+#pragma once
 #include <stdbool.h>
 #include <stddef.h>
 #include "plutovg.h"
@@ -190,5 +188,4 @@ void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
 #define POINTS_PER_PIXEL(dpi) (72.0 / (dpi))
 #define MM_PER_PIXEL(dpi) (25.4 / (dpi))
 #define PIXELS_PER_MM(dpi) ((dpi) / 25.4)
-#endif
 #endif
