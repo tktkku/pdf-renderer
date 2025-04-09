@@ -1,7 +1,7 @@
 #pragma once
 #include <stdbool.h>
 #include <stddef.h>
-#include "plutovg.h"
+
 //#define CVECTOR_LINEAR_GROWTH
 #include "../c-vector/cvector.h"
 typedef struct pdf_parser_token pdf_parser_token_t;
@@ -46,15 +46,6 @@ typedef struct pdf_buffer pdf_buffer_t;
 struct pdf_cmap;
 typedef struct pdf_cmap pdf_cmap_t;
 
-typedef struct pdf_stack_node pdf_stack_node_t;
-typedef struct pdf_stack pdf_stack_t;
-void pdf_value_free(struct pdf_value* value);
-
-pdf_stack_t* pdf_stack_init(void);
-void pdf_stack_push(pdf_stack_t* s, const void* data, size_t size);
-void pdf_stack_pop(pdf_stack_t* s, pdf_stack_node_t* data);
-void pdf_stack_free(pdf_stack_t* s);
-void pdf_stack_show(pdf_stack_t* s);
 
 /**
  * buf: start position
@@ -129,50 +120,7 @@ void pdf_array_free(pdf_array_t* array);
 pdf_cmap_t* pdf_cmap_init(void);
 void pdf_cmap_free(pdf_cmap_t* cmap);
 
-typedef struct pdf_graphics_state {
-    char currentColorSpace[256];
-    double fillColor[3];
-    double strokeColor[3];
-    double lineWidth;
-    int lineCap;
-    int lineJoin;
-    double miterLimit;
-    struct {
-        double* dashs;
-        int dash_size;
-        double offset;
-    } dashPattern;
-    struct {
-        double characterSpacing;
-        double wordSpacing;
-        double horizontalScaling;
-        double textLeading;
-        double fontSize;
-        int textMode;
-        double textRise;
-        plutovg_font_face_t* fontface;
-        bool font_face_loaded;
-        pdf_font_t* font;
-        double textLineWidth;
-    } textState;
-    struct pdf_graphics_state* next;
-} pdf_graphics_state_t;
-typedef struct
-{
-    pdf_font_t* font;
-    plutovg_font_face_t* fontface;
-    bool loaded;
-} pdf_font_cache_t;
-typedef struct context
-{
-    pdf_stack_t* stack;
-    plutovg_canvas_t* canvas;
-    pdf_file_t* pdf;
-    pdf_page_t* page;
-    pdf_obj_t* current_obj;
-    pdf_graphics_state_t* state;
-    cvector_vector_type(pdf_font_cache_t*) fontcache;
-} pdf_context_t;
+
 void render_to_png_by_plutovg(pdf_page_t* page, char* filename);
 void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
     int width, int height, int stride);

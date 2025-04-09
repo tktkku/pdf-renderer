@@ -1,4 +1,5 @@
 #include "render.h"
+#include "pdf-private.h"
 #include "plutovg-stb-image-write.h"
 #include "plutovg-stb-image.h"
 void handle_Do(pdf_context_t* context)
@@ -22,7 +23,7 @@ void handle_Do(pdf_context_t* context)
     }
     else
     {
-        return NULL;
+        return;
     }
     // if (xobj == NULL)
     // {

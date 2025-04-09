@@ -1,4 +1,6 @@
 #include "render.h"
+#include "pdf-private.h"
+#include <plutovg-private.h>
 void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
 {
     int width = pdf_page_get_media_width(page) * PIXELS_PER_POINT;
@@ -334,8 +336,10 @@ void _do_text_render(pdf_context_t* context, char* buf, int len)
                 PLUTOVG_TEXT_ENCODING_UTF16, context->state->textState.textLineWidth, 0);
     }
     else
+    {
         context->state->textState.textLineWidth += plutovg_canvas_fill_text1(context->canvas, unicode, unicode_cnt,
             PLUTOVG_TEXT_ENCODING_UTF16, context->state->textState.textLineWidth, 0);
+    }
     plutovg_canvas_restore(context->canvas);
 }
 

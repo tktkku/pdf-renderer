@@ -379,17 +379,6 @@ struct pdf_stream
     int earlychange;
 };
 
-struct pdf_stack_node
-{
-    char* data;
-    size_t size;
-    struct pdf_stack_node* next;
-};
-
-struct pdf_stack
-{
-    pdf_stack_node_t* top;
-};
 bool _is_space(char c);
 bool _is_hex(char c);
 bool _is_digit(char c);

@@ -1,4 +1,5 @@
 #include "render.h"
+#include "pdf-private.h"
 void handle_Tf(pdf_context_t* context)
 {
     // set font and font size to use
@@ -23,7 +24,7 @@ void handle_Tf(pdf_context_t* context)
             context->state->textState.fontface = cache->fontface;
             context->state->textState.font_face_loaded = cache->loaded;
             context->state->textState.font = font;
-            plutovg_canvas_set_font(context->canvas, context->state->textState.fontface, fontsize);
+            //plutovg_canvas_set_font(context->canvas, context->state->textState.fontface, fontsize);
             return;
         }
     }
@@ -94,7 +95,7 @@ void handle_Tf(pdf_context_t* context)
     cache->loaded = context->state->textState.font_face_loaded;
     cvector_push_back(context->fontcache, cache);
     // set font face
-    plutovg_canvas_set_font(context->canvas, context->state->textState.fontface, fontsize);
+    //plutovg_canvas_set_font(context->canvas, context->state->textState.fontface, fontsize);
     // set font matrix
     // plutovg_matrix_init_scale(&context->fontMatrixPlutovg, fontsize, fontsize);
     // plutovg_canvas_set_matrix(context->canvas, &context->fontMatrixPlutovg);

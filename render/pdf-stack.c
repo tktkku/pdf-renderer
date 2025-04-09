@@ -1,4 +1,4 @@
-#include "pdf-private.h"
+#include "render.h"
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>

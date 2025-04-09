@@ -10,7 +10,6 @@ set(PARSER_SOURCES
     pdf-obj.c
     pdf-page.c
     pdf-parser.c
-    pdf-stack.c
     pdf-stream.c
     pdf-private.h
     pdf.h
