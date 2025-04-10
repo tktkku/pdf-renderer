@@ -21,6 +21,7 @@ void handle_Tf(pdf_context_t* context)
         pdf_font_cache_t* cache = context->fontcache[i];
         if (cache->font == font)
         {
+            context->state->textState.ft_face = cache->ft_face;
             context->state->textState.fontface = cache->fontface;
             context->state->textState.font_face_loaded = cache->loaded;
             context->state->textState.font = font;
@@ -49,12 +50,13 @@ void handle_Tf(pdf_context_t* context)
             {
                 context->state->textState.fontface = plutovg_font_face_load_from_file("fonts/SimSun.ttf", 0);
                 context->state->textState.font_face_loaded = true;
+                // FT_New_Face(context->ft_library, "fonts/SimSun.ttf", 0, &context->state->textState.ft_face);
             }
             else
             {
-                // FT_New_Face(context->ft_library, "fonts/SimSun.ttf", 0, &face);
                 context->state->textState.fontface = plutovg_font_face_load_from_file("fonts/SimSun.ttf", 0);
                 context->state->textState.font_face_loaded = true;
+                // FT_New_Face(context->ft_library, "fonts/SimSun.ttf", 0, &context->state->textState.ft_face);
             }
         }
         else
@@ -62,13 +64,15 @@ void handle_Tf(pdf_context_t* context)
             context->state->textState.fontface = plutovg_font_face_load_from_data(
                 font->font_data, font->font_data_length, 0, NULL, NULL);
             context->state->textState.font_face_loaded = true;
+            // FT_New_Memory_Face(context->ft_library, font->font_data,
+            //     font->font_data_length, 0, &context->state->textState.ft_face);
         }
     }
     else
     {
         if (font->font_data == NULL)
         {
-            // FT_New_Face(context->ft_library, "fonts/SimSun.ttf", 0, &face);
+            // FT_New_Face(context->ft_library, "fonts/SimSun.ttf", 0, &context->state->textState.ft_face);
             context->state->textState.fontface = plutovg_font_face_load_from_file("fonts/SimSun.ttf", 0);
             context->state->textState.font_face_loaded = true;
         }
@@ -82,17 +86,25 @@ void handle_Tf(pdf_context_t* context)
                 context->state->textState.font_face_loaded = false;
                 context->state->textState.fontface = plutovg_font_face_load_from_data1(
                     font->font_data, font->font_data_length, 0, NULL, NULL);
+                if (context->state->textState.fontface == NULL)
+                {
+                    FT_New_Memory_Face(context->ft_library, font->font_data,
+                        font->font_data_length, 0, &context->state->textState.ft_face);
+                }
             }
             else
             {
                 context->state->textState.font_face_loaded = true;
             }
+            // FT_New_Memory_Face(context->ft_library, font->font_data,
+            //     font->font_data_length, 0, &context->state->textState.ft_face);
         }
     }
     pdf_font_cache_t* cache = (pdf_font_cache_t*)malloc(sizeof(pdf_font_cache_t));
     cache->font = font;
     cache->fontface = plutovg_font_face_reference(context->state->textState.fontface);
     cache->loaded = context->state->textState.font_face_loaded;
+    cache->ft_face = context->state->textState.ft_face;
     cvector_push_back(context->fontcache, cache);
     // set font face
     //plutovg_canvas_set_font(context->canvas, context->state->textState.fontface, fontsize);

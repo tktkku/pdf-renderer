@@ -20,7 +20,8 @@ void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
     int width, int height, int stride)
 {
     pdf_stack_t* stack = pdf_stack_init();
-
+    FT_Library ft_library = NULL;
+    FT_Init_FreeType(&ft_library);
     pdf_context_t context;
 
     plutovg_surface_t* surface =
@@ -40,28 +41,39 @@ void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
     plutovg_canvas_translate(canvas, 0, height);
     plutovg_canvas_scale(canvas, PIXELS_PER_POINT, -PIXELS_PER_POINT);
     context.canvas = canvas;
-    context.state = (pdf_graphics_state_t*)malloc(sizeof(pdf_graphics_state_t));
-    memset(context.state, 0, sizeof(pdf_graphics_state_t));
-    strcpy(context.state->currentColorSpace, "DeviceGray");
-    context.state->strokeColor[0] = 0;
-    context.state->strokeColor[1] = 0;
-    context.state->strokeColor[2] = 0;
-    context.state->fillColor[0] = 0;
-    context.state->fillColor[1] = 0;
-    context.state->fillColor[2] = 0;
     context.stack = stack;
     context.pdf = page->pdf;
     context.page = page;
+
+    context.state = (pdf_graphics_state_t*)malloc(sizeof(pdf_graphics_state_t));
+    memset(context.state, 0, sizeof(pdf_graphics_state_t));
+    strcpy(context.state->fill.currentColorSpace, "DeviceGray");
+    strcpy(context.state->stroke.currentColorSpace, "DeviceGray");
+    context.state->stroke.color[0] = 0;
+    context.state->stroke.color[1] = 0;
+    context.state->stroke.color[2] = 0;
+    context.state->fill.color[0] = 0;
+    context.state->fill.color[1] = 0;
+    context.state->fill.color[2] = 0;
+    
     context.state->lineWidth = 1.0;
     context.state->lineCap = 0;
     context.state->lineJoin = 0;
     context.state->miterLimit = 10.0;
-    context.state->textState.textMode = 0;
+
+    context.state->textState.characterSpacing = 0;
+    context.state->textState.wordSpacing = 0;
+    context.state->textState.horizontalScaling = 100;
     context.state->textState.textLeading = 0;
+    context.state->textState.textMode = 0;
+    context.state->textState.textRise = 0;
+    
     context.state->textState.font = NULL;
     context.state->textState.fontface = NULL;
     context.current_obj = page->obj;
     context.fontcache = NULL;
+    context.surface = surface;
+    context.ft_library = ft_library;
     int numStreams = pdf_page_get_streams(page);
     for (int j = 0; j < numStreams; j++)
     {
@@ -76,14 +88,7 @@ void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
             const char* token = pdf_parser_token_get_token(tk);
             if (token == NULL)
                 continue;
-            // printf("%s\n", token);
             _do_render_operation(&context, tk);
-            // if (!strcmp(tk->token, "Tf"))
-            // {
-            //     plutovg_surface_write_to_png(surface, "test.png");
-            //     printf("Press any key to continue...");
-            //     getchar();
-            // }
             pdf_parser_token_free(stream->parser, tk);
         }
 
@@ -161,17 +166,22 @@ void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
         {
             plutovg_font_face_destroy(fontcache->fontface);
         }
+        if (fontcache->ft_face != NULL)
+        {
+            FT_Done_Face(fontcache->ft_face);
+        }
         free(fontcache);
     }
     cvector_free(context.fontcache);
     free(context.state);
     plutovg_canvas_destroy(canvas);
     plutovg_surface_destroy(surface);
+    FT_Done_FreeType(ft_library);
 }
-
+#define DEBUG 1
 void _do_render_operation(pdf_context_t* context, pdf_parser_token_t* tk)
 {
-#if 0
+#if DEBUG
     printf("%s\n", tk->token);
 #endif
     if (tk->type != TOKEN_OPERATOR)
@@ -204,6 +214,14 @@ void _do_render_operation(pdf_context_t* context, pdf_parser_token_t* tk)
                                 PLUTOVG_FILL_RULE_EVEN_ODD);
                     }
                     handlers[mid].handler(context);
+#if DEBUG
+                    if (!strcmp(tk->token, "f"))
+                    {
+                        plutovg_surface_write_to_png(context->surface, "test.png");
+                        printf("Press any key to continue...");
+                        getchar();
+                    }
+#endif
                     return;
                 }
             }
@@ -245,6 +263,105 @@ uint16_t _get_unicode_from_cmap(pdf_cmap_t* cmap, uint16_t code)
     }
     return code;
 }
+static void glyph_traverse_func(void* closure, plutovg_path_command_t command, const plutovg_point_t* points, int npoints)
+{
+    plutovg_path_t* path = (plutovg_path_t*)(closure);
+    switch(command) {
+    case PLUTOVG_PATH_COMMAND_MOVE_TO:
+        plutovg_path_move_to(path, points[0].x, points[0].y);
+        break;
+    case PLUTOVG_PATH_COMMAND_LINE_TO:
+        plutovg_path_line_to(path, points[0].x, points[0].y);
+        break;
+    case PLUTOVG_PATH_COMMAND_CUBIC_TO:
+        plutovg_path_cubic_to(path, points[0].x, points[0].y, points[1].x, points[1].y, points[2].x, points[2].y);
+        break;
+    case PLUTOVG_PATH_COMMAND_CLOSE:
+        plutovg_path_close(path);
+        break;
+    }
+}
+
+float _canvas_fill_text(pdf_context_t* context, const void* text, int length, plutovg_text_encoding_t encoding, float x, float y, bool cid_eq_gid)
+{
+    plutovg_canvas_t* canvas = context->canvas; 
+    plutovg_canvas_new_path(canvas);
+    pdf_graphics_state_t* state = context->state;
+    if (state->textState.ft_face == NULL || state->textState.fontSize <= 0.f)
+        return 0.f;
+
+    FT_Face face = state->textState.ft_face;
+    FT_Set_Char_Size(face, 0, (FT_F26Dot6)(state->textState.fontSize), 0, 0);
+
+    plutovg_text_iterator_t it;
+    plutovg_text_iterator_init(&it, text, length, encoding);
+    float advance_width = 0.f;
+
+    while (plutovg_text_iterator_has_next(&it)) {
+        plutovg_codepoint_t codepoint = plutovg_text_iterator_next(&it);
+        if (cid_eq_gid)
+        {
+            if (FT_Load_Char(face, codepoint, FT_LOAD_NO_SCALE)) {
+                continue; // Skip invalid glyphs
+            }
+        }
+        else
+        {
+            FT_UInt glyph_index = FT_Get_Char_Index(face, codepoint);
+            FT_Load_Glyph(face, glyph_index, FT_LOAD_NO_SCALE);
+        }
+
+        FT_GlyphSlot slot = face->glyph;
+        FT_Outline* outline = &slot->outline;
+
+        float scale = state->textState.fontSize / face->units_per_EM;
+        plutovg_matrix_t matrix;
+        plutovg_matrix_init_translate(&matrix, x, y);
+        plutovg_matrix_scale(&matrix, scale, -scale);
+
+        plutovg_path_t* path = canvas->path;
+        for (int i = 0; i < outline->n_contours; i++) {
+            int start = (i == 0) ? 0 : outline->contours[i - 1] + 1;
+            int end = outline->contours[i];
+
+            for (int j = start; j <= end; j++) {
+                FT_Vector* point = &outline->points[j];
+                char tag = outline->tags[j];
+
+                plutovg_point_t mapped_point = { point->x, point->y};
+                plutovg_matrix_map_points(&matrix, &mapped_point, &mapped_point, 1);
+
+                if (tag & FT_CURVE_TAG_ON) {
+                    if (j == start) {
+                        glyph_traverse_func(path, PLUTOVG_PATH_COMMAND_MOVE_TO, &mapped_point, 1);
+                    } else {
+                        glyph_traverse_func(path, PLUTOVG_PATH_COMMAND_LINE_TO, &mapped_point, 1);
+                    }
+                } else if (tag & FT_CURVE_TAG_CUBIC) {
+                    FT_Vector* next_point = &outline->points[(j + 1) % (end + 1)];
+                    plutovg_point_t control1 = { point->x, point->y};
+                    plutovg_point_t control2 = { next_point->x, next_point->y};
+                    plutovg_point_t end_point = { outline->points[(j + 2) % (end + 1)].x, outline->points[(j + 2) % (end + 1)].y};
+
+                    plutovg_matrix_map_points(&matrix, &control1, &control1, 1);
+                    plutovg_matrix_map_points(&matrix, &control2, &control2, 1);
+                    plutovg_matrix_map_points(&matrix, &end_point, &end_point, 1);
+
+                    glyph_traverse_func(path, PLUTOVG_PATH_COMMAND_CUBIC_TO, (plutovg_point_t[]){ control1, control2, end_point }, 3);
+                    j += 2; // Skip the next two points
+                }
+            }
+            glyph_traverse_func(path, PLUTOVG_PATH_COMMAND_CLOSE, NULL, 0);
+        }
+
+        advance_width += slot->advance.x * scale;
+        x += slot->advance.x * scale;
+    }
+
+    plutovg_canvas_fill(canvas);
+    return advance_width;
+}
+
 void _do_text_render(pdf_context_t* context, char* buf, int len)
 {
     float x, y;
@@ -323,9 +440,9 @@ void _do_text_render(pdf_context_t* context, char* buf, int len)
     plutovg_canvas_set_font_size(context->canvas, context->state->textState.fontSize);
     plutovg_canvas_set_font_face(context->canvas, context->state->textState.fontface);
     plutovg_canvas_set_rgb(context->canvas,
-        context->state->fillColor[0],
-        context->state->fillColor[1],
-        context->state->fillColor[2]);
+        context->state->fill.color[0],
+        context->state->fill.color[1],
+        context->state->fill.color[2]);
     if (context->state->textState.font_face_loaded)
     {
         if (strstr(context->state->textState.font->encoding, "Identity"))
@@ -337,9 +454,18 @@ void _do_text_render(pdf_context_t* context, char* buf, int len)
     }
     else
     {
-        context->state->textState.textLineWidth += plutovg_canvas_fill_text1(context->canvas, unicode, unicode_cnt,
-            PLUTOVG_TEXT_ENCODING_UTF16, context->state->textState.textLineWidth, 0);
+        if (context->state->textState.fontface != NULL)
+        {
+            context->state->textState.textLineWidth += plutovg_canvas_fill_text1(context->canvas, unicode, unicode_cnt,
+                PLUTOVG_TEXT_ENCODING_UTF16, context->state->textState.textLineWidth, 0);
+        }
+        else
+        {
+            context->state->textState.textLineWidth += _canvas_fill_text(context, unicode, unicode_cnt,
+                PLUTOVG_TEXT_ENCODING_UTF16, context->state->textState.textLineWidth, 0, true); 
+        }
     }
+
     plutovg_canvas_restore(context->canvas);
 }
 
@@ -399,7 +525,18 @@ void handle_BDC(pdf_context_t* context)
     pdf_stack_node_t node;
     node.data = buf;
     pdf_stack_pop(context->stack, &node);
-    pdf_stack_pop(context->stack, &node);
+    if (!strcmp(buf, ">>"))
+    {
+        pdf_stack_pop(context->stack, &node); // str
+        pdf_stack_pop(context->stack, &node); // name
+        pdf_stack_pop(context->stack, &node); // <<
+    }
+    else
+    {
+        pdf_stack_pop(context->stack, &node); // name
+    }
+    pdf_stack_pop(context->stack, &node); // tag
+    
 }
 void handle_BI(pdf_context_t* context)
 {
@@ -482,7 +619,18 @@ void handle_cs(pdf_context_t* context)
     // node.data = buf;
     // stack_pop(context->stack, &node);
 
-    handle_CS(context);
+    char buf[1024] = { 0 };
+    pdf_stack_node_t node;
+    node.data = buf;
+    pdf_stack_pop(context->stack, &node);
+    if (!strcmp(buf, "/DeviceGray") || !strcmp(buf, "/DeviceRGB") || !strcmp(buf, "/DeviceCMYK"))
+    {
+        strcpy(context->state->fill.currentColorSpace, buf);
+    }
+    else
+    {
+        pdf_obj_get_colorspace(context->current_obj, buf, context->state->fill.currentColorSpace);
+    }
 }
 
 void handle_CS(pdf_context_t* context)
@@ -499,7 +647,14 @@ void handle_CS(pdf_context_t* context)
     pdf_stack_node_t node;
     node.data = buf;
     pdf_stack_pop(context->stack, &node);
-    memcpy(context->state->currentColorSpace, buf, strlen(buf) + 1);
+    if (!strcmp(buf, "/DeviceGray") || !strcmp(buf, "/DeviceRGB") || !strcmp(buf, "/DeviceCMYK"))
+    {
+        strcpy(context->state->stroke.currentColorSpace, buf);
+    }
+    else
+    {
+        pdf_obj_get_colorspace(context->current_obj, buf, context->state->stroke.currentColorSpace);
+    }
 }
 
 void handle_d(pdf_context_t* context)
@@ -597,8 +752,8 @@ void handle_F_f(pdf_context_t* context)
     // fill the path, using the nonzero winding number rule
     // to determine the region to fill
 
-    plutovg_canvas_set_rgb(context->canvas, context->state->fillColor[0],
-        context->state->fillColor[1], context->state->fillColor[2]);
+    plutovg_canvas_set_rgb(context->canvas, context->state->fill.color[0],
+        context->state->fill.color[1], context->state->fill.color[2]);
     plutovg_canvas_fill(context->canvas);
 }
 
@@ -618,10 +773,11 @@ void handle_g(pdf_context_t* context)
     pdf_stack_pop(context->stack, &node);
     float g = strtof(buf, NULL);
     // handle_G(context);
-    plutovg_canvas_set_rgb(context->canvas, g, g, g);
-    context->state->fillColor[0] = g;
-    context->state->fillColor[1] = g;
-    context->state->fillColor[2] = g;
+    //plutovg_canvas_set_rgb(context->canvas, g, g, g);
+    context->state->fill.color[0] = g;
+    context->state->fill.color[1] = g;
+    context->state->fill.color[2] = g;
+    strcpy(context->state->fill.currentColorSpace, "/DeviceGray");
 }
 
 void handle_G(pdf_context_t* context)
@@ -633,10 +789,10 @@ void handle_G(pdf_context_t* context)
     node.data = buf;
     pdf_stack_pop(context->stack, &node);
     float g = strtof(buf, NULL);
-    context->state->strokeColor[0] = g;
-    context->state->strokeColor[1] = g;
-    context->state->strokeColor[2] = g;
-    strcpy(context->state->currentColorSpace, "/DeviceGray");
+    context->state->stroke.color[0] = g;
+    context->state->stroke.color[1] = g;
+    context->state->stroke.color[2] = g;
+    strcpy(context->state->stroke.currentColorSpace, "/DeviceGray");
 }
 
 void handle_gs(pdf_context_t* context)
@@ -724,10 +880,11 @@ void handle_k(pdf_context_t* context)
     float r = (1.0 - c) * (1.0 - k);
     float g = (1.0 - m) * (1.0 - k);
     float b = (1.0 - y) * (1.0 - k);
-    plutovg_canvas_set_rgb(context->canvas, r, g, b);
-    context->state->fillColor[0] = r;
-    context->state->fillColor[1] = g;
-    context->state->fillColor[2] = b;
+    //plutovg_canvas_set_rgb(context->canvas, r, g, b);
+    context->state->fill.color[0] = r;
+    context->state->fill.color[1] = g;
+    context->state->fill.color[2] = b;
+    strcpy(context->state->fill.currentColorSpace, "/DeviceCMYK");
 }
 
 void handle_K(pdf_context_t* context)
@@ -744,10 +901,10 @@ void handle_K(pdf_context_t* context)
     float m = strtof(buf, NULL);
     pdf_stack_pop(context->stack, &node);
     float c = strtof(buf, NULL);
-    context->state->strokeColor[0] = (1.0 - c) * (1.0 - k);
-    context->state->strokeColor[1] = (1.0 - m) * (1.0 - k);
-    context->state->strokeColor[2] = (1.0 - y) * (1.0 - k);
-    strcpy(context->state->currentColorSpace, "/DeviceCMYK");
+    context->state->stroke.color[0] = (1.0 - c) * (1.0 - k);
+    context->state->stroke.color[1] = (1.0 - m) * (1.0 - k);
+    context->state->stroke.color[2] = (1.0 - y) * (1.0 - k);
+    strcpy(context->state->stroke.currentColorSpace, "/DeviceCMYK");
 }
 
 void handle_l(pdf_context_t* context)
@@ -888,10 +1045,11 @@ void handle_rg(pdf_context_t* context)
     float g = strtof(buf, NULL);
     pdf_stack_pop(context->stack, &node);
     float r = strtof(buf, NULL);
-    plutovg_canvas_set_rgb(context->canvas, r, g, b);
-    context->state->fillColor[0] = r;
-    context->state->fillColor[1] = g;
-    context->state->fillColor[2] = b;
+    //plutovg_canvas_set_rgb(context->canvas, r, g, b);
+    context->state->fill.color[0] = r;
+    context->state->fill.color[1] = g;
+    context->state->fill.color[2] = b;
+    strcpy(context->state->fill.currentColorSpace, "/DeviceRGB");
     // handle_RG(context);
 }
 
@@ -907,11 +1065,11 @@ void handle_RG(pdf_context_t* context)
     float g = strtof(buf, NULL);
     pdf_stack_pop(context->stack, &node);
     float r = strtof(buf, NULL);
-    context->state->strokeColor[0] = r;
-    context->state->strokeColor[1] = g;
-    context->state->strokeColor[2] = b;
+    context->state->stroke.color[0] = r;
+    context->state->stroke.color[1] = g;
+    context->state->stroke.color[2] = b;
     // plutovg_canvas_set_rgb(context->canvas, gray, gray, gray);
-    strcpy(context->state->currentColorSpace, "/DeviceRGB");
+    strcpy(context->state->stroke.currentColorSpace, "/DeviceRGB");
 }
 
 void handle_ri(pdf_context_t* context)
@@ -948,28 +1106,21 @@ void handle_sc(pdf_context_t* context)
     // stack_node_t node;
     // node.data = buf;
     // stack_pop(context->stack, &node);
-    handle_SC(context);
-}
-
-void handle_SC(pdf_context_t* context)
-{
-    // set gray level, 0.0 to balck 1.0 to white
-
     char buf[1024] = { 0 };
     pdf_stack_node_t node;
     node.data = buf;
 
-    if (!strcmp(context->state->currentColorSpace, "/DeviceGray"))
+    if (!strcmp(context->state->fill.currentColorSpace, "/DeviceGray"))
     {
         // gray
         pdf_stack_pop(context->stack, &node);
         float g = strtof(buf, NULL);
         // plutovg_canvas_set_rgb(context->canvas, g, g, g);
-        context->state->strokeColor[0] = g;
-        context->state->strokeColor[1] = g;
-        context->state->strokeColor[2] = g;
+        context->state->fill.color[0] = g;
+        context->state->fill.color[1] = g;
+        context->state->fill.color[2] = g;
     }
-    else if (!strcmp(context->state->currentColorSpace,
+    else if (!strcmp(context->state->fill.currentColorSpace,
         "/DeviceRGB"))
     {
         // red green blue
@@ -981,11 +1132,11 @@ void handle_SC(pdf_context_t* context)
         pdf_stack_pop(context->stack, &node);
         float r = strtof(buf, NULL);
         // plutovg_canvas_set_rgb(context->canvas, r, g, b);
-        context->state->strokeColor[0] = r;
-        context->state->strokeColor[1] = g;
-        context->state->strokeColor[2] = b;
+        context->state->fill.color[0] = r;
+        context->state->fill.color[1] = g;
+        context->state->fill.color[2] = b;
     }
-    else if (!strcmp(context->state->currentColorSpace,
+    else if (!strcmp(context->state->fill.currentColorSpace,
         "/DeviceCMYK"))
     {
         // cyan magenta yellow black
@@ -1002,14 +1153,83 @@ void handle_SC(pdf_context_t* context)
         float g = (1.0 - m) * (1.0 - k);
         float b = (1.0 - y) * (1.0 - k);
 
-        context->state->strokeColor[0] = r;
-        context->state->strokeColor[1] = g;
-        context->state->strokeColor[2] = b;
+        context->state->fill.color[0] = r;
+        context->state->fill.color[1] = g;
+        context->state->fill.color[2] = b;
+    }
+}
+
+void handle_SC(pdf_context_t* context)
+{
+    // set gray level, 0.0 to balck 1.0 to white
+
+    char buf[1024] = { 0 };
+    pdf_stack_node_t node;
+    node.data = buf;
+
+    if (!strcmp(context->state->stroke.currentColorSpace, "/DeviceGray"))
+    {
+        // gray
+        pdf_stack_pop(context->stack, &node);
+        float g = strtof(buf, NULL);
+        // plutovg_canvas_set_rgb(context->canvas, g, g, g);
+        context->state->stroke.color[0] = g;
+        context->state->stroke.color[1] = g;
+        context->state->stroke.color[2] = g;
+    }
+    else if (!strcmp(context->state->stroke.currentColorSpace,
+        "/DeviceRGB"))
+    {
+        // red green blue
+
+        pdf_stack_pop(context->stack, &node);
+        float b = strtof(buf, NULL);
+        pdf_stack_pop(context->stack, &node);
+        float g = strtof(buf, NULL);
+        pdf_stack_pop(context->stack, &node);
+        float r = strtof(buf, NULL);
+        // plutovg_canvas_set_rgb(context->canvas, r, g, b);
+        context->state->stroke.color[0] = r;
+        context->state->stroke.color[1] = g;
+        context->state->stroke.color[2] = b;
+    }
+    else if (!strcmp(context->state->stroke.currentColorSpace,
+        "/DeviceCMYK"))
+    {
+        // cyan magenta yellow black
+        pdf_stack_pop(context->stack, &node);
+        float k = strtof(buf, NULL);
+        pdf_stack_pop(context->stack, &node);
+        float y = strtof(buf, NULL);
+        pdf_stack_pop(context->stack, &node);
+        float m = strtof(buf, NULL);
+        pdf_stack_pop(context->stack, &node);
+        float c = strtof(buf, NULL);
+
+        float r = (1.0 - c) * (1.0 - k);
+        float g = (1.0 - m) * (1.0 - k);
+        float b = (1.0 - y) * (1.0 - k);
+
+        context->state->stroke.color[0] = r;
+        context->state->stroke.color[1] = g;
+        context->state->stroke.color[2] = b;
     }
 }
 
 void handle_scn(pdf_context_t* context)
 {
+    // char buf[1024] = { 0 };
+    // pdf_stack_node_t node;
+    // node.data = buf;
+    // pdf_stack_pop(context->stack, &node);
+    // pdf_stack_pop(context->stack, &node);
+    // pdf_stack_pop(context->stack, &node);
+    if (!strcmp(context->state->fill.currentColorSpace, "/DeviceGray") 
+    || !strcmp(context->state->fill.currentColorSpace, "/DeviceRGB") 
+    || !strcmp(context->state->fill.currentColorSpace, "/DeviceCMYK"))
+    {
+        return handle_sc(context);
+    }
     char buf[1024] = { 0 };
     pdf_stack_node_t node;
     node.data = buf;
@@ -1020,6 +1240,13 @@ void handle_scn(pdf_context_t* context)
 
 void handle_SCN(pdf_context_t* context)
 {
+    if (!strcmp(context->state->stroke.currentColorSpace, "/DeviceGray") 
+    || !strcmp(context->state->stroke.currentColorSpace, "/DeviceRGB") 
+    || !strcmp(context->state->stroke.currentColorSpace, "/DeviceCMYK"))
+    {
+        return handle_SC(context);
+    }
+  
     char buf[1024] = { 0 };
     pdf_stack_node_t node;
     node.data = buf;
@@ -1042,8 +1269,8 @@ void stroke(pdf_context_t* context)
     //double r, g, b, a;
     plutovg_color_t color;
     plutovg_canvas_get_color(context->canvas, &color);
-    plutovg_canvas_set_rgb(context->canvas, context->state->strokeColor[0],
-        context->state->strokeColor[1], context->state->strokeColor[2]);
+    plutovg_canvas_set_rgb(context->canvas, context->state->stroke.color[0],
+        context->state->stroke.color[1], context->state->stroke.color[2]);
     plutovg_canvas_stroke(context->canvas);
     plutovg_canvas_set_color(context->canvas, &color);
     // plutovg_canvas_set_rgb(context->canvas,
@@ -1117,7 +1344,6 @@ void handle_TD(pdf_context_t* context)
     // tx ty Td
 }
 
-#include "Tf.c"
 void handle_Tj(pdf_context_t* context)
 {
     // show / paint the glyphs for a string

@@ -402,6 +402,50 @@ pdf_font_t* _load_truetype_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
     }
     return font;
 }
+void pdf_obj_get_colorspace(pdf_obj_t* obj, const char* name, char* value)
+{
+    if (obj == NULL || name == NULL || value == NULL || obj->resources.colorspace_dict == NULL)
+    {
+        return;
+    }
+    int ref = pdf_dict_get_ref(obj->resources.colorspace_dict, name);
+    if (ref == -1)
+    {
+        char* color_space = pdf_dict_get_name(obj->resources.colorspace_dict, name);
+        if (color_space != NULL)
+        {
+            strcpy(value, color_space);
+        }
+    }
+    else
+    {
+        pdf_obj_t* color_space_obj = pdf_file_get_obj(obj->pdf, ref);
+        if (color_space_obj != NULL)
+        {
+            if (color_space_obj->value->type == NAME)
+            {
+                strcpy(value, color_space_obj->value->val.name);
+            }
+            // else if (color_space_obj->value->type == ARRAY)
+            // {
+            //     pdf_array_t* color_space_aar = color_space_obj->value->val.array;
+            //     if (color_space_aar != NULL && color_space_aar->num_elements > 0)
+            //     {
+            //         strcpy(value, color_space_aar->values[0]->val.name);
+            //     }
+            // }
+            // else if (color_space_obj->value->type == DICT)
+            // {
+            //     pdf_dict_t* color_space_dict = color_space_obj->value->val.dict;
+            //     if (color_space_dict != NULL)
+            //     {
+            //         strcpy(value, pdf_dict_get_name(color_space_dict, "/Name"));
+            //     }
+            // }
+        }
+    }
+
+}
 pdf_font_t* pdf_obj_get_font(pdf_obj_t* obj, const char* name)
 {
     if (obj == NULL || name == NULL || obj->resources.font_dict == NULL) return NULL;

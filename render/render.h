@@ -6,6 +6,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <wchar.h>
+#include <ft2build.h>
+#include FT_FREETYPE_H
+#include FT_OUTLINE_H
+#include FT_MODULE_H 
 #include <plutovg.h>
 #include "plutovg-stb-image-write.h"
 #include "plutovg-stb-image.h"
@@ -31,9 +35,14 @@ void pdf_stack_free(pdf_stack_t* s);
 void pdf_stack_show(pdf_stack_t* s);
 
 typedef struct pdf_graphics_state {
-    char currentColorSpace[256];
-    double fillColor[3];
-    double strokeColor[3];
+    struct {
+        char currentColorSpace[256];
+        double color[3];
+    } fill;
+    struct {
+        char currentColorSpace[256];
+        double color[3];
+    } stroke;
     double lineWidth;
     int lineCap;
     int lineJoin;
@@ -44,6 +53,8 @@ typedef struct pdf_graphics_state {
         double offset;
     } dashPattern;
     struct {
+        plutovg_matrix_t textMatrix;
+        plutovg_matrix_t textLineMatrix;
         double characterSpacing;
         double wordSpacing;
         double horizontalScaling;
@@ -51,7 +62,9 @@ typedef struct pdf_graphics_state {
         double fontSize;
         int textMode;
         double textRise;
+        double TJValue;
         plutovg_font_face_t* fontface;
+        FT_Face ft_face;
         bool font_face_loaded;
         pdf_font_t* font;
         double textLineWidth;
@@ -61,11 +74,14 @@ typedef struct pdf_graphics_state {
 typedef struct
 {
     pdf_font_t* font;
+    FT_Face ft_face;
     plutovg_font_face_t* fontface;
     bool loaded;
 } pdf_font_cache_t;
 typedef struct context
 {
+    FT_Library ft_library;
+    plutovg_surface_t* surface;
     pdf_stack_t* stack;
     plutovg_canvas_t* canvas;
     pdf_file_t* pdf;

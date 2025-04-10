@@ -92,6 +92,7 @@ void pdf_stream_get_all(pdf_stream_t* stream, unsigned char** buffer, int* size)
 pdf_obj_t* pdf_obj_init(void);
 void pdf_obj_free(pdf_obj_t* obj);
 pdf_font_t* pdf_obj_get_font(pdf_obj_t* obj, const char* name);
+void pdf_obj_get_colorspace(pdf_obj_t* obj, const char* name, char* value);
 
 pdf_file_t* pdf_file_read_file(const char* file_name);
 void pdf_file_free(pdf_file_t* file);
