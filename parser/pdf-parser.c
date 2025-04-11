@@ -366,6 +366,7 @@ pdf_parser_t* pdf_parser_init(pdf_file_t* pdf, pdf_parser_reader_type_t type, vo
     parser->reader.type = type;
     parser->reader.source = source;
     parser->pause_read = false;
+    parser->eof = false;
     switch (type)
     {
         case BUFFER_READER:
@@ -802,8 +803,17 @@ void _pdf_parser_read_file(pdf_parser_t* parser, void* source)
     {
         return;
     }
-    int end_i = off + ret - 1;
-    _pdf_parser_split(parser, end_i);
+    if (ret == 0)
+    {
+        parser->end_pos = parser->buffer + off - 1;
+        parser->splite_pos = parser->buffer + off;
+        parser->eof = true;
+    }
+    else
+    {
+        int end_i = off + ret - 1;
+        _pdf_parser_split(parser, end_i);
+    }
     parser->pause_read = false;
 }
 void _pdf_parser_read_buffer(pdf_parser_t* parser, void* source)
@@ -825,8 +835,17 @@ void _pdf_parser_read_buffer(pdf_parser_t* parser, void* source)
         }
     }
 
-    int end_i = off + ret - 1;
-    _pdf_parser_split(parser, end_i);
+    if (ret == 0)
+    {
+        parser->end_pos = parser->buffer + off - 1;
+        parser->splite_pos = parser->buffer + off;
+        parser->eof = true;
+    }
+    else
+    {
+        int end_i = off + ret - 1;
+        _pdf_parser_split(parser, end_i);
+    }
     parser->pause_read = false;
 }
 void _pdf_parser_read_stream(pdf_parser_t* parser, void* source)
@@ -846,9 +865,17 @@ void _pdf_parser_read_stream(pdf_parser_t* parser, void* source)
             ret = pdf_stream_get_data(stream, parser->buffer + off, parser->buffer_size - off);
         }
     }
-
-    int end_i = off + ret - 1;
-    _pdf_parser_split(parser, end_i);
+    if (ret == 0)
+    {
+        parser->end_pos = parser->buffer + off - 1;
+        parser->splite_pos = parser->buffer + off;
+        parser->eof = true;
+    }
+    else
+    {
+        int end_i = off + ret - 1;
+        _pdf_parser_split(parser, end_i);
+    }
     parser->pause_read = false;
 }
 
@@ -968,7 +995,7 @@ pdf_parser_token_t* pdf_parser_next_token(pdf_parser_t* parser)
         return NULL;
 
     // unsigned char* save_cur = parser->current_pos;
-    if (parser->current_pos >= parser->splite_pos)
+    if (parser->current_pos >= parser->splite_pos && !parser->eof)
     {
         parser->reader.read(parser, parser->reader.source);
     }

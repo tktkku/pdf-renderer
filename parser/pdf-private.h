@@ -264,6 +264,7 @@ struct pdf_font
     int font_weight;
     int flags;
     int italic_angle;
+    pdf_array_t* font_matrix;
     pdf_array_t* font_bbox;
     int ascent;
     int descent;
@@ -345,6 +346,7 @@ struct pdf_parser
     pdf_parser_token_t* cached_tokens[3];
     int num_cached_tokens;
     bool pause_read;
+    bool eof;
 };
 
 struct pdf_buffer

@@ -413,6 +413,8 @@ pdf_font_t* _load_type3_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
     font->first_char = pdf_dict_get_number(font_dict, "/FirstChar");
     font->last_char = pdf_dict_get_number(font_dict, "/LastChar");
     font->widths = pdf_dict_get_array(font_dict, "/Widths");
+    font->font_matrix = pdf_dict_get_array(font_dict, "/FontMatrix");
+    font->font_bbox = pdf_dict_get_array(font_dict, "/FontBBox");
     font->charProcs = pdf_dict_get_dict(font_dict, "/CharProcs");
     if (font->charProcs == NULL)
     {
@@ -513,7 +515,14 @@ pdf_font_t* _load_type3_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
         font->font_weight = pdf_dict_get_number(font->font_descriptor, "/FontWeight");
         font->flags = pdf_dict_get_number(font->font_descriptor, "/Flags");
         font->italic_angle = pdf_dict_get_number(font->font_descriptor, "/ItalicAngle");
-        font->font_bbox = pdf_dict_get_array(font->font_descriptor, "/FontBBox");
+        if (font->font_bbox == NULL)
+        {
+            font->font_bbox = pdf_dict_get_array(font->font_descriptor, "/FontBBox");
+        }
+        if (font->font_matrix == NULL)
+        {
+            font->font_matrix = pdf_dict_get_array(font->font_descriptor, "/FontMatrix");
+        }
         font->ascent = pdf_dict_get_number(font->font_descriptor, "/Ascent");
         font->descent = pdf_dict_get_number(font->font_descriptor, "/Descent");
         font->cap_height = pdf_dict_get_number(font->font_descriptor, "/CapHeight");

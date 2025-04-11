@@ -224,7 +224,7 @@ void _do_render_operation(pdf_context_t* context, pdf_parser_token_t* tk)
                     }
                     handlers[mid].handler(context);
 #if DEBUG
-                    if (!strcmp(tk->token, "Tj"))
+                    if (!strcmp(tk->token, "f"))
                     {
                         plutovg_surface_write_to_png(context->surface, "test.png");
                         printf("Press any key to continue...");
@@ -373,91 +373,90 @@ float _canvas_fill_text(pdf_context_t* context, const void* text, int length, pl
 
 void _do_text_render(pdf_context_t* context, char* buf, int len)
 {
-    
-    if (strcmp(context->state->textState.font->subtype, "/Type3"))
-    {
-        float x, y;
-        plutovg_canvas_get_current_point(context->canvas, &x, &y);
-        plutovg_canvas_save(context->canvas);
-        // cos(theta), sin(theta),  0
-        // -sin(theta), cos(theta), 0
-        // 0, 0, 1
+    plutovg_canvas_save(context->canvas);
+    float x, y;
+    plutovg_canvas_get_current_point(context->canvas, &x, &y);
+    // cos(theta), sin(theta),  0
+    // -sin(theta), cos(theta), 0
+    // 0, 0, 1
 
-        // 1,  0, 0
-        // 0, -1, 0,
-        // 0,  0, 1
-        // rotate 180閹�?
-        // or scale by 1
-        plutovg_canvas_transform(context->canvas, &context->state->textState.textMatrix);
-        plutovg_canvas_scale(context->canvas, 1, -1);
-        plutovg_canvas_set_font_size(context->canvas, context->state->textState.fontSize);
-        plutovg_canvas_set_font_face(context->canvas, context->state->textState.fontface);
-        plutovg_canvas_set_rgb(context->canvas,
-            context->state->fill.color[0],
-            context->state->fill.color[1],
-            context->state->fill.color[2]);
-        int unicode_cnt = 0;
-        uint16_t unicode[1024] = { 0 };
-        if (buf[0] == '<')
+    // 1,  0, 0
+    // 0, -1, 0,
+    // 0,  0, 1
+    // rotate 180閹�?
+    // or scale by 1
+    plutovg_canvas_transform(context->canvas, &context->state->textState.textMatrix);
+    plutovg_canvas_scale(context->canvas, 1, -1);
+    plutovg_canvas_set_font_size(context->canvas, context->state->textState.fontSize);
+    plutovg_canvas_set_font_face(context->canvas, context->state->textState.fontface);
+    plutovg_canvas_set_rgb(context->canvas,
+        context->state->fill.color[0],
+        context->state->fill.color[1],
+        context->state->fill.color[2]);
+    int unicode_cnt = 0;
+    uint16_t unicode[1024] = { 0 };
+    if (buf[0] == '<')
+    {
+        if (strstr(context->state->textState.font->encoding, "Identity"))
+        {
+            for (char* p = &buf[1]; *p != '\0'; p += 4)
+            {
+                uint16_t t = _hex_str_to_16bit(p);
+                unicode[unicode_cnt++] = t;
+            }
+        }
+        else
+        {
+            for (char* p = &buf[1]; *p != '\0'; p += 4)
+            {
+                uint16_t t = _hex_str_to_16bit(p);
+                unicode[unicode_cnt++] = _get_unicode_from_cmap(context->state->textState.font->cmap, t);
+            }
+        }
+        // for (char* p = &buf[1]; *p != '\0'; p += 4)
+        // {
+        //     uint16_t t = _hex_str_to_16bit(p);
+        //     wchar_t w = _get_unicode_from_cmap(context->state->textState.font->to_unicode_map, t);
+        //     printf("%lc", w);
+        // }
+        // printf("\n");
+    }
+    else if (buf[0] == '(')
+    {
+        if (!strcmp(context->state->textState.font->subtype, "/TrueType") || !strcmp(context->state->textState.font->subtype, "/Type3"))
+        {
+            for (int i = 1; i < len; i++)
+            {
+                unicode[unicode_cnt++] = buf[i];
+            }
+        }
+        else
         {
             if (strstr(context->state->textState.font->encoding, "Identity"))
             {
-                for (char* p = &buf[1]; *p != '\0'; p += 4)
+                for (int i = 1; i < len; i += 2)
                 {
-                    uint16_t t = _hex_str_to_16bit(p);
-                    unicode[unicode_cnt++] = t;
+                    unicode[unicode_cnt++] = ((buf[i] << 8) & 0xFF00) | (buf[i + 1] & 0x00FF);
                 }
             }
             else
             {
-                for (char* p = &buf[1]; *p != '\0'; p += 4)
+                for (int i = 1; i < len; i += 2)
                 {
-                    uint16_t t = _hex_str_to_16bit(p);
+                    uint16_t t = ((buf[i] << 8) & 0xFF00) | (buf[i + 1] & 0x00FF);
                     unicode[unicode_cnt++] = _get_unicode_from_cmap(context->state->textState.font->cmap, t);
                 }
             }
-            // for (char* p = &buf[1]; *p != '\0'; p += 4)
-            // {
-            //     uint16_t t = _hex_str_to_16bit(p);
-            //     wchar_t w = _get_unicode_from_cmap(context->state->textState.font->to_unicode_map, t);
-            //     printf("%lc", w);
-            // }
-            // printf("\n");
         }
-        else if (buf[0] == '(')
-        {
-            if (!strcmp(context->state->textState.font->subtype, "/TrueType"))
-            {
-                for (int i = 1; i < len; i++)
-                {
-                    unicode[unicode_cnt++] = buf[i];
-                }
-            }
-            else
-            {
-                if (strstr(context->state->textState.font->encoding, "Identity"))
-                {
-                    for (int i = 1; i < len; i += 2)
-                    {
-                        unicode[unicode_cnt++] = ((buf[i] << 8) & 0xFF00) | (buf[i + 1] & 0x00FF);
-                    }
-                }
-                else
-                {
-                    for (int i = 1; i < len; i += 2)
-                    {
-                        uint16_t t = ((buf[i] << 8) & 0xFF00) | (buf[i + 1] & 0x00FF);
-                        unicode[unicode_cnt++] = _get_unicode_from_cmap(context->state->textState.font->cmap, t);
-                    }
-                }
-            }
-        }
-        if (unicode_cnt == 0)
-        {
-            plutovg_canvas_restore(context->canvas);
-            return;
-        }
+    }
+    if (unicode_cnt == 0)
+    {
+        plutovg_canvas_restore(context->canvas);
+        return;
+    }
 
+    if (strcmp(context->state->textState.font->subtype, "/Type3"))
+    {
         if (context->state->textState.font_face_loaded)
         {
             if (strstr(context->state->textState.font->encoding, "Identity"))
@@ -480,22 +479,37 @@ void _do_text_render(pdf_context_t* context, char* buf, int len)
                     PLUTOVG_TEXT_ENCODING_UTF16, context->state->textState.textLineWidth, 0, true); 
             }
         }
-        plutovg_canvas_restore(context->canvas);
     }
     else
     {
+        // render Type3 font
         pdf_array_t* differences = context->state->textState.font->differences;
         if (differences != NULL)
         {
-            //plutovg_canvas_new_path(context->canvas);
-            for (int i = 1; i < len; i++)
+            // pdf_array_t* font_bbox = context->state->textState.font->font_bbox;
+            // pdf_array_t* font_matrix = context->state->textState.font->font_matrix;
+            // plutovg_matrix_t m;
+            // plutovg_matrix_init_identity(&m);
+            // plutovg_matrix_init(&m, font_matrix->values[0]->val.number, font_matrix->values[1]->val.number,
+            //     font_matrix->values[2]->val.number, font_matrix->values[3]->val.number,
+            //     font_matrix->values[4]->val.number, font_matrix->values[5]->val.number);
+            // plutovg_canvas_transform(context->canvas, &m);
+            // plutovg_canvas_move_to(context->canvas, 0, 0);
+            // plutovg_canvas_rect(context->canvas, font_bbox->values[0]->val.number,
+            //     font_bbox->values[1]->val.number, font_bbox->values[2]->val.number,
+            //     font_bbox->values[3]->val.number);
+            // plutovg_canvas_clip(context->canvas);
+
+            // plutovg_canvas_new_path(context->canvas);
+            for (int i = 0; i < unicode_cnt; i++)
             {
-                unsigned char c = buf[i];
-                for (int j = 0; i < differences->num_elements; j += 2)
+                uint16_t c = unicode[i];
+                for (int j = 0; j < differences->num_elements; j += 2)
                 {
                     if (differences->values[j]->val.number == c)
                     {
                         const char* name = differences->values[j + 1]->val.name;
+                        printf("%d %s\n", c, name);
                         int ref = pdf_dict_get_ref(context->state->textState.font->charProcs, name);
                         if (ref != -1)
                         {
@@ -510,7 +524,11 @@ void _do_text_render(pdf_context_t* context, char* buf, int len)
                                     pdf_parser_token_t* tk = NULL;
                                     while ((tk = pdf_stream_get_next_token(obj->stream)) != NULL)
                                     {
-                                        //_do_render_operation(context, tk);
+                                        if (!strcmp(tk->token, "87"))
+                                        {
+                                            getchar();
+                                        }
+                                        _do_render_operation(context, tk);
                                         pdf_parser_token_free(obj->stream->parser, tk);
                                     }
                                     pdf_stream_close(obj->stream);
@@ -520,15 +538,37 @@ void _do_text_render(pdf_context_t* context, char* buf, int len)
                         }
                         else
                         {
-                            // if not found, do nothing
+                            if (context->state->textState.font_face_loaded)
+                            {
+                                if (strstr(context->state->textState.font->encoding, "Identity"))
+                                    context->state->textState.textLineWidth += plutovg_canvas_fill_text1(context->canvas, &c, 1,
+                                        PLUTOVG_TEXT_ENCODING_UTF16, context->state->textState.textLineWidth, 0);
+                                else
+                                    context->state->textState.textLineWidth += plutovg_canvas_fill_text(context->canvas, &c, 1,
+                                        PLUTOVG_TEXT_ENCODING_UTF16, context->state->textState.textLineWidth, 0);
+                            }
+                            else
+                            {
+                                if (context->state->textState.fontface != NULL)
+                                {
+                                    context->state->textState.textLineWidth += plutovg_canvas_fill_text1(context->canvas, &c, 1,
+                                        PLUTOVG_TEXT_ENCODING_UTF16, context->state->textState.textLineWidth, 0);
+                                }
+                                else
+                                {
+                                    context->state->textState.textLineWidth += _canvas_fill_text(context, &c, 1,
+                                        PLUTOVG_TEXT_ENCODING_UTF16, context->state->textState.textLineWidth, 0, true); 
+                                }
+                            }
                         }
                         break;
                     }
                 }
             }
-            //plutovg_canvas_fill(context->canvas);
+            // plutovg_canvas_fill(context->canvas);
         }
     }
+    plutovg_canvas_restore(context->canvas);
 }
 
 void handle_apostrophe(pdf_context_t* context)
@@ -765,7 +805,7 @@ void handle_d0(pdf_context_t* context)
     float wy = strtof(buf, NULL);
     pdf_stack_pop(context->stack, &node);
     float wx = strtof(buf, NULL);
-    // plutovg_canvas_translate(context->canvas, wx, wy);
+    plutovg_canvas_translate(context->canvas, wx, wy);
 }
 
 void handle_d1(pdf_context_t* context)
@@ -786,8 +826,8 @@ void handle_d1(pdf_context_t* context)
     float wy = strtof(buf, NULL);
     pdf_stack_pop(context->stack, &node);
     float wx = strtof(buf, NULL);
-    // plutovg_canvas_translate(context->canvas, wx, wy);
-    // plutovg_canvas_rect(context->canvas, llx, lly, urx - llx, ury - lly);
+    plutovg_canvas_translate(context->canvas, wx, wy);
+    plutovg_canvas_rect(context->canvas, llx, lly, urx - llx, ury - lly);
 }
 
 void handle_DP(pdf_context_t* context)
