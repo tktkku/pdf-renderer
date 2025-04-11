@@ -531,7 +531,10 @@ pdf_page_t* pdf_file_get_page(pdf_file_t* pdf, int pageNo)
         page->contents[0] = content_obj;
     }
 
-
+    if (rotate == -1)
+    {
+        rotate = 0;
+    }
     page->rotate = rotate;
     if (crop_arr != NULL)
     {
@@ -588,13 +591,109 @@ void _fill_resources(pdf_obj_t* obj)
     if (resources == NULL)
         return;
     obj->resources.extgstate_dict = pdf_dict_get_dict(resources, "/ExtGState");
+    if (obj->resources.extgstate_dict == NULL)
+    {
+        int ext_ref = pdf_dict_get_ref(resources, "/ExtGState");
+        if (ext_ref != -1)
+        {
+            pdf_obj_t* ext_obj = pdf_file_get_obj(obj->pdf, ext_ref);
+            if (ext_obj != NULL)
+            {
+                obj->resources.extgstate_dict = ext_obj->value->val.dict;
+            }
+        }
+    }
     obj->resources.colorspace_dict = pdf_dict_get_dict(resources, "/ColorSpace");
+    if (obj->resources.colorspace_dict == NULL)
+    {
+        int color_ref = pdf_dict_get_ref(resources, "/ColorSpace");
+        if (color_ref != -1)
+        {
+            pdf_obj_t* color_obj = pdf_file_get_obj(obj->pdf, color_ref);
+            if (color_obj != NULL)
+            {
+                obj->resources.colorspace_dict = color_obj->value->val.dict;
+            }
+        }
+    }
     obj->resources.pattern_dict = pdf_dict_get_dict(resources, "/Pattern");
+    if (obj->resources.pattern_dict == NULL)
+    {
+        int pattern_ref = pdf_dict_get_ref(resources, "/Pattern");
+        if (pattern_ref != -1)
+        {
+            pdf_obj_t* pattern_obj = pdf_file_get_obj(obj->pdf, pattern_ref);
+            if (pattern_obj != NULL)
+            {
+                obj->resources.pattern_dict = pattern_obj->value->val.dict;
+            }
+        }
+    }
     obj->resources.shading_dict = pdf_dict_get_dict(resources, "/Shading");
+    if (obj->resources.shading_dict == NULL)
+    {
+        int shading_ref = pdf_dict_get_ref(resources, "/Shading");
+        if (shading_ref != -1)
+        {
+            pdf_obj_t* shading_obj = pdf_file_get_obj(obj->pdf, shading_ref);
+            if (shading_obj != NULL)
+            {
+                obj->resources.shading_dict = shading_obj->value->val.dict;
+            }
+        }
+    }
     obj->resources.xobject_dict = pdf_dict_get_dict(resources, "/XObject");
+    if (obj->resources.xobject_dict == NULL)
+    {
+        int xobj_ref = pdf_dict_get_ref(resources, "/XObject");
+        if (xobj_ref != -1)
+        {
+            pdf_obj_t* xobj_obj = pdf_file_get_obj(obj->pdf, xobj_ref);
+            if (xobj_obj != NULL)
+            {
+                obj->resources.xobject_dict = xobj_obj->value->val.dict;
+            }
+        }
+    }
     obj->resources.font_dict = pdf_dict_get_dict(resources, "/Font");
+    if (obj->resources.font_dict == NULL)
+    {
+        int font_ref = pdf_dict_get_ref(resources, "/Font");
+        if (font_ref != -1)
+        {
+            pdf_obj_t* font_obj = pdf_file_get_obj(obj->pdf, font_ref);
+            if (font_obj != NULL)
+            {
+                obj->resources.font_dict = font_obj->value->val.dict;
+            }
+        }
+    }
     obj->resources.procset_arr = pdf_dict_get_array(resources, "/ProcSet");
+    if (obj->resources.procset_arr == NULL)
+    {
+        int proc_ref = pdf_dict_get_ref(resources, "/ProcSet");
+        if (proc_ref != -1)
+        {
+            pdf_obj_t* proc_obj = pdf_file_get_obj(obj->pdf, proc_ref);
+            if (proc_obj != NULL)
+            {
+                obj->resources.procset_arr = proc_obj->value->val.array;
+            }
+        }
+    }
     obj->resources.properties_dict = pdf_dict_get_dict(resources, "/Properties");
+    if (obj->resources.properties_dict == NULL)
+    {
+        int prop_ref = pdf_dict_get_ref(resources, "/Properties");
+        if (prop_ref != -1)
+        {
+            pdf_obj_t* prop_obj = pdf_file_get_obj(obj->pdf, prop_ref);
+            if (prop_obj != NULL)
+            {
+                obj->resources.properties_dict = prop_obj->value->val.dict;
+            }
+        }
+    }
 }
 pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, int ref)
 {

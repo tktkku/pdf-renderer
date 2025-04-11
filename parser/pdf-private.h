@@ -255,6 +255,9 @@ struct pdf_font
     char* subtype;
     char* basefont;
     char* encoding;
+    pdf_dict_t* encoding_dict;
+    pdf_array_t* differences;
+    pdf_dict_t* charProcs;
     pdf_cmap_t* to_unicode_map;
     pdf_dict_t* descendant_font_dict;
     pdf_dict_t* font_descriptor;

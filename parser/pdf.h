@@ -46,7 +46,7 @@ typedef struct pdf_buffer pdf_buffer_t;
 struct pdf_cmap;
 typedef struct pdf_cmap pdf_cmap_t;
 
-
+void pdf_value_free(struct pdf_value* value);
 /**
  * buf: start position
  * size: size of the buffer

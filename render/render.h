@@ -26,8 +26,6 @@ typedef struct pdf_stack
     pdf_stack_node_t* top;
 } pdf_stack_t;
 
-void pdf_value_free(struct pdf_value* value);
-
 pdf_stack_t* pdf_stack_init(void);
 void pdf_stack_push(pdf_stack_t* s, const void* data, size_t size);
 void pdf_stack_pop(pdf_stack_t* s, pdf_stack_node_t* data);

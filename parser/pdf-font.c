@@ -37,6 +37,10 @@ void pdf_font_free(pdf_font_t* font)
             pdf_cmap_free(p);
         }
     }
+    if (font->differences != NULL)
+    {
+        pdf_array_free(font->differences);
+    }
     free(font);
     font = NULL;
 }
