@@ -843,7 +843,10 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj, const char* name)
                                     tmp[index2 + 3] = smask[index];
                                 }
                             }
-                            free(lookup);
+                            if (color_space_aar->values[3]->type == INDIRECT)
+                            {
+                                free(lookup);
+                            }
                         }
                         else
                         {

@@ -596,7 +596,12 @@ void handle_b_star(pdf_context_t* context)
     // same as the sequence
     // h B*
     plutovg_canvas_close_path(context->canvas);
+    plutovg_color_t c;
+    plutovg_canvas_get_color(context->canvas, &c);
+    plutovg_canvas_set_rgb(context->canvas, context->state->fill.color[0],
+        context->state->fill.color[1], context->state->fill.color[2]);
     plutovg_canvas_fill(context->canvas);
+    plutovg_canvas_set_color(context->canvas, &c);
     // plutovg_canvas_stroke(context->canvas);
     stroke(context);
 }
@@ -604,7 +609,12 @@ void handle_b_star(pdf_context_t* context)
 void handle_B_star(pdf_context_t* context)
 {
     // fill and then stroke the path, using the even-odd rule
+    plutovg_color_t c;
+    plutovg_canvas_get_color(context->canvas, &c);
+    plutovg_canvas_set_rgb(context->canvas, context->state->fill.color[0],
+        context->state->fill.color[1], context->state->fill.color[2]);
     plutovg_canvas_fill(context->canvas);
+    plutovg_canvas_set_color(context->canvas, &c);
     // plutovg_canvas_stroke(context->canvas);
     stroke(context);
 }
@@ -615,7 +625,12 @@ void handle_b(pdf_context_t* context)
     // same as the sequence
     // h B
     plutovg_canvas_close_path(context->canvas);
+    plutovg_color_t c;
+    plutovg_canvas_get_color(context->canvas, &c);
+    plutovg_canvas_set_rgb(context->canvas, context->state->fill.color[0],
+        context->state->fill.color[1], context->state->fill.color[2]);
     plutovg_canvas_fill(context->canvas);
+    plutovg_canvas_set_color(context->canvas, &c);
     // plutovg_canvas_stroke(context->canvas);
     stroke(context);
 }
@@ -623,7 +638,12 @@ void handle_b(pdf_context_t* context)
 void handle_B(pdf_context_t* context)
 {
     // fill and then stroke the path, using the nonzero winding number rule
+    plutovg_color_t c;
+    plutovg_canvas_get_color(context->canvas, &c);
+    plutovg_canvas_set_rgb(context->canvas, context->state->fill.color[0],
+        context->state->fill.color[1], context->state->fill.color[2]);
     plutovg_canvas_fill(context->canvas);
+    plutovg_canvas_set_color(context->canvas, &c);
     // plutovg_canvas_stroke(context->canvas);
     stroke(context);
 }
