@@ -413,6 +413,18 @@ pdf_font_t* _load_type3_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
     font->first_char = pdf_dict_get_number(font_dict, "/FirstChar");
     font->last_char = pdf_dict_get_number(font_dict, "/LastChar");
     font->widths = pdf_dict_get_array(font_dict, "/Widths");
+    if (font->widths == NULL)
+    {
+        int ref = pdf_dict_get_ref(font_dict, "/Widths");
+        if (ref != -1)
+        {
+            pdf_obj_t* obj1 = pdf_file_get_obj(obj->pdf, ref);
+            if (obj1 != NULL)
+            {
+                font->widths = obj1->value->val.array;
+            }
+        }
+    }
     font->font_matrix = pdf_dict_get_array(font_dict, "/FontMatrix");
     font->font_bbox = pdf_dict_get_array(font_dict, "/FontBBox");
     font->charProcs = pdf_dict_get_dict(font_dict, "/CharProcs");
@@ -977,7 +989,16 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj, const char* name)
         xobj->obj = xobject;
         xobj->type = XOBJ_FORM;
         xobj->form = (pdf_form_t*)malloc(sizeof(pdf_form_t));
-
+        xobj->form->matrix[0] = 1;
+        xobj->form->matrix[1] = 0;
+        xobj->form->matrix[2] = 0;
+        xobj->form->matrix[3] = 1;
+        xobj->form->matrix[4] = 0;
+        xobj->form->matrix[5] = 0;
+        xobj->form->bbox[0] = 0;
+        xobj->form->bbox[1] = 0;
+        xobj->form->bbox[2] = 0;
+        xobj->form->bbox[3] = 0;
         pdf_array_t* ctm_aar = pdf_dict_get_array(xobject_dict, "/Matrix");
         for (int i = 0; ctm_aar && i < ctm_aar->num_elements; i++)
         {

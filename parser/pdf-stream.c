@@ -196,7 +196,172 @@ int pdf_stream_get_data(pdf_stream_t* stream, unsigned char* buf, int size)
 
     return ret;
 }
+static void _png_sub(unsigned char* start, int columns, int colors)
+{
+    for (int k = 0; k < colors; k++)
+    {
+        *(start + k) += 0;
+    }
+    for (int j = 1; j < columns; j++)
+    {
+        int jcolors = j * colors;
+        for (int k = 0; k < colors; k++)
+        {
+            *(start + jcolors + k) += *(start + (jcolors - colors) + k);
+        }
+        
+    }
+}
+static void _png_up(unsigned char* start, unsigned char* up, int columns, int colors)
+{
+    if (start == NULL) return;
+    if (up != NULL)
+    {
+        for (int j = 0; j < columns; j++)
+        {
+            int jcolors = j * colors;
+            for (int k = 0; k < colors; k++)
+            {
+                *(start + jcolors + k) += *(up + jcolors + k);
+            }
+        }
+    }
+    else
+    {
+        for (int j = 0; j < columns; j++)
+        {
+            int jcolors = j * colors;
+            for (int k = 0; k < colors; k++)
+            {
+                *(start + jcolors + k) += 0;
+            }
+        }
+    }
+}
 
+static void _png_average(unsigned char* start, unsigned char* up, int columns, int colors)
+{
+    if (start == NULL) return;
+    for (int k = 0; k < colors; k++)
+    {
+        *(start + k) += (*(up + k) + 0) / 2;
+    }
+    if (up != NULL)
+    {
+        for (int j = 1; j < columns; j++)
+        {
+            int jcolors = j * colors;
+            for (int k = 0; k < colors; k++)
+            {
+                *(start + jcolors + k) += (*(up + jcolors + k) + *(start + (jcolors - colors) + k)) / 2;
+            }
+        }
+    }
+    else
+    {
+        for (int j = 1; j < columns; j++)
+        {
+            int jcolors = j * colors;
+            for (int k = 0; k < colors; k++)
+            {
+                *(start + jcolors + k) += (0 + *(start + (jcolors - colors) + k)) / 2;
+            }
+        }
+    }
+}
+
+static void _png_paeth(unsigned char* start, unsigned char* up, int columns, int colors)
+{
+    if (start == NULL) return;
+    for (int k = 0; k < colors; k++)
+    {
+        unsigned char ra = 0;
+        unsigned char rb = *(up + k);
+        unsigned char rc = 0;
+        short p = ra + (rb - rc);
+        unsigned char pa = abs(p - ra);
+        unsigned char pb = abs(p - rb);
+        unsigned char pc = abs(p - rc);
+        unsigned char paeth = *(start + k);
+        if (pa <= pb && pa <= pc)
+        {
+            paeth += ra;
+        }
+        else if (pb <= pc)
+        {
+            paeth += rb;
+        }
+        else
+        {
+            paeth += rc;
+        }
+        *(start + k) = paeth;
+    }
+    if (up != NULL)
+    {
+        for (int j = 1; j < columns; j++)
+        {
+            int jcolors = j * colors;
+            for (int k = 0; k < colors; k++)
+            {
+                unsigned char ra = *(start + (jcolors - colors) + k);
+                unsigned char rb = *(up + jcolors + k);
+                unsigned char rc = *(up + (jcolors - colors) + k);
+                short p = ra + (rb - rc);
+                unsigned char pa = abs(p - ra);
+                unsigned char pb = abs(p - rb);
+                unsigned char pc = abs(p - rc);
+
+                unsigned char paeth = *(start + jcolors + k);
+                if (pa <= pb && pa <= pc)
+                {
+                    paeth += ra;
+                }
+                else if (pb <= pc)
+                {
+                    paeth += rb;
+                }
+                else
+                {
+                    paeth += rc;
+                }
+                *(start + jcolors + k) = paeth;
+            }
+        }
+    }
+    else
+    {
+        for (int j = 1; j < columns; j++)
+        {
+            int jcolors = j * colors;
+            for (int k = 0; k < colors; k++)
+            {
+                unsigned char ra = *(start + (jcolors - colors) + k);
+                unsigned char rb = 0;
+                unsigned char rc = 0;
+                short p = ra + (rb - rc);
+                unsigned char pa = abs(p - ra);
+                unsigned char pb = abs(p - rb);
+                unsigned char pc = abs(p - rc);
+
+                unsigned char paeth = *(start + jcolors + k);
+                if (pa <= pb && pa <= pc)
+                {
+                    paeth += ra;
+                }
+                else if (pb <= pc)
+                {
+                    paeth += rb;
+                }
+                else
+                {
+                    paeth += rc;
+                }
+                *(start + jcolors + k) = paeth;
+            }
+        }
+    }
+}
 void pdf_stream_get_all(pdf_stream_t* stream, unsigned char** buffer, int* size)
 {
     unsigned char* start = NULL;
@@ -222,11 +387,60 @@ void pdf_stream_get_all(pdf_stream_t* stream, unsigned char** buffer, int* size)
         memcpy(start + off, tmp, ret);
         off += ret;
     }
-    if (stream->predictor == 12) // PNG UP
+    if (stream->predictor == 10)
     {
         int stride = stream->columns * stream->colors * stream->bitspercomponent / 8;
         int rows = off / (stride + 1);
-        char* data1 = (char*)malloc(off);
+        unsigned char* data1 = (unsigned char*)malloc(off);
+        memcpy(data1, start, off);
+        memcpy(start, data1 + 1, stride);
+        _png_sub(start, stream->columns, stream->colors);
+        for (int i = 1; i < rows; i++)
+        {
+            memcpy(start + i * stride, data1 + i * (stride + 1) + 1, stride);
+            unsigned char f = *(data1 + i * (stride + 1));
+            if (f == 1) // Sub = Raw - RawLeft, Raw = Sub + RawLeft
+            {
+                _png_sub(start + i * stride, stream->columns, stream->colors);
+            }
+            else if (f == 2) // Up = Raw - RawUp, Raw = Up + RawUp
+            {
+                _png_up(start + i * stride, start + (i - 1) * stride, stream->columns, stream->colors);
+            }
+            else if (f == 3) // Avg = Raw - (RawLeft + RawUp) / 2, Raw = Avg + (RawLeft + RawUp) / 2
+            {
+                _png_average(start + i * stride, start + (i - 1) * stride, stream->columns, stream->colors);
+            }
+            else if (f == 4) // Paeth
+            {
+                _png_paeth(start + i * stride, start + (i - 1) * stride, stream->columns, stream->colors);
+            }
+        }
+        off = stride * rows;
+        free(data1);
+    }
+    else if (stream->predictor == 11) // Sub
+    {
+        int stride = stream->columns * stream->colors * stream->bitspercomponent / 8;
+        int rows = off / (stride + 1);
+        unsigned char* data1 = (unsigned char*)malloc(off);
+        memcpy(data1, start, off);
+        memcpy(start, data1 + 1, stride);
+        for (int i = 0; i < rows; i++)
+        {
+            memcpy(start + i * stride, data1 + i * (stride + 1) + 1, stride);
+            unsigned char f = *(data1 + i * (stride + 1));
+            assert(f == 1);
+            _png_sub(start + i * stride, stream->columns, stream->colors);
+        }
+        off = stride * rows;
+        free(data1);
+    }
+    else if (stream->predictor == 12) // PNG UP
+    {
+        int stride = stream->columns * stream->colors * stream->bitspercomponent / 8;
+        int rows = off / (stride + 1);
+        unsigned char* data1 = (unsigned char*)malloc(off);
         memcpy(data1, start, off);
         /**
          * 2 0 0 0 0 0 255 255
@@ -244,12 +458,41 @@ void pdf_stream_get_all(pdf_stream_t* stream, unsigned char** buffer, int* size)
             memcpy(start + i * stride, data1 + i * (stride + 1) + 1, stride);
             char f = *(data1 + i * (stride + 1));
             assert(f == 2);
-            for (int j = 0; j < stride; j++)
-            {
-                // encode: encoded_cur = raw_cur -  encoded_up
-                // decode: raw_cur = encoded_cur + decoded_up
-                *(start + i * stride + j) += *(start + (i - 1) * stride + j);
-            }
+            _png_up(start + i * stride, start + (i - 1) * stride, stream->columns, stream->colors);
+        }
+        off = stride * rows;
+        free(data1);
+    }
+    else if (stream->predictor == 13)
+    {
+        int stride = stream->columns * stream->colors * stream->bitspercomponent / 8;
+        int rows = off / (stride + 1);
+        unsigned char* data1 = (unsigned char*)malloc(off);
+        memcpy(data1, start, off);
+        memcpy(start, data1 + 1, stride);
+        for (int i = 1; i < rows; i++)
+        {
+            memcpy(start + i * stride, data1 + i * (stride + 1) + 1, stride);
+            unsigned char f = *(data1 + i * (stride + 1));
+            assert(f == 3);
+            _png_average(start + i * stride, start + (i - 1) * stride, stream->columns, stream->colors);
+        }
+        off = stride * rows;
+        free(data1);
+    }
+    else if (stream->predictor == 14)
+    {
+        int stride = stream->columns * stream->colors * stream->bitspercomponent / 8;
+        int rows = off / (stride + 1);
+        unsigned char* data1 = (unsigned char*)malloc(off);
+        memcpy(data1, start, off);
+        memcpy(start, data1 + 1, stride);
+        for (int i = 1; i < rows; i++)
+        {
+            memcpy(start + i * stride, data1 + i * (stride + 1) + 1, stride);
+            unsigned char f = *(data1 + i * (stride + 1));
+            assert(f == 4);
+            _png_paeth(start + i * stride, start + (i - 1) * stride, stream->columns, stream->colors);
         }
         off = stride * rows;
         free(data1);

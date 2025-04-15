@@ -6,7 +6,7 @@ void handle_Do(pdf_context_t* context)
 {
     // paint a specified XObject
     // name
-    char buf[1024] = { 0 };
+    unsigned char buf[1024] = { 0 };
     pdf_stack_node_t node;
     node.data = buf;
     pdf_stack_pop(context->stack, &node);
@@ -41,11 +41,11 @@ void handle_Do(pdf_context_t* context)
             xobj->form->matrix[4], xobj->form->matrix[5]);
 
         plutovg_canvas_transform(context->canvas, &m);
-        plutovg_canvas_move_to(context->canvas, 0, 0);
-        plutovg_canvas_rect(context->canvas, xobj->form->bbox[0],
-            xobj->form->bbox[1], xobj->form->bbox[2],
-            xobj->form->bbox[3]);
-        plutovg_canvas_clip(context->canvas);
+        // plutovg_canvas_move_to(context->canvas, 0, 0);
+        // plutovg_canvas_rect(context->canvas, xobj->form->bbox[0],
+        //     xobj->form->bbox[1], xobj->form->bbox[2],
+        //     xobj->form->bbox[3]);
+        // plutovg_canvas_clip(context->canvas);
 
         if (xobj->obj->stream != NULL)
         {
