@@ -83,7 +83,7 @@ struct pdf_value
         pdf_array_t* array;
     } val;
     int value_len;
-    enum pdf_value_type type;
+    pdf_value_type_t type;
 };
 
 
@@ -285,6 +285,8 @@ struct pdf_font
     int first_char;
     int last_char;
     pdf_array_t* widths;
+    pdf_array_t* charstrings;
+    int references;
 };
 
 struct pdf_image
@@ -393,3 +395,17 @@ void _pdf_parser_read_buffer(pdf_parser_t* parser, void* source);
 void _pdf_parser_read_stream(pdf_parser_t* parser, void* source);
 uint16_t _hex_str_to_16bit(char hexStr[4]);
 uint8_t _hex_str_to_8bit(char hexStr[2]);
+struct pdf_node
+{
+    void* data;
+    size_t size;
+    struct pdf_node* prev;
+    struct pdf_node* next;
+};
+
+struct pdf_deque
+{
+    pdf_node_t* front;
+    pdf_node_t* rear;
+    size_t size;
+};

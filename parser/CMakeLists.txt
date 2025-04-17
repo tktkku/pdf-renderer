@@ -3,7 +3,9 @@ project(pdf-parser LANGUAGES C)
 set(PARSER_SOURCES
     pdf-array.c
     pdf-common.c
+    pdf-cff.c
     pdf-cmap.c
+    pdf-deque.c
     pdf-dict.c
     pdf-file.c
     pdf-font.c

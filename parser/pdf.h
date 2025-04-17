@@ -6,8 +6,13 @@
 #include "../c-vector/cvector.h"
 typedef struct pdf_parser_token pdf_parser_token_t;
 typedef enum pdf_parser_token_type pdf_parser_token_type_t;
+typedef enum pdf_value_type pdf_value_type_t;
+
+typedef struct pdf_node pdf_node_t;
+typedef struct pdf_deque pdf_deque_t;
 
 struct pdf_value;
+typedef struct pdf_value pdf_value_t;
 typedef struct pdf_value pdf_obj_value_t;
 typedef struct pdf_value pdf_dict_pair_value_t;
 typedef struct pdf_value pdf_array_element_value_t;
@@ -110,10 +115,14 @@ pdf_dict_t* pdf_dict_get_dict(pdf_dict_t* dict, const char* name);
 const char* pdf_dict_get_name(pdf_dict_t* dict, const char* name);
 int pdf_dict_get_bool(pdf_dict_t* dict, const char* name);
 bool pdf_dict_add_array(pdf_dict_t* dict, const char* name, pdf_array_t* array);
+bool pdf_dict_add(pdf_dict_t* dict, const char* name, pdf_value_type_t type, void* data);
 const char* pdf_dict_get_string(pdf_dict_t* dict, const char* name);
+bool pdf_dict_add_value(pdf_dict_t* dict, const char* name, pdf_value_t* value);
 
 pdf_font_t* pdf_font_init(void);
 void pdf_font_free(pdf_font_t* font);
+pdf_font_t* pdf_font_reference(pdf_font_t* font);
+void pdf_cff_parse(pdf_font_t* font);
 
 pdf_array_t* pdf_array_init(void);
 void pdf_array_free(pdf_array_t* array);
@@ -121,6 +130,11 @@ void pdf_array_free(pdf_array_t* array);
 pdf_cmap_t* pdf_cmap_init(void);
 void pdf_cmap_free(pdf_cmap_t* cmap);
 
+pdf_deque_t* pdf_deque_init();
+void pdf_deque_free(pdf_deque_t* deque);
+void pdf_deque_push(pdf_deque_t* q, const void* data, size_t size);
+void pdf_deque_pop_front(pdf_deque_t* q, pdf_node_t* data);
+void pdf_deque_pop_end(pdf_deque_t* q, pdf_node_t* data);
 
 void render_to_png_by_plutovg(pdf_page_t* page, char* filename);
 void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,

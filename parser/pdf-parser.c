@@ -1084,16 +1084,34 @@ pdf_cmap_t* pdf_parser_build_cmap(pdf_parser_t* parser)
                 char_range_map->srcEnd = _hex_str_to_16bit(tk2->token + 1);
                 if (isCid)
                 {
-                    char_range_map->dstStart = (uint16_t)strtol(tk3->token + 1, NULL, 10);
+                    char_range_map->dstStart = (uint16_t)strtol(tk3->token, NULL, 10);
+                    cvector_push_back(cmap->char_range_map, char_range_map);
                 }
                 else
                 {
-                    char_range_map->dstStart = _hex_str_to_16bit(tk3->token + 1);
+                    if (tk3->type != TOKEN_ARRAY_BEG)
+                    {
+                        char_range_map->dstStart = _hex_str_to_16bit(tk3->token + 1);
+                        cvector_push_back(cmap->char_range_map, char_range_map);
+                    }
+                    else
+                    {
+                        pdf_array_t* arr = pdf_parser_build_array(parser);
+                        for (int i = 0; i < arr->num_elements; i++)
+                        {
+                            pdf_char_range_map_t* char_range_map1 = (pdf_char_range_map_t*)malloc(sizeof(pdf_char_range_map_t));
+                            char_range_map1->srcStart = char_range_map->srcStart + i;
+                            char_range_map1->srcEnd = char_range_map->srcStart + i;
+                            char_range_map1->dstStart = _hex_str_to_16bit(arr->values[i]->val.string + 1);
+                            cvector_push_back(cmap->char_range_map, char_range_map1);
+                        }
+                        pdf_array_free(arr);
+                        free(char_range_map);
+                    }
                 }
                 pdf_parser_token_free(parser, tk1);
                 pdf_parser_token_free(parser, tk2);
                 pdf_parser_token_free(parser, tk3);
-                cvector_push_back(cmap->char_range_map, char_range_map);
             }
             continue;
         }

@@ -16,17 +16,20 @@ void pdf_cmap_free(pdf_cmap_t* cmap)
         free(cmap->char_range_map[i]);
     }
     cvector_free(cmap->char_range_map);
+    cmap->char_range_map = NULL;
     nums = cvector_size(cmap->code_range_map);
     for (int i = 0; i < nums; i++)
     {
         free(cmap->code_range_map[i]);
     }
     cvector_free(cmap->code_range_map);
+    cmap->code_range_map = NULL;
     nums = cvector_size(cmap->unicode_map);
     for (int i = 0; i < nums; i++)
     {
         free(cmap->unicode_map[i]);
     }
     cvector_free(cmap->unicode_map);
+    cmap->unicode_map = NULL;
     free(cmap);
 }

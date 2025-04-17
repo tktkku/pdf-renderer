@@ -28,7 +28,7 @@ void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
 void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
     int width, int height, int stride)
 {
-    pdf_stack_t* stack = pdf_stack_init();
+    pdf_deque_t* deque = pdf_deque_init();
     FT_Library ft_library = NULL;
     FT_Init_FreeType(&ft_library);
     pdf_context_t context;
@@ -50,7 +50,7 @@ void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
     plutovg_canvas_translate(canvas, 0, height);
     plutovg_canvas_scale(canvas, PIXELS_PER_POINT, -PIXELS_PER_POINT);
     context.canvas = canvas;
-    context.stack = stack;
+    context.deque = deque;
     context.pdf = page->pdf;
     context.page = page;
 
@@ -163,14 +163,14 @@ void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
             pdf_dict_get_dict(anno_obj->value->val.dict, "/OC");
         }
     }
-    pdf_stack_free(stack);
+    pdf_deque_free(deque);
     for (int i = 0; i < cvector_size(context.fontcache); i++)
     {
         pdf_font_cache_t* fontcache = context.fontcache[i];
-        // if (fontcache->font != NULL)
-        // {
-        //     pdf_font_free(fontcache->font);
-        // }
+        if (fontcache->font != NULL)
+        {
+            pdf_font_free(fontcache->font);
+        }
         if (fontcache->fontface != NULL)
         {
             plutovg_font_face_destroy(fontcache->fontface);
@@ -196,8 +196,8 @@ void _do_render_operation(pdf_context_t* context, pdf_parser_token_t* tk)
     if (tk->type != TOKEN_OPERATOR)
     {
         // did not match any operation
-        // push data to stack
-        pdf_stack_push(context->stack, tk->token, tk->token_len);
+        // push data to deque
+        pdf_deque_push(context->deque, tk->token, tk->token_len);
     }
     else
     {
@@ -346,7 +346,19 @@ float _canvas_fill_text(pdf_context_t* context, const void* text, int length, pl
                     } else {
                         glyph_traverse_func(path, PLUTOVG_PATH_COMMAND_LINE_TO, &mapped_point, 1);
                     }
-                } else if (tag & FT_CURVE_TAG_CUBIC) {
+                } 
+                else if (tag & FT_CURVE_TAG_CONIC)
+                {
+                    FT_Vector* next_point = &outline->points[(j + 1) % (end + 1)];
+                    plutovg_point_t control = { point->x, point->y};
+                    plutovg_point_t end_point = { next_point->x, next_point->y};
+
+                    plutovg_matrix_map_points(&matrix, &control, &control, 1);
+                    plutovg_matrix_map_points(&matrix, &end_point, &end_point, 1);
+
+                    glyph_traverse_func(path, PLUTOVG_PATH_COMMAND_CUBIC_TO, (plutovg_point_t[]){ control, control, end_point }, 3);
+                }
+                else if (tag & FT_CURVE_TAG_CUBIC) {
                     FT_Vector* next_point = &outline->points[(j + 1) % (end + 1)];
                     plutovg_point_t control1 = { point->x, point->y};
                     plutovg_point_t control2 = { next_point->x, next_point->y};
@@ -371,6 +383,221 @@ float _canvas_fill_text(pdf_context_t* context, const void* text, int length, pl
     return advance_width;
 }
 
+void _cff_render_char(pdf_array_t* charstrings_index, int gid, plutovg_canvas_t* canvas)
+{
+    int len = charstrings_index->values[gid]->value_len;
+    unsigned char* buf = (unsigned char*)malloc(len + 1);
+    memcpy(buf, charstrings_index->values[gid]->val.string, len);
+    for (int i = 0; i < len; i++)
+    {
+        printf("%#X ", buf[i]);
+    }
+    printf("\n");
+    unsigned char* p = buf;
+    unsigned char* end = buf + len;
+    pdf_deque_t* deque = pdf_deque_init();
+    pdf_node_t node;
+    void* data = malloc(16);
+    node.data = data;
+    while (p < end)
+    {
+        double v = 0;
+        uint8_t b0 = p[0]; p++;
+        if (p[0] == 28)
+        {
+            uint8_t b1 = p[0];
+            uint8_t b2 = p[1];
+            p += 2;
+            v = b1 << 8 | b2; 
+        }
+        else if (p[0] >= 32 && p[0] <= 246)
+        { 
+            v = b0 - 139;
+        }
+        else if (p[0] >= 247 && p[0] <= 250)
+        {
+            uint8_t b1 = p[0];
+            p++;
+            v = (b0 - 247) * 256 + b1 + 108;
+        }
+        else if (p[0] >= 251 && p[0] <= 254)
+        {
+            uint8_t b1 = p[0];
+            p++;
+            v = -(b0 - 251) * 256 - b1 - 108;
+        }
+        else if (p[0] == 255) p += 4;
+        else if (p[0] == 14)
+        {
+            break;
+        }
+        pdf_deque_push(deque, &v, sizeof(double));
+
+        uint8_t operator1 = p[0];
+        switch (operator1)
+        {
+            case 4:
+                {
+                    pdf_deque_pop_end(deque, &node);
+                    double dy1 = *((double*)data);
+                    float x, y;
+                    plutovg_canvas_get_current_point(canvas, &x, &y);
+                    plutovg_canvas_move_to(canvas, x, dy1);
+                    p++;
+                    break;
+                }
+            case 5:
+                {
+                    while (deque->size > 0)
+                    {
+                        pdf_deque_pop_end(deque, &node);
+                        double dx1 = *((double*)data);
+                        pdf_deque_pop_end(deque, &node);
+                        double dy1 = *((double*)data);
+
+                        plutovg_canvas_line_to(canvas, dx1, dy1);
+                    }
+                    p++;
+                    break;
+                }
+            case 6:
+                {
+                    if (deque->size % 2 == 0)
+                    {
+                        while (deque->size > 0)
+                        {
+                            float x, y;
+                            plutovg_canvas_get_current_point(canvas, &x, &y);
+                            pdf_deque_pop_end(deque, &node);
+                            double dx1 = *((double*)data);
+                            plutovg_canvas_line_to(canvas, dx1, y);
+
+                            plutovg_canvas_get_current_point(canvas, &x, &y);
+                            pdf_deque_pop_end(deque, &node);
+                            double dy1 = *((double*)data);
+                            plutovg_canvas_line_to(canvas, x, dy1);
+                        }
+                    }
+                    else
+                    {
+                        float x, y;
+                        plutovg_canvas_get_current_point(canvas, &x, &y);
+                        pdf_deque_pop_end(deque, &node);
+                        double dx1 = *((double*)data);
+                        plutovg_canvas_line_to(canvas, dx1, y);
+                        while (deque->size > 0)
+                        {
+                            plutovg_canvas_get_current_point(canvas, &x, &y);
+                            pdf_deque_pop_end(deque, &node);
+                            double dy1 = *((double*)data);
+                            plutovg_canvas_line_to(canvas, x, dy1);
+
+                            plutovg_canvas_get_current_point(canvas, &x, &y);
+                            pdf_deque_pop_end(deque, &node);
+                            double dx1 = *((double*)data);
+                            plutovg_canvas_line_to(canvas, dx1, y);
+                        }
+                    }
+                    p++;
+                    break;
+                }
+            case 7:
+                {
+                    if (deque->size % 2 == 0)
+                    {
+                        float x, y;
+                        while (deque->size > 0)
+                        {
+                            plutovg_path_get_current_point(canvas, &x, &y);
+                            pdf_deque_pop_end(deque, &node);
+                            double dy1 = *((double*)data);
+                            plutovg_canvas_line_to(canvas, x, dy1);
+
+                            plutovg_path_get_current_point(canvas, &x, &y);
+                            pdf_deque_pop_end(deque, &node);
+                            double dx1 = *((double*)data);
+                            plutovg_canvas_line_to(canvas, dx1, y);
+                        }
+                    }
+                    else
+                    {
+                        float x, y;
+                        plutovg_path_get_current_point(canvas, &x, &y);
+                        pdf_deque_pop_end(deque, &node);
+                        double dy1 = *((double*)data);
+                        plutovg_canvas_line_to(canvas, x, dy1);
+                        while (deque->size > 0)
+                        {
+                            plutovg_path_get_current_point(canvas, &x, &y);
+                            pdf_deque_pop_end(deque, &node);
+                            double dx1 = *((double*)data);
+                            plutovg_canvas_line_to(canvas, dx1, y);
+
+                            plutovg_path_get_current_point(canvas, &x, &y);
+                            pdf_deque_pop_end(deque, &node);
+                            double dy1 = *((double*)data);
+                            plutovg_canvas_line_to(canvas, x, dy1);
+                        }
+                    }
+                    p++;
+                    break;
+                }
+            case 8:
+                {
+                    while (deque->size > 0)
+                    {
+                        pdf_deque_pop_end(deque, &node);
+                        double dxa = *((double*)data);
+                        pdf_deque_pop_end(deque, &node);
+                        double dya = *((double*)data);
+                        pdf_deque_pop_end(deque, &node);
+                        double dxb = *((double*)data);
+                        pdf_deque_pop_end(deque, &node);
+                        double dyb = *((double*)data);
+                        pdf_deque_pop_end(deque, &node);
+                        double dxc = *((double*)data);
+                        pdf_deque_pop_end(deque, &node);
+                        double dyc = *((double*)data);
+
+                        plutovg_canvas_cubic_to(canvas, dxa, dya, dxb, dyb, dxc, dyc);
+                    }
+                    
+                    p++;
+                    break;
+                }
+            case 21:
+                {
+                    pdf_deque_pop_end(deque, &node);
+                    double dx1 = *((double*)data);
+                    pdf_deque_pop_end(deque, &node);
+                    double dy1 = *((double*)data);
+                    plutovg_canvas_move_to(canvas, dx1, dy1);
+                    p++;
+                    break;
+                }  
+            case 22:
+                {
+                    float x, y;
+                    plutovg_canvas_get_current_point(canvas, &x, &y);
+                    pdf_deque_pop_end(deque, &node);
+                    double dx1 = *((double*)data);
+                    plutovg_canvas_move_to(canvas, dx1, y);
+                    p++;
+                    break;
+                }
+            case 27:
+                {
+
+                    p++;
+                    break;
+                }
+            default:
+                break;
+        }
+    }
+    free(data);
+    pdf_deque_free(deque);
+}
 void _do_text_render(pdf_context_t* context, char* buf, int len)
 {
     plutovg_canvas_save(context->canvas);
@@ -458,6 +685,15 @@ void _do_text_render(pdf_context_t* context, char* buf, int len)
             context->state->fill.color[0],
             context->state->fill.color[1],
             context->state->fill.color[2]);
+
+#if USE_FREETYPE
+        if (strstr(context->state->textState.font->encoding, "Identity"))
+            context->state->textState.textLineWidth += _canvas_fill_text(context, unicode, unicode_cnt,
+            PLUTOVG_TEXT_ENCODING_UTF16, context->state->textState.textLineWidth, 0, true);
+        else
+        context->state->textState.textLineWidth += _canvas_fill_text(context, unicode, unicode_cnt,
+            PLUTOVG_TEXT_ENCODING_UTF16, context->state->textState.textLineWidth, 0, false);
+#else
         if (context->state->textState.font_face_loaded)
         {
             if (strstr(context->state->textState.font->encoding, "Identity"))
@@ -474,12 +710,22 @@ void _do_text_render(pdf_context_t* context, char* buf, int len)
                 context->state->textState.textLineWidth += plutovg_canvas_fill_text1(context->canvas, unicode, unicode_cnt,
                     PLUTOVG_TEXT_ENCODING_UTF16, context->state->textState.textLineWidth, 0);
             }
-            else
+            else if (context->state->textState.font->charstrings != NULL)
             {
-                context->state->textState.textLineWidth += _canvas_fill_text(context, unicode, unicode_cnt,
-                    PLUTOVG_TEXT_ENCODING_UTF16, context->state->textState.textLineWidth, 0, true); 
+                // context->state->textState.textLineWidth += _canvas_fill_text(context, unicode, unicode_cnt,
+                //     PLUTOVG_TEXT_ENCODING_UTF16, context->state->textState.textLineWidth, 0, true);
+                plutovg_canvas_save(context->canvas);
+                plutovg_canvas_new_path(context->canvas);
+                for (int i = 0; i < unicode_cnt; i++)
+                {
+                    _cff_render_char(context->state->textState.font->charstrings, unicode[i], context->canvas);
+                }
+                
+                plutovg_canvas_fill(context->canvas);
+                plutovg_canvas_restore(context->canvas); 
             }
         }
+#endif
     }
     else
     {
@@ -651,20 +897,20 @@ void handle_BDC(pdf_context_t* context)
 {
     // tag properties
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     if (!strcmp(buf, ">>"))
     {
-        pdf_stack_pop(context->stack, &node); // str
-        pdf_stack_pop(context->stack, &node); // name
-        pdf_stack_pop(context->stack, &node); // <<
+        pdf_deque_pop_front(context->deque, &node); // str
+        pdf_deque_pop_front(context->deque, &node); // name
+        pdf_deque_pop_front(context->deque, &node); // <<
     }
     else
     {
-        pdf_stack_pop(context->stack, &node); // name
+        pdf_deque_pop_front(context->deque, &node); // name
     }
-    pdf_stack_pop(context->stack, &node); // tag
+    pdf_deque_pop_front(context->deque, &node); // tag
     
 }
 void handle_BI(pdf_context_t* context)
@@ -676,9 +922,9 @@ void handle_BMC(pdf_context_t* context)
 {
     // tag
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
 }
 void handle_BT(pdf_context_t* context)
 {
@@ -698,19 +944,19 @@ void handle_c(pdf_context_t* context)
     // using (x1, y1) and (x2 ,y2) as the Bezier control points
     // x1 y1 x2 y2 x3 y3
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float y3 = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float x3 = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float y2 = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float x2 = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float y1 = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float x1 = strtof(buf, NULL);
 
     plutovg_canvas_cubic_to(context->canvas, x1, y1, x2, y2, x3, y3);
@@ -721,19 +967,19 @@ void handle_cm(pdf_context_t* context)
     // change matrix CTM
     // a b c d e f
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float f = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float e = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float d = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float c = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float b = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float a = strtof(buf, NULL);
 
     plutovg_matrix_t ctm;
@@ -745,14 +991,14 @@ void handle_cs(pdf_context_t* context)
 {
     // for nonstroking
     // char buf[1024] = { 0 };
-    // stack_node_t node;
+    // deque_node_t node;
     // node.data = buf;
-    // stack_pop(context->stack, &node);
+    // deque_pop(context->deque, &node);
 
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     if (!strcmp(buf, "/DeviceGray") || !strcmp(buf, "/DeviceRGB") || !strcmp(buf, "/DeviceCMYK"))
     {
         strcpy(context->state->fill.currentColorSpace, buf);
@@ -774,9 +1020,9 @@ void handle_CS(pdf_context_t* context)
     // initialize the corresponding current color of cyan magenta yellow to 0.0
     // and the black to 1.0
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     if (!strcmp(buf, "/DeviceGray") || !strcmp(buf, "/DeviceRGB") || !strcmp(buf, "/DeviceCMYK"))
     {
         strcpy(context->state->stroke.currentColorSpace, buf);
@@ -792,16 +1038,16 @@ void handle_d(pdf_context_t* context)
     // set line dash pattern
     // dashArray dashPhase
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float offset = strtof(buf, NULL);
 
     int index = 2;
     float dashs[2] = { 0 };
     while (true)
     {
-        pdf_stack_pop(context->stack, &node);
+        pdf_deque_pop_front(context->deque, &node);
         if (!strcmp(node.data, "]"))
         {
             // ignore
@@ -826,11 +1072,11 @@ void handle_d0(pdf_context_t* context)
 {
     // wx wy
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float wy = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float wx = strtof(buf, NULL);
     // plutovg_canvas_translate(context->canvas, wx, wy);
 }
@@ -839,19 +1085,19 @@ void handle_d1(pdf_context_t* context)
 {
     // wx wy llx lly urx ury
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float ury = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float urx = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float lly = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float llx = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float wy = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float wx = strtof(buf, NULL);
     // plutovg_canvas_translate(context->canvas, wx, wy);
     // plutovg_canvas_rect(context->canvas, llx, lly, urx - llx, ury - lly);
@@ -861,10 +1107,10 @@ void handle_DP(pdf_context_t* context)
 {
     // tag properties
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
-    pdf_stack_pop(context->stack, &node);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
+    pdf_deque_pop_front(context->deque, &node);
 }
 void handle_EI(pdf_context_t* context)
 {
@@ -916,9 +1162,9 @@ void handle_g(pdf_context_t* context)
 {
     // for nonstroking
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float g = strtof(buf, NULL);
     // handle_G(context);
     //plutovg_canvas_set_rgb(context->canvas, g, g, g);
@@ -933,9 +1179,9 @@ void handle_G(pdf_context_t* context)
     // set both in one operation
     // gray
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float g = strtof(buf, NULL);
     context->state->stroke.color[0] = g;
     context->state->stroke.color[1] = g;
@@ -951,9 +1197,9 @@ void handle_gs(pdf_context_t* context)
     // in the ExtGState subdictionary of the current resource dictionary
     // dictName
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     // pdf_page_get_ext_gstate(context->page, buf);
 }
 
@@ -971,9 +1217,9 @@ void handle_i(pdf_context_t* context)
     // set flatness tolerance
     // flatness
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     //float i = strtof(buf, NULL);
     // context->graphics_state.flatness = i;
 }
@@ -989,9 +1235,9 @@ void handle_j(pdf_context_t* context)
     // lineJoin
 
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     int j = atoi(buf);
 
     plutovg_canvas_set_line_join(context->canvas, j);
@@ -1001,10 +1247,10 @@ void handle_J(pdf_context_t* context)
 {
     // set cap style
     // lineCap
-    pdf_stack_node_t node;
+    pdf_node_t node;
     char buf[1024] = { 0 };
     node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     int c = atoi(buf);
 
     plutovg_canvas_set_line_cap(context->canvas, c);
@@ -1014,15 +1260,15 @@ void handle_k(pdf_context_t* context)
 {
     // for nonstroking
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float k = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float y = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float m = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float c = strtof(buf, NULL);
     // handle_K(context);
     float r = (1.0 - c) * (1.0 - k);
@@ -1039,15 +1285,15 @@ void handle_K(pdf_context_t* context)
 {
     // combine CS and SC for DeviceCMYK
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float k = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float y = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float m = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float c = strtof(buf, NULL);
     context->state->stroke.color[0] = (1.0 - c) * (1.0 - k);
     context->state->stroke.color[1] = (1.0 - m) * (1.0 - k);
@@ -1060,11 +1306,11 @@ void handle_l(pdf_context_t* context)
     // append a straight line segment from the current point to (x, y)
     // x y
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float y = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float x = strtof(buf, NULL);
     plutovg_canvas_line_to(context->canvas, x, y);
 }
@@ -1074,11 +1320,11 @@ void handle_m(pdf_context_t* context)
     // begin a new subpath by moving the current point to (x,y)
     // x y
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float y = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float x = strtof(buf, NULL);
     plutovg_canvas_move_to(context->canvas, x, y);
 }
@@ -1088,9 +1334,9 @@ void handle_M(pdf_context_t* context)
     // set miter limit
     // miterLimit
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float m = strtof(buf, NULL);
     plutovg_canvas_set_miter_limit(context->canvas, m);
 }
@@ -1099,9 +1345,9 @@ void handle_MP(pdf_context_t* context)
 {
     // tag
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
 }
 void handle_n(pdf_context_t* context)
 {
@@ -1140,11 +1386,11 @@ void handle_quotation(pdf_context_t* context)
     // ac as the character spacing
     // aw ac string
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
-    pdf_stack_pop(context->stack, &node);
-    pdf_stack_pop(context->stack, &node);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
+    pdf_deque_pop_front(context->deque, &node);
+    pdf_deque_pop_front(context->deque, &node);
     context->state->textState.textLineWidth = 0;
     // TODO
 }
@@ -1167,15 +1413,15 @@ void handle_re(pdf_context_t* context)
     */
 
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float height = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float width = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float y = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float x = strtof(buf, NULL);
 
     plutovg_canvas_rect(context->canvas, x, y, width, height);
@@ -1185,13 +1431,13 @@ void handle_rg(pdf_context_t* context)
 {
     // for nonstroking
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float b = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float g = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float r = strtof(buf, NULL);
     //plutovg_canvas_set_rgb(context->canvas, r, g, b);
     context->state->fill.color[0] = r;
@@ -1205,13 +1451,13 @@ void handle_RG(pdf_context_t* context)
 {
     // combine CS and SC for DeviceRGB
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float b = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float g = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float r = strtof(buf, NULL);
     context->state->stroke.color[0] = r;
     context->state->stroke.color[1] = g;
@@ -1225,9 +1471,9 @@ void handle_ri(pdf_context_t* context)
     // set color rendering intent
     // intent
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
 }
 
 void handle_s(pdf_context_t* context)
@@ -1251,17 +1497,17 @@ void handle_sc(pdf_context_t* context)
 {
     // for nonstroking
     // char buf[1024] = { 0 };
-    // stack_node_t node;
+    // deque_node_t node;
     // node.data = buf;
-    // stack_pop(context->stack, &node);
+    // deque_pop(context->deque, &node);
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
 
     if (!strcmp(context->state->fill.currentColorSpace, "/DeviceGray"))
     {
         // gray
-        pdf_stack_pop(context->stack, &node);
+        pdf_deque_pop_front(context->deque, &node);
         float g = strtof(buf, NULL);
         // plutovg_canvas_set_rgb(context->canvas, g, g, g);
         context->state->fill.color[0] = g;
@@ -1273,11 +1519,11 @@ void handle_sc(pdf_context_t* context)
     {
         // red green blue
 
-        pdf_stack_pop(context->stack, &node);
+        pdf_deque_pop_front(context->deque, &node);
         float b = strtof(buf, NULL);
-        pdf_stack_pop(context->stack, &node);
+        pdf_deque_pop_front(context->deque, &node);
         float g = strtof(buf, NULL);
-        pdf_stack_pop(context->stack, &node);
+        pdf_deque_pop_front(context->deque, &node);
         float r = strtof(buf, NULL);
         // plutovg_canvas_set_rgb(context->canvas, r, g, b);
         context->state->fill.color[0] = r;
@@ -1288,13 +1534,13 @@ void handle_sc(pdf_context_t* context)
         "/DeviceCMYK"))
     {
         // cyan magenta yellow black
-        pdf_stack_pop(context->stack, &node);
+        pdf_deque_pop_front(context->deque, &node);
         float k = strtof(buf, NULL);
-        pdf_stack_pop(context->stack, &node);
+        pdf_deque_pop_front(context->deque, &node);
         float y = strtof(buf, NULL);
-        pdf_stack_pop(context->stack, &node);
+        pdf_deque_pop_front(context->deque, &node);
         float m = strtof(buf, NULL);
-        pdf_stack_pop(context->stack, &node);
+        pdf_deque_pop_front(context->deque, &node);
         float c = strtof(buf, NULL);
 
         float r = (1.0 - c) * (1.0 - k);
@@ -1312,13 +1558,13 @@ void handle_SC(pdf_context_t* context)
     // set gray level, 0.0 to balck 1.0 to white
 
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
 
     if (!strcmp(context->state->stroke.currentColorSpace, "/DeviceGray"))
     {
         // gray
-        pdf_stack_pop(context->stack, &node);
+        pdf_deque_pop_front(context->deque, &node);
         float g = strtof(buf, NULL);
         // plutovg_canvas_set_rgb(context->canvas, g, g, g);
         context->state->stroke.color[0] = g;
@@ -1330,11 +1576,11 @@ void handle_SC(pdf_context_t* context)
     {
         // red green blue
 
-        pdf_stack_pop(context->stack, &node);
+        pdf_deque_pop_front(context->deque, &node);
         float b = strtof(buf, NULL);
-        pdf_stack_pop(context->stack, &node);
+        pdf_deque_pop_front(context->deque, &node);
         float g = strtof(buf, NULL);
-        pdf_stack_pop(context->stack, &node);
+        pdf_deque_pop_front(context->deque, &node);
         float r = strtof(buf, NULL);
         // plutovg_canvas_set_rgb(context->canvas, r, g, b);
         context->state->stroke.color[0] = r;
@@ -1345,13 +1591,13 @@ void handle_SC(pdf_context_t* context)
         "/DeviceCMYK"))
     {
         // cyan magenta yellow black
-        pdf_stack_pop(context->stack, &node);
+        pdf_deque_pop_front(context->deque, &node);
         float k = strtof(buf, NULL);
-        pdf_stack_pop(context->stack, &node);
+        pdf_deque_pop_front(context->deque, &node);
         float y = strtof(buf, NULL);
-        pdf_stack_pop(context->stack, &node);
+        pdf_deque_pop_front(context->deque, &node);
         float m = strtof(buf, NULL);
-        pdf_stack_pop(context->stack, &node);
+        pdf_deque_pop_front(context->deque, &node);
         float c = strtof(buf, NULL);
 
         float r = (1.0 - c) * (1.0 - k);
@@ -1367,11 +1613,11 @@ void handle_SC(pdf_context_t* context)
 void handle_scn(pdf_context_t* context)
 {
     // char buf[1024] = { 0 };
-    // pdf_stack_node_t node;
+    // pdf_node_t node;
     // node.data = buf;
-    // pdf_stack_pop(context->stack, &node);
-    // pdf_stack_pop(context->stack, &node);
-    // pdf_stack_pop(context->stack, &node);
+    // pdf_deque_pop_front(context->deque, &node);
+    // pdf_deque_pop_front(context->deque, &node);
+    // pdf_deque_pop_front(context->deque, &node);
     if (!strcmp(context->state->fill.currentColorSpace, "/DeviceGray") 
     || !strcmp(context->state->fill.currentColorSpace, "/DeviceRGB") 
     || !strcmp(context->state->fill.currentColorSpace, "/DeviceCMYK"))
@@ -1379,11 +1625,11 @@ void handle_scn(pdf_context_t* context)
         return handle_sc(context);
     }
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
-    pdf_stack_pop(context->stack, &node);
-    pdf_stack_pop(context->stack, &node);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
+    pdf_deque_pop_front(context->deque, &node);
+    pdf_deque_pop_front(context->deque, &node);
 }
 
 void handle_SCN(pdf_context_t* context)
@@ -1396,20 +1642,20 @@ void handle_SCN(pdf_context_t* context)
     }
   
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
-    pdf_stack_pop(context->stack, &node);
-    pdf_stack_pop(context->stack, &node);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
+    pdf_deque_pop_front(context->deque, &node);
+    pdf_deque_pop_front(context->deque, &node);
 }
 
 void handle_sh(pdf_context_t* context)
 {
     // name
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
 }
 
 void stroke(pdf_context_t* context)
@@ -1447,9 +1693,9 @@ void handle_Tc(pdf_context_t* context)
     // used by Tj TJ '
     // charSpace initial value=0
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float c = strtof(buf, NULL);
     context->state->textState.characterSpacing = c;
 }
@@ -1459,11 +1705,11 @@ void handle_Td(pdf_context_t* context)
     // set start position on the page
     // tx ty
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float ty = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float tx = strtof(buf, NULL);
 
     // plutovg_canvas_translate(context->canvas, tx, ty);
@@ -1478,11 +1724,11 @@ void handle_TD(pdf_context_t* context)
     // offset form the start of the current line
     // tx ty
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float ty = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float tx = strtof(buf, NULL);
 
     // plutovg_canvas_translate(context->canvas, tx, ty);
@@ -1500,9 +1746,9 @@ void handle_Tj(pdf_context_t* context)
     // show / paint the glyphs for a string
     // string
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     if (context->state->textState.font == NULL)
         return;
 
@@ -1515,12 +1761,12 @@ void handle_TJ(pdf_context_t* context)
     // if the element is a string , show the string
     // if the element is a number, adjust the position
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
-    pdf_stack_t* tmp_stack = pdf_stack_init();
+    pdf_deque_t* tmp_deque = pdf_deque_init();
     while (true)
     {
-        pdf_stack_pop(context->stack, &node);
+        pdf_deque_pop_front(context->deque, &node);
         if (!strcmp(buf, "]"))
         {
             // ignore
@@ -1531,18 +1777,18 @@ void handle_TJ(pdf_context_t* context)
         }
         else
         {
-            pdf_stack_push(tmp_stack, buf, strlen(buf));
+            pdf_deque_push(tmp_deque, buf, strlen(buf));
         }
     }
     if (context->state->textState.font == NULL)
     {
-        pdf_stack_free(tmp_stack);
+        pdf_deque_free(tmp_deque);
         return;
     }
     memset(buf, 0, sizeof(buf));
-    while (tmp_stack->top != NULL)
+    while (tmp_deque->size > 0)
     {
-        pdf_stack_pop(tmp_stack, &node);
+        pdf_deque_pop_front(tmp_deque, &node);
         if (buf[0] == '<' || buf[0] == '(')
         {
             _do_text_render(context, node.data, node.size);
@@ -1556,7 +1802,7 @@ void handle_TJ(pdf_context_t* context)
         }
     }
 
-    pdf_stack_free(tmp_stack);
+    pdf_deque_free(tmp_deque);
 }
 
 void handle_TL(pdf_context_t* context)
@@ -1565,9 +1811,9 @@ void handle_TL(pdf_context_t* context)
     // used by T* ' "
     // leading initial value = 0
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float t = strtof(buf, NULL);
     context->state->textState.textLeading = t;
 }
@@ -1577,20 +1823,20 @@ void handle_Tm(pdf_context_t* context)
     // set the text matrix, and the text line matrix
     // a b c d e f
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
     float a, b, c, d, e, f;
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     f = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     e = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     d = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     c = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     b = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     a = strtof(buf, NULL);
 
     plutovg_matrix_t m;
@@ -1608,9 +1854,9 @@ void handle_Tr(pdf_context_t* context)
     // set text rendering mode
     // mode initial value =0
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     int v = strtof(buf, NULL);
     // STROKE FILL BOTH CLIP
 
@@ -1635,9 +1881,9 @@ void handle_Ts(pdf_context_t* context)
     // set text rise
     // rise initial value=0
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float r = strtof(buf, NULL);
 
     context->state->textState.textRise = r;
@@ -1649,9 +1895,9 @@ void handle_Tw(pdf_context_t* context)
     // used by Tj TJ '
     // wordSpace initial value=0
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float w = strtof(buf, NULL);
     context->state->textState.wordSpacing = w;
 }
@@ -1661,9 +1907,9 @@ void handle_Tz(pdf_context_t* context)
     // horizontal scaling
     // scale initial value=100
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float h = strtof(buf, NULL);
     //plutovg_canvas_scale(context->canvas, h / 100.0, 1.0);
     context->state->textState.horizontalScaling = h;
@@ -1677,16 +1923,16 @@ void handle_v(pdf_context_t* context)
     // x1 y1 same as current point
     // x2 y2 x3 y3
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
     float x1, y1, x2, y2, x3, y3;
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     y3 = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     x3 = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     y2 = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     x2 = strtof(buf, NULL);
 
     plutovg_canvas_get_current_point(context->canvas, &x1, &y1);
@@ -1705,9 +1951,9 @@ void handle_w(pdf_context_t* context)
     // set line width
     // lineWidth
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float w = strtof(buf, NULL);
     plutovg_canvas_set_line_width(context->canvas, w);
 }
@@ -1728,15 +1974,15 @@ void handle_y(pdf_context_t* context)
     // x2 y2 same as x3 y3
     // x1 y1 x3 y3
     char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float y3 = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float x3 = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float y1 = strtof(buf, NULL);
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
     float x1 = strtof(buf, NULL);
 
     plutovg_canvas_cubic_to(context->canvas, x1, y1, x3, y3, x3, y3);

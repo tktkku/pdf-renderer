@@ -53,10 +53,12 @@ void pdf_obj_free(pdf_obj_t* obj)
     if (obj->font != NULL)
     {
         pdf_font_free(obj->font);
+        obj->font = NULL;
     }
     if (obj->font_data != NULL)
     {
         free(obj->font_data);
+        obj->font_data = NULL;
     }
     pdf_value_free(obj->value);
     obj->value = NULL;
@@ -114,6 +116,7 @@ pdf_font_t* _load_type0_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
         pdf_cmap_t* cmap = pdf_parser_build_cmap(parser);
         cmap->worldwide = false;
         font->to_unicode_map = cmap;
+        pdf_parser_free(parser);
         free(origin);
     }
     // CIDFonts
@@ -252,6 +255,7 @@ pdf_font_t* _load_type0_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
                     pdf_stream_get_all(fontfile_obj->stream, &font->font_data, &font->font_data_length);
                     fontfile_obj->font_data = font->font_data;
                     fontfile_obj->font_data_len = font->font_data_length;
+                    pdf_cff_parse(font);
                 }
             }
         }

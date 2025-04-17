@@ -7,9 +7,9 @@ void handle_Do(pdf_context_t* context)
     // paint a specified XObject
     // name
     unsigned char buf[1024] = { 0 };
-    pdf_stack_node_t node;
+    pdf_node_t node;
     node.data = buf;
-    pdf_stack_pop(context->stack, &node);
+    pdf_deque_pop_front(context->deque, &node);
 
     //pdf_obj_t* tmp_obj = NULL;
     pdf_xobject_t* xobj = NULL;
