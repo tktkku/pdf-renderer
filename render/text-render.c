@@ -148,7 +148,7 @@ void _cff_do_render_char(pdf_context_t* context, pdf_deque_t* deque, unsigned ch
 
     for (int i = 0; i < len; i++)
     {
-        printf("%#X ", buf[i]);
+        printf("%d ", buf[i]);
     }
     printf("\n");
     unsigned char* p = buf;
@@ -201,878 +201,87 @@ void _cff_do_render_char(pdf_context_t* context, pdf_deque_t* deque, unsigned ch
             break;
         }
         pdf_deque_push(deque, &v, sizeof(double));
-
+        printf("%d ", (uint32_t)v);
         uint8_t operator1 = p[0];
         switch (operator1)
         {
-            case 1:
-                {
-                    printf("hstem not implemented\n");
-                    if (deque->size % 2 != 0)
-                    {
-                        pdf_deque_pop_end(deque, &node);
-                        width = *((double*)data);
-                    }
-
-                    pdf_deque_pop_end(deque, &node);
-                    double y = *((double*)data);
-                    pdf_deque_pop_end(deque, &node);
-                    double dy = *((double*)data);
-                    while (deque->size > 0 && deque->size % 2 == 0)
-                    {
-                        pdf_deque_pop_end(deque, &node);
-                        double dya = *((double*)data);
-                        pdf_deque_pop_end(deque, &node);
-                        double dyb = *((double*)data);
-                    }
-                    pdf_deque_empty(deque);
-                    p++;
-                    break;
-                }
-            case 3:
-                {
-                    printf("vstem not implemented\n");
-                    if (deque->size % 2 != 0)
-                    {
-                        pdf_deque_pop_end(deque, &node);
-                        width = *((double*)data);
-                    }
-                    pdf_deque_pop_end(deque, &node);
-                    double x = *((double*)data);
-                    pdf_deque_pop_end(deque, &node);
-                    double dx = *((double*)data);
-                    while (deque->size > 0 && deque->size % 2 == 0)
-                    {
-                        pdf_deque_pop_end(deque, &node);
-                        double dxa = *((double*)data);
-                        pdf_deque_pop_end(deque, &node);
-                        double dxb = *((double*)data);
-                    }
-                    pdf_deque_empty(deque);
-                    p++;
-                    break;
-                }
+            case 1://hstem
+            case 3://vstem
             case 4://vmoveto
-                {
-                    if (deque->size > 1)
-                    {
-                        pdf_deque_pop_end(deque, &node);
-                        width = *((double*)data);
-                    }
-                    pdf_deque_pop_end(deque, &node);
-                    double dy1 = *((double*)data);
-                    float x, y;
-                    plutovg_canvas_get_current_point(canvas, &x, &y);
-                    plutovg_canvas_move_to(canvas, x, y + dy1);
-                    pdf_deque_empty(deque);
-                    p++;
-                    break;
-                }
             case 5://rlineto
-                {
-                    float cur_x, cur_y;
-                    plutovg_canvas_get_current_point(canvas, &cur_x, &cur_y);
-                    while (deque->size > 0)
-                    {
-                        pdf_deque_pop_end(deque, &node);
-                        double dx1 = *((double*)data);
-                        pdf_deque_pop_end(deque, &node);
-                        double dy1 = *((double*)data);
-
-                        cur_x += dx1;
-                        cur_y += dy1;
-                        plutovg_canvas_line_to(canvas, cur_x, cur_y);
-                    }
-                    pdf_deque_empty(deque);
-                    p++;
-                    break;
-                }
             case 6://hlineto
-                {
-                    if (deque->size % 2 == 0)
-                    {
-                        float curx, cury;
-                        plutovg_canvas_get_current_point(canvas, &curx, &curx);
-                        while (deque->size > 0)
-                        {
-                            pdf_deque_pop_end(deque, &node);
-                            double dxa = *((double*)data);
-                            curx += dxa;
-                            plutovg_canvas_line_to(canvas, curx, cury);
-
-                            pdf_deque_pop_end(deque, &node);
-                            double dyb = *((double*)data);
-                            cury += dyb;
-                            plutovg_canvas_line_to(canvas, curx, cury);
-                        }
-                    }
-                    else
-                    {
-                        float curx, cury;
-                        plutovg_canvas_get_current_point(canvas, &curx, &cury);
-                        pdf_deque_pop_end(deque, &node);
-                        double dx1 = *((double*)data);
-                        curx += dx1;
-                        plutovg_canvas_line_to(canvas, curx, cury);
-                        while (deque->size > 0)
-                        {
-                            pdf_deque_pop_end(deque, &node);
-                            double dya = *((double*)data);
-                            cury += dya;
-                            plutovg_canvas_line_to(canvas, curx, cury);
-
-                            pdf_deque_pop_end(deque, &node);
-                            double dxb = *((double*)data);
-                            curx += dxb;
-                            plutovg_canvas_line_to(canvas, curx, cury);
-                        }
-                    }
-                    pdf_deque_empty(deque);
-                    p++;
-                    break;
-                }
             case 7://vlineto
-                {
-                    if (deque->size % 2 == 0)
-                    {
-                        float curx, cury;
-                        while (deque->size > 0)
-                        {
-                            pdf_deque_pop_end(deque, &node);
-                            double dya = *((double*)data);
-                            cury += dya;
-                            plutovg_canvas_line_to(canvas, curx, dya);
-
-                            pdf_deque_pop_end(deque, &node);
-                            double dxb = *((double*)data);
-                            curx += dxb;
-                            plutovg_canvas_line_to(canvas, curx, cury);
-                        }
-                    }
-                    else
-                    {
-                        float curx, cury;
-                        pdf_deque_pop_end(deque, &node);
-                        double dy1 = *((double*)data);
-                        cury += dy1;
-                        plutovg_canvas_line_to(canvas, curx, cury);
-                        while (deque->size > 0)
-                        {
-                            pdf_deque_pop_end(deque, &node);
-                            double dxa = *((double*)data);
-                            curx += dxa;
-                            plutovg_canvas_line_to(canvas, curx, cury);
-
-                            pdf_deque_pop_end(deque, &node);
-                            double dyb = *((double*)data);
-                            cury += dyb;
-                            plutovg_canvas_line_to(canvas, curx, cury);
-                        }
-                    }
-                    pdf_deque_empty(deque);
-                    p++;
-                    break;
-                }
             case 8://rrcurveto
-                {
-                    float curx, cury;
-                    plutovg_canvas_get_current_point(canvas, &curx, &cury);
-                    while (deque->size > 0 && deque->size % 6 == 0)
-                    {
-                        pdf_deque_pop_end(deque, &node);
-                        double dxa = *((double*)data);
-                        pdf_deque_pop_end(deque, &node);
-                        double dya = *((double*)data);
-                        pdf_deque_pop_end(deque, &node);
-                        double dxb = *((double*)data);
-                        pdf_deque_pop_end(deque, &node);
-                        double dyb = *((double*)data);
-                        pdf_deque_pop_end(deque, &node);
-                        double dxc = *((double*)data);
-                        pdf_deque_pop_end(deque, &node);
-                        double dyc = *((double*)data);
-
-                        double c1x = curx + dxa; double c1y = cury + dya;
-                        double c2x = c1x + dxb; double c2y = c1y + dyb;
-                        double c3x = c2x + dxc; double c3y = c2y + dyc;
-
-                        plutovg_canvas_cubic_to(canvas, c1x, c1y, c2x, c2y, c3x, c3y);
-                        curx = c3x;
-                        cury = c3y;
-                    }
-                    pdf_deque_empty(deque);
-                    p++;
-                    break;
-                }
             case 10://callsubr
-                {
-                    printf("callsubr not implemented\n");
-                    pdf_deque_pop_front(deque, &node);
-                    double g = *((double*)data);
-
-                    p++;
-                    break;
-                }
+            case 18://hstemhm
+            case 19://hintmask
+            case 20://cntrmask
+            case 21://rmoveto
+            case 22://hmoveto
+            case 23://vstemhm
+            case 24://rcurveline
+            case 25://rlinecurve
+            case 26://vvcurveto
+            case 27://hhcurveto
+            case 29://callgsubr
+            case 30://vhcurveto
+            case 31://hvcurveto
+            {
+                CFF_HANDLERS1[operator1](context, deque);
+                p++;
+                break;
+            }
             case 11://return
             case 14://endcar
-                {
-                    free(data);
-                    return;
-                }
-            case 18://hstemhm
-                {
-                    printf("hstemhm not implemented\n");
-                    if (deque->size % 2 != 0)
-                    {
-                        pdf_deque_pop_end(deque, &node);
-                        width = *((double*)data);
-                    }
-                    pdf_deque_pop_end(deque, &node);
-                    double y = *((double*)data);
-                    pdf_deque_pop_end(deque, &node);
-                    double dy = *((double*)data);
-                    while (deque->size > 0 && deque->size % 2 == 0)
-                    {
-                        pdf_deque_pop_end(deque, &node);
-                        double dya = *((double*)data);
-                        pdf_deque_pop_end(deque, &node);
-                        double dyb = *((double*)data);
-                    }
-                    pdf_deque_empty(deque);
-                    p++;
-                    break;
-                }
-            case 19://hintmask
-                {
-                    printf("hintmask not implemented\n");
-                    pdf_deque_empty(deque);
-                    p++;
-                    break;
-                }
-            case 20://cntrmask
-                {
-                    printf("cntrmask not implemented\n");
-                    pdf_deque_empty(deque);
-                    p++;
-                    break;
-                }
-            case 21://rmoveto
-                {
-                    if (deque->size % 2 != 0)
-                    {
-                        pdf_deque_pop_end(deque, &node);
-                        width = *((double*)data);
-                    }
-                    pdf_deque_pop_end(deque, &node);
-                    double dx1 = *((double*)data);
-                    pdf_deque_pop_end(deque, &node);
-                    double dy1 = *((double*)data);
-                    float curx, cury;
-                    plutovg_canvas_get_current_point(canvas, &curx, &cury);
-                    plutovg_canvas_move_to(canvas, curx + dx1, cury + dy1);
-                    pdf_deque_empty(deque);
-                    p++;
-                    break;
-                }  
-            case 22://hmoveto
-                {
-                    if (deque->size > 1)
-                    {
-                        pdf_deque_pop_end(deque, &node);
-                        width = *((double*)data);
-                    }
-                    float x, y;
-                    plutovg_canvas_get_current_point(canvas, &x, &y);
-                    pdf_deque_pop_end(deque, &node);
-                    double dx1 = *((double*)data);
-                    plutovg_canvas_move_to(canvas, x + dx1, y);
-                    pdf_deque_empty(deque);
-                    p++;
-                    break;
-                }
-            case 23://vstemhm
-                {
-                    printf("vstemhm not implemented\n");
-                    if (deque->size % 2 != 0)
-                    {
-                        pdf_deque_pop_end(deque, &node);
-                        width = *((double*)data);
-                    }
-                    pdf_deque_pop_end(deque, &node);
-                    double x = *((double*)data);
-                    pdf_deque_pop_end(deque, &node);
-                    double dx = *((double*)data);
-                    while (deque->size > 0 && deque->size % 2 == 0)
-                    {
-                        pdf_deque_pop_end(deque, &node);
-                        double dxa = *((double*)data);
-                        pdf_deque_pop_end(deque, &node);
-                        double dxb = *((double*)data);
-                    }
-                    pdf_deque_empty(deque);
-                    p++;
-                    break;
-                }
-            case 24://rcurveline
-                {
-                    float curx, cury;
-                    plutovg_canvas_get_current_point(canvas, &curx, &cury);
-                    while (deque->size > 0 && deque->size % 6 == 0)
-                    {
-                        pdf_deque_pop_end(deque, &node);
-                        double dxa = *((double*)data);
-                        pdf_deque_pop_end(deque, &node);
-                        double dya = *((double*)data);
-                        pdf_deque_pop_end(deque, &node);
-                        double dxb = *((double*)data);
-                        pdf_deque_pop_end(deque, &node);
-                        double dyb = *((double*)data);
-                        pdf_deque_pop_end(deque, &node);
-                        double dxc = *((double*)data);
-                        pdf_deque_pop_end(deque, &node);
-                        double dyc = *((double*)data);
-
-                        double c1x = curx + dxa; double c1y = cury + dya;
-                        double c2x = c1x + dxb; double c2y = c1y + dyb;
-                        double c3x = c2x + dxc; double c3y = c2y + dyc;
-
-                        plutovg_canvas_cubic_to(canvas, c1x, c1y, c2x, c2y, c3x, c3y);
-                        curx = c3x;
-                        cury = c3y;
-                    }
-                    pdf_deque_pop_end(deque, &node);
-                    double dxd = *((double*)data);
-                    pdf_deque_pop_end(deque, &node);
-                    double dyd = *((double*)data);
-
-                    plutovg_canvas_line_to(canvas, curx + dxd, cury + dyd);
-
-                    pdf_deque_empty(deque);
-                    p++;
-                    break;
-                }
-            case 25://rlinecurve
-                {
-                    float curx, cury;
-                    plutovg_canvas_get_current_point(canvas, &curx, &cury);
-                    while (deque->size > 0 && deque->size % 6 == 0)
-                    {
-                        pdf_deque_pop_end(deque, &node);
-                        double dxa = *((double*)data);
-                        pdf_deque_pop_end(deque, &node);
-                        double dya = *((double*)data);
-                        curx += dxa;
-                        cury += dya;
-                        plutovg_canvas_line_to(canvas, curx, cury);
-                    }
-                    
-                    pdf_deque_pop_end(deque, &node);
-                    double dxb = *((double*)data);
-                    pdf_deque_pop_end(deque, &node);
-                    double dyb = *((double*)data);
-                    pdf_deque_pop_end(deque, &node);
-                    double dxc = *((double*)data);
-                    pdf_deque_pop_end(deque, &node);
-                    double dyc = *((double*)data);
-                    pdf_deque_pop_end(deque, &node);
-                    double dxd = *((double*)data);
-                    pdf_deque_pop_end(deque, &node);
-                    double dyd = *((double*)data);
-
-                    double c1x = curx + dxb; double c1y = cury + dyb;
-                    double c2x = c1x + dxc; double c2y = c1y + dyc;
-                    double c3x = c2x + dxd; double c3y = c2y + dyd;
-
-                    plutovg_canvas_cubic_to(canvas, c1x, c1y, c2x, c2y, c3x, c3y);
-
-                    pdf_deque_empty(deque);
-                    p++;
-                    break;
-                }
-            case 26://vvcurveto
-                {
-                    float cur_x, cur_y;
-                    plutovg_canvas_get_current_point(canvas, &cur_x, &cur_y);
-                    double dx1;
-                    if (deque->size % 4 == 1)
-                    {
-                        pdf_deque_pop_end(deque, &node);
-                        dx1 = *((double*)data);
-                        cur_x += dx1;
-                    }
-                    double dya, dxb, dyb, dyc;
-                    while (deque->size >= 4)
-                    {
-                        pdf_deque_pop_end(deque, &node);
-                        dya = *((double*)data);
-                        pdf_deque_pop_end(deque, &node);
-                        dxb = *((double*)data);
-                        pdf_deque_pop_end(deque, &node);
-                        dyb = *((double*)data);
-                        pdf_deque_pop_end(deque, &node);
-                        dyc = *((double*)data);
-
-                        double cp1_x = cur_x;
-                        double cp1_y = cur_y + dya;
-                        double cp2_x = cp1_x + dxb;
-                        double cp2_y = cp1_y + dyb;
-                        double end_x = cp2_x;
-                        double end_y = cp2_y + dyc;
-
-                        plutovg_canvas_cubic_to(canvas, cp1_x, cp1_y, cp2_x, cp2_y, end_x, end_y);
-
-                        cur_x = end_x;
-                        cur_y = end_y;
-                    }
-                    pdf_deque_empty(deque);
-                    p++;
-                    break;
-                }
-            case 27://hhcurveto
-                {
-                    float cur_x, cur_y;
-                    plutovg_canvas_get_current_point(canvas, &cur_x, &cur_y);
-                    double dy1;
-                    if (deque->size % 4 == 1)
-                    {
-                        pdf_deque_pop_end(deque, &node);
-                        dy1 = *((double*)data);
-                        cur_y += dy1;
-                    }
-                    double dxa, dxb, dyb, dxc;
-                    while (deque->size >= 4)
-                    {
-                        pdf_deque_pop_end(deque, &node);
-                        dxa = *((double*)data);
-                        pdf_deque_pop_end(deque, &node);
-                        dxb = *((double*)data);
-                        pdf_deque_pop_end(deque, &node);
-                        dyb = *((double*)data);
-                        pdf_deque_pop_end(deque, &node);
-                        dxc = *((double*)data);
-
-                        double cp1_x = cur_x + dxa;
-                        double cp1_y = cur_y;
-                        double cp2_x = cp1_x + dxb;
-                        double cp2_y = cp1_y + dyb;
-                        double end_x = cp2_x + dxc;
-                        double end_y = cp2_y;
-
-                        plutovg_canvas_cubic_to(canvas, cp1_x, cp1_y, cp2_x, cp2_y, end_x, end_y);
-
-                        cur_x = end_x;
-                        cur_y = end_y;
-                    }
-                    pdf_deque_empty(deque);
-                    p++;
-                    break;
-                }
-            case 29://callgsubr
-                {
-                    pdf_deque_pop_front(deque, &node);
-                    double g = *((double*)data);
-                    uint32_t off = g + global_bias;
-                    _cff_do_render_char(context, deque, 
-                        global_subr_index->values[off]->val.string, 
-                        global_subr_index->values[off]->value_len);
-                    p++;
-                    break;
-                }
-            case 30://vhcurveto
-                {
-                    // z = 4 + 8x + y (x = 0,1,2,3...,y= 0 or 1)
-                    // z = 8 + 8x + y (x = 0,1,2,3...,y= 0 or 1)
-                    bool last_dyf = deque->size % 8 == 4 || deque->size % 8 == 5;
-                    bool is_vertical_start = true;
-                    float cur_x, cur_y;
-                    plutovg_canvas_get_current_point(canvas, &cur_x, &cur_y);
-                    if (deque->size % 4 == 0)
-                    {
-                        while (deque->size >= 4)
-                        {
-                            double params[4];
-                            for (int i = 0; i < 4; i++)
-                            {
-                                pdf_deque_pop_end(deque, &node);
-                                params[i] = *((double*)data);
-                            }
-                            if (is_vertical_start)
-                            {
-                                double x1 = cur_x;
-                                double y1 = cur_y + params[0];
-                                double x2 = x1 + params[1];
-                                double y2 = y1 + params[2];
-                                double x3 = x2 + params[3];
-                                double y3 = y2;
-
-                                plutovg_canvas_cubic_to(canvas, x1, y1, x2, y2, x3, y3);
-                                cur_x = x3;
-                                cur_y = y3;
-                            }
-                            else
-                            {
-                                double x1 = cur_x + params[0];
-                                double y1 = cur_y;
-                                double x2 = x1 + params[1];
-                                double y2 = y1 + params[2];
-                                double x3 = x2;
-                                double y3 = y2 + params[3];
-                                
-                                plutovg_canvas_cubic_to(canvas, x1, y1, x2, y2, x3, y3);
-                                cur_x = x3;
-                                cur_y = y3;
-                            }
-                            is_vertical_start = !is_vertical_start;
-                        }  
-                    }
-                    else
-                    {
-                        while (deque->size > 5)
-                        {
-                            double params[4];
-                            for (int i = 0; i < 4; i++)
-                            {
-                                pdf_deque_pop_end(deque, &node);
-                                params[i] = *((double*)data);
-                            }
-                            if (is_vertical_start)
-                            {
-                                double x1 = cur_x;
-                                double y1 = cur_y + params[0];
-                                double x2 = x1 + params[1];
-                                double y2 = y1 + params[2];
-                                double x3 = x2 + params[3];
-                                double y3 = y2;
-
-                                plutovg_canvas_cubic_to(canvas, x1, y1, x2, y2, x3, y3);
-                                cur_x = x3;
-                                cur_y = y3;
-                            }
-                            else
-                            {
-                                double x1 = cur_x + params[0];
-                                double y1 = cur_y;
-                                double x2 = x1 + params[1];
-                                double y2 = y1 + params[2];
-                                double x3 = x2;
-                                double y3 = y2 + params[3];
-                                
-                                plutovg_canvas_cubic_to(canvas, x1, y1, x2, y2, x3, y3);
-                                cur_x = x3;
-                                cur_y = y3;
-                            }
-                            is_vertical_start = !is_vertical_start;
-                        }
-                        double params[5];
-                        for (int i = 0; i < 5; i++)
-                        {
-                            pdf_deque_pop_end(deque, &node);
-                            params[i] = *((double*)data);
-                        }
-                        double x1 = cur_x;
-                        double y1 = cur_y + params[0];
-                        double x2 = x1 + params[1];
-                        double y2 = y1 + params[2];
-                        if (last_dyf)
-                        {
-                            double x3 = x2 + params[3];
-                            double y3 = y2 + params[4];
-                            plutovg_canvas_cubic_to(canvas, x1, y1, x2, y2, x3, y3);
-                        }
-                        else
-                        {
-                            double x3 = x2 + params[4];
-                            double y3 = y2 + params[3];
-                            plutovg_canvas_cubic_to(canvas, x1, y1, x2, y2, x3, y3);
-                        }
-                    }
-                    pdf_deque_empty(deque);
-                    p++;
-                    break;
-                }
-            case 31://hvcurveto
-                {
-                    // z = 4 + 8x + y (x = 0,1,2,3...,y= 0 or 1)
-                    // z = 8 + 8x + y (x = 0,1,2,3...,y= 0 or 1)
-                    bool last_dyf = deque->size % 8 == 0 || deque->size % 8 == 1;
-                    bool is_horizontal_start = true;
-                    float cur_x, cur_y;
-                    plutovg_canvas_get_current_point(canvas, &cur_x, &cur_y);
-                    if (deque->size % 4 == 0)
-                    {
-                        while (deque->size >= 4)
-                        {
-                            double params[4];
-                            for (int i = 0; i < 4; i++)
-                            {
-                                pdf_deque_pop_end(deque, &node);
-                                params[i] = *((double*)data);
-                            }
-                            if (is_horizontal_start)
-                            {
-                                double x1 = cur_x + params[0];
-                                double y1 = cur_y;
-                                double x2 = x1 + params[1];
-                                double y2 = y1 + params[2];
-                                double x3 = x2;
-                                double y3 = y2 + params[3];
-
-                                plutovg_canvas_cubic_to(canvas, x1, y1, x2, y2, x3, y3);
-                                cur_x = x3;
-                                cur_y = y3;
-                            }
-                            else
-                            {
-                                double x1 = cur_x;
-                                double y1 = cur_y + params[0];
-                                double x2 = x1 + params[1];
-                                double y2 = y1 + params[2];
-                                double x3 = x2 + params[3];
-                                double y3 = y2;
-                                
-                                plutovg_canvas_cubic_to(canvas, x1, y1, x2, y2, x3, y3);
-                                cur_x = x3;
-                                cur_y = y3;
-                            }
-                            is_horizontal_start = !is_horizontal_start;
-                        }  
-                    }
-                    else
-                    {
-                        while (deque->size > 5)
-                        {
-                            double params[4];
-                            for (int i = 0; i < 4; i++)
-                            {
-                                pdf_deque_pop_end(deque, &node);
-                                params[i] = *((double*)data);
-                            }
-                            if (is_horizontal_start)
-                            {
-                                double x1 = cur_x + params[0];
-                                double y1 = cur_y;
-                                double x2 = x1 + params[1];
-                                double y2 = y1 + params[2];
-                                double x3 = x2;
-                                double y3 = y2 + params[3];
-
-                                plutovg_canvas_cubic_to(canvas, x1, y1, x2, y2, x3, y3);
-                                cur_x = x3;
-                                cur_y = y3;
-                            }
-                            else
-                            {
-                                double x1 = cur_x;
-                                double y1 = cur_y + params[0];
-                                double x2 = x1 + params[1];
-                                double y2 = y1 + params[2];
-                                double x3 = x2 + params[3];
-                                double y3 = y2;
-                                
-                                plutovg_canvas_cubic_to(canvas, x1, y1, x2, y2, x3, y3);
-                                cur_x = x3;
-                                cur_y = y3;
-                            }
-                            is_horizontal_start = !is_horizontal_start;
-                        }
-                        double params[5];
-                        for (int i = 0; i < 5; i++)
-                        {
-                            pdf_deque_pop_end(deque, &node);
-                            params[i] = *((double*)data);
-                        }
-                        double x1 = cur_x + params[0];
-                        double y1 = cur_y;
-                        double x2 = x1 + params[1];
-                        double y2 = y1 + params[2];
-                        if (last_dyf)
-                        {
-                            double x3 = x2 + params[3];
-                            double y3 = y2 + params[4];
-
-                            plutovg_canvas_cubic_to(canvas, x1, y1, x2, y2, x3, y3);
-                        }
-                        else
-                        {
-                            double x3 = x2 + params[4];
-                            double y3 = y2 + params[3];
-
-                            plutovg_canvas_cubic_to(canvas, x1, y1, x2, y2, x3, y3);
-                        }
-                        
-                    }
-                    pdf_deque_empty(deque);
-                    p++;
-                    break;
-                }
+            {
+                free(data);
+                return;
+            }
             case 12:
+            {
+                uint8_t operator2 = p[1];
+                switch (operator2)
                 {
-                    uint8_t operator2 = p[1];
-                    switch (operator2)
+                    case 3: // and
+                    case 4: // or
+                    case 5:// not
+                    case 9://abs
+                    case 10: // add
+                    case 11: // sub
+                    case 12: // div
+                    case 14: // neg
+                    case 15://eq
+                    case 18: // drop
+                    case 20: // put
+                    case 21: // get
+                    case 22:// ifelse
+                    case 23://random
+                    case 24://mul
+                    case 26: // sqrt
+                    case 27: //dup
+                    case 28: //exch
+                    case 29: // index
+                    case 30:// roll
+                    case 34://hflex
+                    case 35://flex
+                    case 36: // hflex1
+                    case 37://flex1
                     {
-                        case 3: // and
-                            {
-                                printf("and not implemented\n");
-                                p += 2;
-                                break;
-                            }
-                        case 4: // or
-                            {
-                                printf("or not implemented\n");
-                                p += 2;
-                                break;
-                            }
-                        case 5:// not
-                            {
-                                printf("not not implemented\n");
-                                p += 2;
-                                break;
-                            }
-                        case 9://abs
-                            {
-                                printf("abs not implemented\n");
-                                p += 2;
-                                break;
-                            }
-                        case 10: // add
-                            {
-                                printf("add not implemented\n");
-                                p += 2;
-                                break;
-                            }
-                        case 11: // sub
-                            {
-                                printf("sub not implemented\n");
-                                p += 2;
-                                break;
-                            }
-                        case 12: // div
-                            {
-                                printf("div not implemented\n");
-                                p += 2;
-                                break;
-                            }
-                        case 14: // neg
-                            {
-                                printf("neg not implemented\n");
-                                p += 2;
-                                break;
-                            }
-                        case 15://eq
-                            {
-                                printf("eq not implemented\n");
-                                p += 2;
-                                break;
-                            }
-                        case 18: // drop
-                            {
-                                printf("drop not implemented\n");
-                                p += 2;
-                                break;
-                            }
-                        case 20: // put
-                            {
-                                printf("put not implemented\n");
-                                p += 2;
-                                break;
-                            }
-                        case 21: // get
-                            {
-                                printf("get not implemented\n");
-                                p += 2;
-                                break;
-                            }
-                        case 22:// ifelse
-                            {
-                                printf("ifelse not implemented\n");
-                                p += 2;
-                                break;
-                            }
-                        case 23://random
-                            {
-                                printf("random not implemented\n");
-                                p += 2;
-                                break;
-                            }
-                        case 24://mul
-                            {
-                                printf("mul not implemented\n");
-                                p += 2;
-                                break;
-                            }
-                        case 26: // sqrt
-                            {
-                                printf("sqrt not implemented\n");
-                                p += 2;
-                                break;
-                            }
-                        case 27: //dup
-                            {
-                                printf("dup not implemented\n");
-                                p += 2;
-                                break;
-                            }
-                        case 28: //exch
-                            {
-                                printf("exch not implemented\n");
-                                p += 2;
-                                break;
-                            }
-                        case 29: // index
-                            {
-                                printf("index not implemented\n");
-                                p += 2;
-                                break;
-                            }
-                        case 30:// roll
-                            {
-                                printf("roll not implemented\n");
-                                p += 2;
-                                break;
-                            }
-                        case 34://hflex
-                            {
-                                printf("hflex not implemented\n");
-                                p += 2;
-                                break;
-                            }
-                        case 35://flex
-                            {
-                                printf("flex not implemented\n");
-                                p += 2;
-                                break;
-                            }
-                        case 36: // hflex1
-                            {
-                                printf("hflex1 not implemented\n");
-                                p += 2;
-                                break;
-                            }
-                        case 37://flex1
-                            {
-                                printf("flex1 not implemented\n");
-                                p += 2;
-                                break;
-                            }
+                        CFF_HANDLERS2[operator2](context, deque);
+                        p += 2;
+                        break;
                     }
+                    default:
+                        break;
                 }
+            }
             default:
                 break;
         }
     }
     free(data);
 }
-void _cff_render_char(pdf_context_t* context, pdf_deque_t* deque, int gid)
-{
-    plutovg_canvas_t* canvas = context->canvas;
-    pdf_array_t* charstrings_index = context->state->textState.font->charstrings;
-    pdf_array_t* global_subr_index = context->state->textState.font->global_subr;
-    uint16_t global_bias = context->state->textState.font->global_subr_bias;
 
-    int len = charstrings_index->values[gid]->value_len;
-    unsigned char* buf = charstrings_index->values[gid]->val.string;
-    _cff_do_render_char(context, deque, buf, len);
-}
 void _do_text_render(pdf_context_t* context, char* buf, int len)
 {
     plutovg_canvas_save(context->canvas);
@@ -1187,13 +396,16 @@ void _do_text_render(pdf_context_t* context, char* buf, int len)
         }
         else
         {
-            if (context->state->textState.font->charstrings != NULL)
+            pdf_array_t* charstrings_index = context->state->textState.font->charstrings;
+
+            if (charstrings_index != NULL)
             {
                 // context->state->textState.textLineWidth += _canvas_fill_text(context, unicode, unicode_cnt,
                 //     PLUTOVG_TEXT_ENCODING_UTF16, context->state->textState.textLineWidth, 0, true);
                 pdf_array_t* font_matrix = context->state->textState.font->font_matrix;
                 for (int i = 0; i < unicode_cnt; i++)
                 {
+                    if (unicode[i] != 26) continue;
                     pdf_deque_t* deque = pdf_deque_init();
                     plutovg_canvas_save(context->canvas);
                     plutovg_matrix_t font_matrix_plutovg, rm;
@@ -1215,13 +427,15 @@ void _do_text_render(pdf_context_t* context, char* buf, int len)
                         context->state->fill.color[2]);
                     plutovg_canvas_new_path(context->canvas);
 
-                    _cff_render_char(context, deque, unicode[i]);
-                    
+                    int len = charstrings_index->values[unicode[i]]->value_len;
+                    unsigned char* buf = charstrings_index->values[unicode[i]]->val.string;
+                    _cff_do_render_char(context, deque, buf, len);
+
                     plutovg_canvas_fill(context->canvas);
                     plutovg_canvas_restore(context->canvas); 
                     pdf_deque_free(deque);
                 }
-                plutovg_surface_write_to_png(context->surface, "test.png");
+                //plutovg_surface_write_to_png(context->surface, "test.png");
             }
         }
 #endif

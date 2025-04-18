@@ -177,3 +177,113 @@ const static handler_entry handlers[] = {
 void _do_render_operation(pdf_context_t* context, pdf_parser_token_t* tk);
 void stroke(pdf_context_t* context);
 void _do_text_render(pdf_context_t* context, char* buf, int len);
+
+typedef void (*CFF_HANDLER)(pdf_context_t* context, pdf_deque_t* deque);
+void handle_hstem(pdf_context_t* context, pdf_deque_t* deque);
+void handle_vstem(pdf_context_t* context, pdf_deque_t* deque);
+void handle_vmoveto(pdf_context_t* context, pdf_deque_t* deque);
+void handle_rlineto(pdf_context_t* context, pdf_deque_t* deque);
+void handle_hlineto(pdf_context_t* context, pdf_deque_t* deque);
+void handle_vlineto(pdf_context_t* context, pdf_deque_t* deque);
+void handle_rrcurveto(pdf_context_t* context, pdf_deque_t* deque);
+void handle_callsubr(pdf_context_t* context, pdf_deque_t* deque);
+void handle_hstemhm(pdf_context_t* context, pdf_deque_t* deque);
+void handle_hintmask(pdf_context_t* context, pdf_deque_t* deque);
+void handle_cntrmask(pdf_context_t* context, pdf_deque_t* deque);
+void handle_rmoveto(pdf_context_t* context, pdf_deque_t* deque);
+void handle_hmoveto(pdf_context_t* context, pdf_deque_t* deque);
+void handle_vstemhm(pdf_context_t* context, pdf_deque_t* deque);
+void handle_rcurveline(pdf_context_t* context, pdf_deque_t* deque);
+void handle_rlinecurve(pdf_context_t* context, pdf_deque_t* deque);
+void handle_vvcurveto(pdf_context_t* context, pdf_deque_t* deque);
+void handle_hhcurveto(pdf_context_t* context, pdf_deque_t* deque);
+void handle_callgsubr(pdf_context_t* context, pdf_deque_t* deque);
+void handle_vhcurveto(pdf_context_t* context, pdf_deque_t* deque);
+void handle_hvcurveto(pdf_context_t* context, pdf_deque_t* deque);
+
+const static CFF_HANDLER CFF_HANDLERS1[] = {
+    NULL,
+    handle_hstem,
+    NULL,
+    handle_vstem,
+    handle_vmoveto,
+    handle_rlineto,
+    handle_hlineto,
+    handle_vlineto,
+    handle_rrcurveto,
+    NULL,
+    handle_callsubr,//10
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+    handle_hstemhm,
+    handle_hintmask,
+    handle_cntrmask,//20
+    handle_rmoveto,
+    handle_hmoveto,
+    handle_vstemhm,
+    handle_rcurveline,
+    handle_rlinecurve,
+    handle_vvcurveto,
+    handle_hhcurveto,
+    NULL,
+    handle_callgsubr,
+    handle_vhcurveto,//30
+    handle_hvcurveto,
+};
+void handle_and(pdf_context_t* context, pdf_deque_t* deque);
+void handle_or(pdf_context_t* context, pdf_deque_t* deque);
+void handle_not(pdf_context_t* context, pdf_deque_t* deque);
+void handle_abs(pdf_context_t* context, pdf_deque_t* deque);
+void handle_add(pdf_context_t* context, pdf_deque_t* deque);
+void handle_sub(pdf_context_t* context, pdf_deque_t* deque);
+void handle_div(pdf_context_t* context, pdf_deque_t* deque);
+void handle_neg(pdf_context_t* context, pdf_deque_t* deque);
+void handle_eq(pdf_context_t* context, pdf_deque_t* deque);
+void handle_drop(pdf_context_t* context, pdf_deque_t* deque);
+void handle_put(pdf_context_t* context, pdf_deque_t* deque);
+void handle_get(pdf_context_t* context, pdf_deque_t* deque);
+void handle_ifelse(pdf_context_t* context, pdf_deque_t* deque);
+void handle_random(pdf_context_t* context, pdf_deque_t* deque);
+void handle_mul(pdf_context_t* context, pdf_deque_t* deque);
+void handle_sqrt(pdf_context_t* context, pdf_deque_t* deque);
+void handle_dup(pdf_context_t* context, pdf_deque_t* deque);
+void handle_exch(pdf_context_t* context, pdf_deque_t* deque);
+void handle_index(pdf_context_t* context, pdf_deque_t* deque);
+void handle_roll(pdf_context_t* context, pdf_deque_t* deque);
+void handle_hflex(pdf_context_t* context, pdf_deque_t* deque);
+void handle_flex(pdf_context_t* context, pdf_deque_t* deque);
+void handle_hflex1(pdf_context_t* context, pdf_deque_t* deque);
+void handle_flex1(pdf_context_t* context, pdf_deque_t* deque);
+
+const static CFF_HANDLER CFF_HANDLERS2[] = {
+    NULL, NULL, NULL,
+    handle_and,
+    handle_or,
+    handle_not,
+    NULL, NULL, NULL, 
+    handle_abs,
+    handle_add,//10
+    handle_sub,
+    handle_div,
+    NULL,
+    handle_neg,
+    handle_eq,
+    NULL, NULL,
+    handle_drop,
+    NULL,
+    handle_put, //20
+    handle_get,
+    handle_ifelse,
+    handle_random,
+    handle_mul,
+    NULL,
+    handle_sqrt,
+    handle_dup,
+    handle_exch,
+    handle_index,
+    handle_roll,//30
+    NULL, NULL, NULL,
+    handle_hflex,
+    handle_flex,
+    handle_hflex1,
+    handle_flex1
+};

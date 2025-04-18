@@ -4,6 +4,7 @@ set(RENDER_SOURCES
     Do.c
     Tf.c
     color.c
+    handle_cff.c
     text.c
     text-render.c
     path.c
