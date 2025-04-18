@@ -135,6 +135,7 @@ void pdf_deque_free(pdf_deque_t* deque);
 void pdf_deque_push(pdf_deque_t* q, const void* data, size_t size);
 void pdf_deque_pop_front(pdf_deque_t* q, pdf_node_t* data);
 void pdf_deque_pop_end(pdf_deque_t* q, pdf_node_t* data);
+void pdf_deque_empty(pdf_deque_t* deque);
 
 void render_to_png_by_plutovg(pdf_page_t* page, char* filename);
 void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,

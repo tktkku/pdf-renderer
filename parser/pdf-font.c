@@ -78,6 +78,10 @@ void pdf_font_free(pdf_font_t* font)
         {
             pdf_array_free(font->charstrings);
         }
+        if (font->global_subr != NULL)
+        {
+            pdf_array_free(font->global_subr);
+        }
         free(font);
         font = NULL;
     }

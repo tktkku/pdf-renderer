@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stddef.h>
+// front [1]--[2]--[3] end
 
 pdf_deque_t* pdf_deque_init()
 {
@@ -26,6 +27,21 @@ void pdf_deque_free(pdf_deque_t* deque)
     free(deque);
 }
 
+void pdf_deque_empty(pdf_deque_t* deque)
+{
+    if (deque == NULL) return;
+    pdf_node_t* cur = deque->front;
+    while (cur)
+    {
+        pdf_node_t* next = cur->next;
+        free(cur->data);
+        free(cur);
+        cur = next;
+    }
+    deque->front = deque->rear = NULL;
+    deque->size = 0;
+}
+
 void pdf_deque_push(pdf_deque_t* q, const void* data, size_t size)
 {
     if (q == NULL) return;
@@ -35,10 +51,9 @@ void pdf_deque_push(pdf_deque_t* q, const void* data, size_t size)
     ((char*)node->data)[size] = '\0';
     node->size = size;
     node->next = NULL;
-
+    node->prev = NULL;
     if (q->front == NULL)
     {
-        node->prev = NULL;
         q->front = q->rear = node;
         q->size = 1;
     }
@@ -66,9 +81,17 @@ void pdf_deque_pop_front(pdf_deque_t* q, pdf_node_t* data)
     // [1]--[2]--[3]
     // node next
     pdf_node_t* node = q->front;
-    pdf_node_t* next = q->front->next;
-    if (next != NULL) next->prev = NULL;
-    q->front = next;
+    pdf_node_t* next = node->next;
+    if (next != NULL)
+    {
+        next->prev = NULL;
+        q->front = next;
+    }
+    else
+    {
+        q->front = q->rear = NULL;
+    }
+    
     q->size--;
 
     data->size = node->size;
@@ -88,11 +111,19 @@ void pdf_deque_pop_end(pdf_deque_t* q, pdf_node_t* data)
         return;
     }
     // [1]--[2]--[3]
-    //      prev rear
-    pdf_node_t* prev = q->rear->prev;
+    //      prev node
     pdf_node_t* node = q->rear;
-    if (prev != NULL) prev->next = NULL;
-    q->rear = prev;
+    pdf_node_t* prev = node->prev;
+    if (prev != NULL)
+    {
+        prev->next = NULL;
+        q->rear = prev;
+    }
+    else
+    {
+        q->front = q->rear = NULL;
+    }
+    
     q->size--;
 
     data->size = node->size;

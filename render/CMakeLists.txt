@@ -3,6 +3,10 @@ project(render LANGUAGES C)
 set(RENDER_SOURCES
     Do.c
     Tf.c
+    color.c
+    text.c
+    text-render.c
+    path.c
     pdf-render-by-plutovg.c
     render.h
 )

@@ -286,6 +286,8 @@ struct pdf_font
     int last_char;
     pdf_array_t* widths;
     pdf_array_t* charstrings;
+    pdf_array_t* global_subr;
+    uint16_t global_subr_bias;
     int references;
 };
 

@@ -260,6 +260,17 @@ pdf_dict_t* _parse_cff_dict_data(pdf_array_t* arr, pdf_array_t* string_index)
                         }
                         case 7: // FontMatrix
                         {
+                            pdf_array_t* fontmatrix = pdf_array_init();
+                            fontmatrix->num_elements = 6;
+                            fontmatrix->values = (pdf_array_element_value_t**)malloc(sizeof(pdf_array_element_value_t*) * fontmatrix->num_elements);
+
+                            for (int i = 0; i < fontmatrix->num_elements; i++)
+                            {
+                                pdf_value_t* value = (pdf_value_t*)malloc(sizeof(pdf_value_t));
+                                _parse_cff_operator_value(p_operand, value);
+                                fontmatrix->values[i] = value;
+                            }
+                            pdf_dict_add_array(ret_dict, "FontMatrix", fontmatrix);
                             p += 2;
                             p_operand = p;
                             break;
@@ -509,12 +520,49 @@ void pdf_cff_parse(pdf_font_t* font)
     pdf_array_t* global_suber_index = _parse_cff_index(&p);
 
     pdf_dict_t* top_dict = _parse_cff_dict_data(top_dict_index, string_index);
+    
     int type = pdf_dict_get_number(top_dict, "CharstringType");
+    uint16_t global_bias;
     if (type == -1) type = 2;
+
+    if (type == 1) global_bias = 0;
+    else if (global_suber_index->num_elements < 1240) global_bias = 107;
+    else if (global_suber_index->num_elements < 33900) global_bias = 1131;
+    else global_bias = 32768;
+
+    font->global_subr = global_suber_index;
+    font->global_subr_bias = global_bias;
+
+    pdf_array_t* fontmatrix = pdf_dict_get_array(top_dict, "FontMatrix");
+    if (fontmatrix == NULL)
+    {
+        fontmatrix = pdf_array_init();
+        fontmatrix->num_elements = 6;
+        fontmatrix->values = (pdf_array_element_value_t**)malloc(sizeof(pdf_array_element_value_t*) * fontmatrix->num_elements);
+        fontmatrix->values[0] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
+        fontmatrix->values[0]->type = NUMBER;
+        fontmatrix->values[0]->val.number = 0.001;
+        fontmatrix->values[1] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
+        fontmatrix->values[1]->type = NUMBER;
+        fontmatrix->values[1]->val.number = 0;
+        fontmatrix->values[2] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
+        fontmatrix->values[2]->type = NUMBER;
+        fontmatrix->values[2]->val.number = 0;
+        fontmatrix->values[3] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
+        fontmatrix->values[3]->type = NUMBER;
+        fontmatrix->values[3]->val.number = 0.001;
+        fontmatrix->values[4] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
+        fontmatrix->values[4]->type = NUMBER;
+        fontmatrix->values[4]->val.number = 0;
+        fontmatrix->values[5] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
+        fontmatrix->values[5]->type = NUMBER;
+        fontmatrix->values[5]->val.number = 0.001;
+    }
+    font->font_matrix = fontmatrix;
     pdf_array_t* private_arr = pdf_dict_get_array(top_dict, "Private");
     if (private_arr != NULL)
     {
-        
+
     }
     // bool isCIDFont = pdf_dict_get_array(top_dict, "ROS") != NULL;
     // int offEncoding = pdf_dict_get_number(top_dict, "Encoding");
@@ -536,5 +584,5 @@ void pdf_cff_parse(pdf_font_t* font)
     // pdf_array_free(charstrings_index);
     pdf_array_free(top_dict_index); 
     pdf_array_free(string_index);
-    pdf_array_free(global_suber_index);
+    //pdf_array_free(global_suber_index);
 }
