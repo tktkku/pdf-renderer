@@ -29,8 +29,6 @@ void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
     int width, int height, int stride)
 {
     pdf_deque_t* deque = pdf_deque_init();
-    FT_Library ft_library = NULL;
-    FT_Init_FreeType(&ft_library);
     pdf_context_t context;
 
     plutovg_surface_t* surface =
@@ -82,7 +80,6 @@ void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
     context.current_obj = page->obj;
     context.fontcache = NULL;
     context.surface = surface;
-    context.ft_library = ft_library;
     int numStreams = pdf_page_get_streams(page);
     for (int j = 0; j < numStreams; j++)
     {
@@ -94,9 +91,6 @@ void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
         //int count = 0;
         while ((tk = pdf_stream_get_next_token(stream)) != NULL)
         {
-            const char* token = pdf_parser_token_get_token(tk);
-            if (token == NULL)
-                continue;
             _do_render_operation(&context, tk);
             pdf_parser_token_free(stream->parser, tk);
         }
@@ -175,25 +169,17 @@ void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
         {
             plutovg_font_face_destroy(fontcache->fontface);
         }
-        if (fontcache->ft_face != NULL)
-        {
-            FT_Done_Face(fontcache->ft_face);
-        }
         free(fontcache);
     }
     cvector_free(context.fontcache);
     free(context.state);
     plutovg_canvas_destroy(canvas);
     plutovg_surface_destroy(surface);
-    FT_Done_FreeType(ft_library);
 }
-#define DEBUG 0
+
 void _do_render_operation(pdf_context_t* context, pdf_parser_token_t* tk)
 {
-#if DEBUG
-    printf("%s\n", tk->token);
-#endif
-    if (tk->type != TOKEN_OPERATOR)
+    if (tk->type < TOKEN_OPERATOR && tk->token != NULL)
     {
         // did not match any operation
         // push data to deque
@@ -201,48 +187,27 @@ void _do_render_operation(pdf_context_t* context, pdf_parser_token_t* tk)
     }
     else
     {
-        int count = ARRAY_COUNT(handlers);
-        int left = 0;
-        int right = count - 1;
-        while (left <= right)
+        switch (tk->type)
         {
-            int mid = left + (right - left) / 2;
-            int cmp = strcmp(handlers[mid].operation, tk->token);
-
-            if (cmp == 0)
-            {
-                if (handlers[mid].handler != NULL)
-                {
-                    if (strchr("fFbBW", tk->token[0]) != NULL)
-                    {
-                        if (tk->token[1] == '\0')
-                            plutovg_canvas_set_fill_rule(context->canvas,
-                                PLUTOVG_FILL_RULE_NON_ZERO);
-                        else if (tk->token[1] == '*')
-                            plutovg_canvas_set_fill_rule(context->canvas,
-                                PLUTOVG_FILL_RULE_EVEN_ODD);
-                    }
-                    handlers[mid].handler(context);
-#if DEBUG
-                    if (!strcmp(tk->token, "Tj") || !strcmp(tk->token, "TJ"))
-                    {
-                        plutovg_surface_write_to_png(context->surface, "test.png");
-                        printf("Press any key to continue...");
-                        getchar();
-                    }
-#endif
-                    return;
-                }
-            }
-            else if (cmp < 0)
-            {
-                left = mid + 1;
-            }
-            else
-            {
-                right = mid - 1;
-            }
+            case TOKEN_OPERATOR_B:
+            case TOKEN_OPERATOR_F:
+            case TOKEN_OPERATOR_W:
+            case TOKEN_OPERATOR_b:
+            case TOKEN_OPERATOR_f:
+                plutovg_canvas_set_fill_rule(context->canvas,
+                    PLUTOVG_FILL_RULE_NON_ZERO);
+                break;
+            case TOKEN_OPERATOR_B_star:
+            case TOKEN_OPERATOR_W_star:
+            case TOKEN_OPERATOR_b_star:
+            case TOKEN_OPERATOR_f_star:
+                plutovg_canvas_set_fill_rule(context->canvas,
+                    PLUTOVG_FILL_RULE_EVEN_ODD);
+                break;
+            default:
+                break;
         }
+        handlers[tk->type - TOKEN_OPERATOR](context);
     }
 }
 

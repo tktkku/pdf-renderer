@@ -28,181 +28,88 @@ uint16_t _get_unicode_from_cmap(pdf_cmap_t* cmap, uint16_t code)
     }
     return code;
 }
-static void glyph_traverse_func(void* closure, plutovg_path_command_t command, const plutovg_point_t* points, int npoints)
-{
-    plutovg_path_t* path = (plutovg_path_t*)(closure);
-    switch(command) {
-    case PLUTOVG_PATH_COMMAND_MOVE_TO:
-        plutovg_path_move_to(path, points[0].x, points[0].y);
-        break;
-    case PLUTOVG_PATH_COMMAND_LINE_TO:
-        plutovg_path_line_to(path, points[0].x, points[0].y);
-        break;
-    case PLUTOVG_PATH_COMMAND_CUBIC_TO:
-        plutovg_path_cubic_to(path, points[0].x, points[0].y, points[1].x, points[1].y, points[2].x, points[2].y);
-        break;
-    case PLUTOVG_PATH_COMMAND_CLOSE:
-        plutovg_path_close(path);
-        break;
-    }
-}
 
-float _canvas_fill_text(pdf_context_t* context, const void* text, int length, plutovg_text_encoding_t encoding, float x, float y, bool cid_eq_gid)
-{
-    plutovg_canvas_t* canvas = context->canvas; 
-    plutovg_canvas_new_path(canvas);
-    pdf_graphics_state_t* state = context->state;
-    if (state->textState.ft_face == NULL || state->textState.fontSize <= 0.f)
-        return 0.f;
-
-    FT_Face face = state->textState.ft_face;
-    FT_Set_Char_Size(face, 0, (FT_F26Dot6)(state->textState.fontSize), 0, 0);
-
-    plutovg_text_iterator_t it;
-    plutovg_text_iterator_init(&it, text, length, encoding);
-    float advance_width = 0.f;
-
-    while (plutovg_text_iterator_has_next(&it)) {
-        plutovg_codepoint_t codepoint = plutovg_text_iterator_next(&it);
-        if (cid_eq_gid)
-        {
-            if (FT_Load_Char(face, codepoint, FT_LOAD_NO_SCALE)) {
-                continue; // Skip invalid glyphs
-            }
-        }
-        else
-        {
-            FT_UInt glyph_index = FT_Get_Char_Index(face, codepoint);
-            FT_Load_Glyph(face, glyph_index, FT_LOAD_NO_SCALE);
-        }
-
-        FT_GlyphSlot slot = face->glyph;
-        FT_Outline* outline = &slot->outline;
-
-        float scale = state->textState.fontSize / face->units_per_EM;
-        plutovg_matrix_t matrix;
-        plutovg_matrix_init_translate(&matrix, x, y);
-        plutovg_matrix_scale(&matrix, scale, -scale);
-
-        plutovg_path_t* path = canvas->path;
-        for (int i = 0; i < outline->n_contours; i++) {
-            int start = (i == 0) ? 0 : outline->contours[i - 1] + 1;
-            int end = outline->contours[i];
-
-            for (int j = start; j <= end; j++) {
-                FT_Vector* point = &outline->points[j];
-                char tag = outline->tags[j];
-
-                plutovg_point_t mapped_point = { point->x, point->y};
-                plutovg_matrix_map_points(&matrix, &mapped_point, &mapped_point, 1);
-
-                if (tag & FT_CURVE_TAG_ON) {
-                    if (j == start) {
-                        glyph_traverse_func(path, PLUTOVG_PATH_COMMAND_MOVE_TO, &mapped_point, 1);
-                    } else {
-                        glyph_traverse_func(path, PLUTOVG_PATH_COMMAND_LINE_TO, &mapped_point, 1);
-                    }
-                } 
-                else if (tag & FT_CURVE_TAG_CONIC)
-                {
-                    FT_Vector* next_point = &outline->points[(j + 1) % (end + 1)];
-                    plutovg_point_t control = { point->x, point->y};
-                    plutovg_point_t end_point = { next_point->x, next_point->y};
-
-                    plutovg_matrix_map_points(&matrix, &control, &control, 1);
-                    plutovg_matrix_map_points(&matrix, &end_point, &end_point, 1);
-
-                    glyph_traverse_func(path, PLUTOVG_PATH_COMMAND_CUBIC_TO, (plutovg_point_t[]){ control, control, end_point }, 3);
-                }
-                else if (tag & FT_CURVE_TAG_CUBIC) {
-                    FT_Vector* next_point = &outline->points[(j + 1) % (end + 1)];
-                    plutovg_point_t control1 = { point->x, point->y};
-                    plutovg_point_t control2 = { next_point->x, next_point->y};
-                    plutovg_point_t end_point = { outline->points[(j + 2) % (end + 1)].x, outline->points[(j + 2) % (end + 1)].y};
-
-                    plutovg_matrix_map_points(&matrix, &control1, &control1, 1);
-                    plutovg_matrix_map_points(&matrix, &control2, &control2, 1);
-                    plutovg_matrix_map_points(&matrix, &end_point, &end_point, 1);
-
-                    glyph_traverse_func(path, PLUTOVG_PATH_COMMAND_CUBIC_TO, (plutovg_point_t[]){ control1, control2, end_point }, 3);
-                    j += 2; // Skip the next two points
-                }
-            }
-            glyph_traverse_func(path, PLUTOVG_PATH_COMMAND_CLOSE, NULL, 0);
-        }
-
-        advance_width += slot->advance.x * scale;
-        x += slot->advance.x * scale;
-    }
-
-    plutovg_canvas_fill(canvas);
-    return advance_width;
-}
-
-void _cff_do_render_char(pdf_context_t* context, pdf_deque_t* deque, unsigned char* buf, int len)
+void _cff_do_render_char(pdf_cff_char_render_t* context, pdf_deque_t* deque)
 {
     plutovg_canvas_t* canvas = context->canvas;
-    pdf_array_t* charstrings_index = context->state->textState.font->charstrings;
-    pdf_array_t* global_subr_index = context->state->textState.font->global_subr;
-    uint16_t global_bias = context->state->textState.font->global_subr_bias;
+    pdf_array_t* charstrings_index = context->charstrings;
+    pdf_array_t* global_subr_index = context->global_subr;
+    uint16_t global_bias = context->global_bias;
 
-    for (int i = 0; i < len; i++)
-    {
-        printf("%d ", buf[i]);
-    }
-    printf("\n");
-    unsigned char* p = buf;
-    unsigned char* end = buf + len;
+    unsigned char* end = context->buf + context->len;
+
+    // for (int i = 0; i < context->len; i++)
+    // {
+    //     printf("%d ", context->cur[i]);
+    // }
+    // printf("\n");
+
     pdf_node_t node;
-    void* data = malloc(16);
+    char data[16] = {0};
     node.data = data;
     static double width = 0;
-    while (p < end)
+    while (context->cur < end)
     {
         double v = 0;
-        uint8_t b0 = p[0];
+        uint8_t b0 = context->cur[0];
         if (b0 == 28)
         {
-            p++;
-            uint8_t b1 = p[0];
-            uint8_t b2 = p[1];
-            p += 2;
+            context->cur++;
+            uint8_t b1 = context->cur[0];
+            uint8_t b2 = context->cur[1];
+            context->cur += 2;
             v = b1 << 8 | b2; 
+            pdf_deque_push(deque, &v, sizeof(double));
         }
         else if (b0 >= 32 && b0 <= 246)
         { 
-            p++;
+            context->cur++;
             v = b0 - 139;
+            pdf_deque_push(deque, &v, sizeof(double));
         }
         else if (b0 >= 247 && b0 <= 250)
         {
-            p++;
-            uint8_t b1 = p[0];
-            p++;
+            context->cur++;
+            uint8_t b1 = context->cur[0];
+            context->cur++;
             v = (b0 - 247) * 256 + b1 + 108;
+            pdf_deque_push(deque, &v, sizeof(double));
         }
         else if (b0 >= 251 && b0 <= 254)
         {
-            p++;
-            uint8_t b1 = p[0];
-            p++;
+            context->cur++;
+            uint8_t b1 = context->cur[0];
+            context->cur++;
             v = -(b0 - 251) * 256 - b1 - 108;
+            pdf_deque_push(deque, &v, sizeof(double));
         }
         else if (b0 == 255)
         {
-            p++;
-            int32_t raw_value = (p[0] << 24) | (p[1] << 16) | (p[2] << 8) | p[3];
+            context->cur++;
+            int32_t raw_value = (context->cur[0] << 24) | (context->cur[1] << 16) | (context->cur[2] << 8) | context->cur[3];
             int32_t signed_value = (int32_t)raw_value;
             v = (float)signed_value / 65536.0;
-            p += 4;
+            context->cur += 4;
+            pdf_deque_push(deque, &v, sizeof(double));
         } 
-        else if (b0 == 11 || b0 == 14)
+        else if (b0 == 11) break;
+        else if (b0 == 14)
         {
+            if (deque->size > 0 && !context->havewidth)
+            {
+                pdf_deque_pop_end(deque, &node);
+                double width = fabs(*((double*)data)) * context->fontSize / 1000.0;
+                context->width = width;
+                context->havewidth = true;
+            }
+            pdf_deque_empty(deque);
+            // if (context->open)
+            //     plutovg_canvas_close_path(context->canvas);
+            context->open = false;
             break;
         }
-        pdf_deque_push(deque, &v, sizeof(double));
-        printf("%d ", (uint32_t)v);
-        uint8_t operator1 = p[0];
+
+        uint8_t operator1 = context->cur[0];
         switch (operator1)
         {
             case 1://hstem
@@ -228,18 +135,54 @@ void _cff_do_render_char(pdf_context_t* context, pdf_deque_t* deque, unsigned ch
             case 31://hvcurveto
             {
                 CFF_HANDLERS1[operator1](context, deque);
-                p++;
+                context->cur++;
+                if (!context->fisr_stack_clear)
+                {
+                    if (operator1 != 10 && operator1 != 29)
+                        pdf_deque_empty(deque);
+                }
+                else
+                {
+                    if (operator1 == 1//hstem
+                    || operator1 == 3//vstem
+                    || operator1 == 4//vmoveto
+                    || operator1 == 18//hstemhm
+                    || operator1 == 19//hintmask
+                    || operator1 == 20//cntrmask
+                    || operator1 == 21//rmoveto
+                    || operator1 == 22//hmoveto
+                    || operator1 == 23//vstemhm
+                    )
+                    {
+                        pdf_deque_empty(deque);
+                        context->fisr_stack_clear = false;
+                        break;
+                    }
+                }
                 break;
             }
             case 11://return
+            {
+                return;
+            }
             case 14://endcar
             {
-                free(data);
+                if (deque->size > 0 && !context->havewidth)
+                {
+                    pdf_deque_pop_end(deque, &node);
+                    double width = fabs(*((double*)data)) * context->fontSize / 1000.0;
+                    context->width = width;
+                    context->havewidth = true;
+                }
+                pdf_deque_empty(deque);
+                // if (context->open)
+                //     plutovg_canvas_close_path(context->canvas);
+                context->open = false;
                 return;
             }
             case 12:
             {
-                uint8_t operator2 = p[1];
+                uint8_t operator2 = context->cur[1];
                 switch (operator2)
                 {
                     case 3: // and
@@ -268,7 +211,7 @@ void _cff_do_render_char(pdf_context_t* context, pdf_deque_t* deque, unsigned ch
                     case 37://flex1
                     {
                         CFF_HANDLERS2[operator2](context, deque);
-                        p += 2;
+                        context->cur += 2;
                         break;
                     }
                     default:
@@ -279,7 +222,6 @@ void _cff_do_render_char(pdf_context_t* context, pdf_deque_t* deque, unsigned ch
                 break;
         }
     }
-    free(data);
 }
 
 void _do_text_render(pdf_context_t* context, char* buf, int len)
@@ -405,7 +347,6 @@ void _do_text_render(pdf_context_t* context, char* buf, int len)
                 pdf_array_t* font_matrix = context->state->textState.font->font_matrix;
                 for (int i = 0; i < unicode_cnt; i++)
                 {
-                    if (unicode[i] != 26) continue;
                     pdf_deque_t* deque = pdf_deque_init();
                     plutovg_canvas_save(context->canvas);
                     plutovg_matrix_t font_matrix_plutovg, rm;
@@ -426,11 +367,25 @@ void _do_text_render(pdf_context_t* context, char* buf, int len)
                         context->state->fill.color[1],
                         context->state->fill.color[2]);
                     plutovg_canvas_new_path(context->canvas);
-
-                    int len = charstrings_index->values[unicode[i]]->value_len;
-                    unsigned char* buf = charstrings_index->values[unicode[i]]->val.string;
-                    _cff_do_render_char(context, deque, buf, len);
-
+                    pdf_cff_char_render_t ctx;
+                    ctx.buf = charstrings_index->values[unicode[i]]->val.string;
+                    ctx.cur = ctx.buf;
+                    ctx.len = charstrings_index->values[unicode[i]]->value_len;
+                    ctx.canvas = context->canvas;
+                    ctx.fontSize = context->state->textState.fontSize;
+                    ctx.global_bias = context->state->textState.font->global_subr_bias;
+                    ctx.global_subr = context->state->textState.font->global_subr;
+                    ctx.open = false;
+                    ctx.havewidth = false;
+                    ctx.width = 0;
+                    ctx.curX = 0;
+                    ctx.curY = 0;
+                    ctx.stems = 0;
+                    ctx.stemshm = 0;
+                    ctx.fisr_stack_clear = true;
+                    _cff_do_render_char(&ctx, deque);
+                    context->state->textState.textLineWidth += ctx.width;
+                    plutovg_matrix_translate(&context->state->textState.textMatrix, context->state->textState.textLineWidth, 0); // TODO: width error
                     plutovg_canvas_fill(context->canvas);
                     plutovg_canvas_restore(context->canvas); 
                     pdf_deque_free(deque);

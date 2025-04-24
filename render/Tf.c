@@ -21,7 +21,6 @@ void handle_Tf(pdf_context_t* context)
         pdf_font_cache_t* cache = context->fontcache[i];
         if (cache->font == font)
         {
-            context->state->textState.ft_face = cache->ft_face;
             context->state->textState.fontface = cache->fontface;
             context->state->textState.font_face_loaded = cache->loaded;
             context->state->textState.font = font;
@@ -48,76 +47,48 @@ void handle_Tf(pdf_context_t* context)
         {
             if (strcmp(font->basefont, "/SimSun") == 0)
             {
-#if USE_FREETYPE
-                FT_New_Face(context->ft_library, "fonts/SimSun.ttf", 0, &context->state->textState.ft_face);
-#else
                 context->state->textState.fontface = plutovg_font_face_load_from_file("fonts/SimSun.ttf", 0);
                 context->state->textState.font_face_loaded = true;
-#endif
             }
             else
             {
-#if USE_FREETYPE
-                FT_New_Face(context->ft_library, "fonts/SimSun.ttf", 0, &context->state->textState.ft_face);
-#else
                 context->state->textState.fontface = plutovg_font_face_load_from_file("fonts/SimSun.ttf", 0);
                 context->state->textState.font_face_loaded = true;
-#endif 
             }
         }
         else
         {
-#if USE_FREETYPE
-            FT_New_Memory_Face(context->ft_library, font->font_data,
-                font->font_data_length, 0, &context->state->textState.ft_face);
-#else
             context->state->textState.fontface = plutovg_font_face_load_from_data(
                 font->font_data, font->font_data_length, 0, NULL, NULL);
             context->state->textState.font_face_loaded = true;
-#endif
         }
     }
     else
     {
         if (font->font_data == NULL)
         {
-#if USE_FREETYPE
-            FT_New_Face(context->ft_library, "fonts/SimSun.ttf", 0, &context->state->textState.ft_face);
-#else
             context->state->textState.fontface = plutovg_font_face_load_from_file("fonts/SimSun.ttf", 0);
             context->state->textState.font_face_loaded = true;
-#endif
         }
         else
         {
-#if USE_FREETYPE
-            FT_New_Memory_Face(context->ft_library, font->font_data,
-                font->font_data_length, 0, &context->state->textState.ft_face);
-#else
             if ((context->state->textState.fontface = plutovg_font_face_load_from_data(
                 font->font_data, font->font_data_length, 0, NULL, NULL)) == NULL)
             {
                 context->state->textState.font_face_loaded = false;
                 context->state->textState.fontface = plutovg_font_face_load_from_data1(
                     font->font_data, font->font_data_length, 0, NULL, NULL);
-                if (context->state->textState.fontface == NULL)
-                {
-                    FT_New_Memory_Face(context->ft_library, font->font_data,
-                        font->font_data_length, 0, &context->state->textState.ft_face);
-                }
             }
             else
             {
                 context->state->textState.font_face_loaded = true;
             }
-#endif
         }
     }
     pdf_font_cache_t* cache = (pdf_font_cache_t*)malloc(sizeof(pdf_font_cache_t));
     cache->font = pdf_font_reference(font);
     cache->fontface = context->state->textState.fontface;
     cache->loaded = context->state->textState.font_face_loaded;
-    cache->ft_face = context->state->textState.ft_face;
     cvector_push_back(context->fontcache, cache);
     // set font face
     //plutovg_canvas_set_font(context->canvas, context->state->textState.fontface, fontsize);

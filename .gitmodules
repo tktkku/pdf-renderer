@@ -7,6 +7,3 @@
 [submodule "c-vector"]
 	path = c-vector
 	url = https://github.com/tktkku/c-vector.git
-[submodule "freetype"]
-	path = freetype
-	url = https://github.com/tktkku/freetype.git

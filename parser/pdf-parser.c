@@ -88,90 +88,90 @@ const static fixed_token_map_t fixed_token_map[MAX_FIXED_TOKEN_LEN + 1] =
 {
     {0},
     {29, {
-        {"\"", TOKEN_OPERATOR, 1}, // 34 
-        {"'", TOKEN_OPERATOR, 1}, // 39
-        {"B", TOKEN_OPERATOR, 1},// 66
-        {"F", TOKEN_OPERATOR, 1}, // 70
-        {"G", TOKEN_OPERATOR, 1}, // 71
-        {"J", TOKEN_OPERATOR, 1}, // 74
-        {"K", TOKEN_OPERATOR, 1}, // 75
-        {"M", TOKEN_OPERATOR, 1}, // 77
-        {"Q", TOKEN_OPERATOR, 1}, // 81
+        {"\"", TOKEN_OPERATOR_quotation, 1}, // 34 
+        {"'", TOKEN_OPERATOR_apostrophe, 1}, // 39
+        {"B", TOKEN_OPERATOR_B, 1},// 66
+        {"F", TOKEN_OPERATOR_F, 1}, // 70
+        {"G", TOKEN_OPERATOR_G, 1}, // 71
+        {"J", TOKEN_OPERATOR_J, 1}, // 74
+        {"K", TOKEN_OPERATOR_K, 1}, // 75
+        {"M", TOKEN_OPERATOR_M, 1}, // 77
+        {"Q", TOKEN_OPERATOR_Q, 1}, // 81
         {"R", TOKEN_INDIRECT, 1}, // 82
-        {"S", TOKEN_OPERATOR, 1}, // 83
-        {"W", TOKEN_OPERATOR, 1}, // 87
+        {"S", TOKEN_OPERATOR_S, 1}, // 83
+        {"W", TOKEN_OPERATOR_W, 1}, // 87
         //{"[", TOKEN_ARRAY_BEG, 1}, // 91
         //{"[", TOKEN_ARRAY_END, 1}, // 93
-        {"b", TOKEN_OPERATOR, 1}, //98
-        {"c", TOKEN_OPERATOR, 1}, // 99
-        {"d", TOKEN_OPERATOR, 1}, // 100
-        {"f", TOKEN_OPERATOR, 1}, // 102
-        {"g", TOKEN_OPERATOR, 1},  //103
-        {"h", TOKEN_OPERATOR, 1}, // 104
-        {"i", TOKEN_OPERATOR, 1}, // 105
-        {"j", TOKEN_OPERATOR, 1}, // 106
-        {"k", TOKEN_OPERATOR, 1}, // 107
-        {"l", TOKEN_OPERATOR, 1}, // 108
-        {"m", TOKEN_OPERATOR, 1}, //109
-        {"n", TOKEN_OPERATOR, 1}, // 110
-        {"q", TOKEN_OPERATOR, 1}, // 113
-        {"s", TOKEN_OPERATOR, 1}, // 115
-        {"v", TOKEN_OPERATOR, 1}, // 118
-        {"w", TOKEN_OPERATOR, 1}, // 119
-        {"y", TOKEN_OPERATOR, 1} // 121
+        {"b", TOKEN_OPERATOR_b, 1}, //98
+        {"c", TOKEN_OPERATOR_c, 1}, // 99
+        {"d", TOKEN_OPERATOR_d, 1}, // 100
+        {"f", TOKEN_OPERATOR_f, 1}, // 102
+        {"g", TOKEN_OPERATOR_g, 1},  //103
+        {"h", TOKEN_OPERATOR_h, 1}, // 104
+        {"i", TOKEN_OPERATOR_i, 1}, // 105
+        {"j", TOKEN_OPERATOR_j, 1}, // 106
+        {"k", TOKEN_OPERATOR_k, 1}, // 107
+        {"l", TOKEN_OPERATOR_l, 1}, // 108
+        {"m", TOKEN_OPERATOR_m, 1}, //109
+        {"n", TOKEN_OPERATOR_n, 1}, // 110
+        {"q", TOKEN_OPERATOR_q, 1}, // 113
+        {"s", TOKEN_OPERATOR_s, 1}, // 115
+        {"v", TOKEN_OPERATOR_v, 1}, // 118
+        {"w", TOKEN_OPERATOR_w, 1}, // 119
+        {"y", TOKEN_OPERATOR_y, 1} // 121
     }},
     {38, {
         //{"<<", TOKEN_DICT_BEG, 2}, // 60
         //{">>", TOKEN_DICT_END, 2}, // 62
-        {"B*", TOKEN_OPERATOR, 2},
-        {"BI", TOKEN_OPERATOR, 2},
-        {"BT", TOKEN_OPERATOR, 2},
-        {"CS", TOKEN_OPERATOR, 2},
-        {"DP", TOKEN_OPERATOR, 2},
-        {"Do", TOKEN_OPERATOR, 2},
-        {"EI", TOKEN_OPERATOR, 2},
-        {"ET", TOKEN_OPERATOR, 2},
-        {"ID", TOKEN_OPERATOR, 2},
-        {"MP", TOKEN_OPERATOR, 2},
-        {"RG", TOKEN_OPERATOR, 2},
-        {"SC", TOKEN_OPERATOR, 2},
-        {"T*", TOKEN_OPERATOR, 2},
-        {"TD", TOKEN_OPERATOR, 2},
-        {"TJ", TOKEN_OPERATOR, 2},
-        {"TL", TOKEN_OPERATOR, 2},
-        {"Tc", TOKEN_OPERATOR, 2},
-        {"Td", TOKEN_OPERATOR, 2},
-        {"Tf", TOKEN_OPERATOR, 2},
-        {"Tj", TOKEN_OPERATOR, 2},
-        {"Tm", TOKEN_OPERATOR, 2},
-        {"Tr", TOKEN_OPERATOR, 2},
-        {"Ts", TOKEN_OPERATOR, 2},
-        {"Tw", TOKEN_OPERATOR, 2},
-        {"Tz", TOKEN_OPERATOR, 2},
-        {"W*", TOKEN_OPERATOR, 2},
-        {"b*", TOKEN_OPERATOR, 2},
-        {"cm", TOKEN_OPERATOR, 2},
-        {"cs", TOKEN_OPERATOR, 2},
-        {"d0", TOKEN_OPERATOR, 2},
-        {"d1", TOKEN_OPERATOR, 2},
-        {"f*", TOKEN_OPERATOR, 2},
-        {"gs", TOKEN_OPERATOR, 2},
-        {"re", TOKEN_OPERATOR, 2},
-        {"rg", TOKEN_OPERATOR, 2},
-        {"ri", TOKEN_OPERATOR, 2},
-        {"sc", TOKEN_OPERATOR, 2},
-        {"sh", TOKEN_OPERATOR, 2},
+        {"B*", TOKEN_OPERATOR_B_star, 2},
+        {"BI", TOKEN_OPERATOR_BI, 2},
+        {"BT", TOKEN_OPERATOR_BT, 2},
+        {"CS", TOKEN_OPERATOR_CS, 2},
+        {"DP", TOKEN_OPERATOR_DP, 2},
+        {"Do", TOKEN_OPERATOR_Do, 2},
+        {"EI", TOKEN_OPERATOR_EI, 2},
+        {"ET", TOKEN_OPERATOR_ET, 2},
+        {"ID", TOKEN_OPERATOR_ID, 2},
+        {"MP", TOKEN_OPERATOR_MP, 2},
+        {"RG", TOKEN_OPERATOR_RG, 2},
+        {"SC", TOKEN_OPERATOR_SC, 2},
+        {"T*", TOKEN_OPERATOR_T_star, 2},
+        {"TD", TOKEN_OPERATOR_TD, 2},
+        {"TJ", TOKEN_OPERATOR_TJ, 2},
+        {"TL", TOKEN_OPERATOR_TL, 2},
+        {"Tc", TOKEN_OPERATOR_Tc, 2},
+        {"Td", TOKEN_OPERATOR_Td, 2},
+        {"Tf", TOKEN_OPERATOR_Tf, 2},
+        {"Tj", TOKEN_OPERATOR_Tj, 2},
+        {"Tm", TOKEN_OPERATOR_Tm, 2},
+        {"Tr", TOKEN_OPERATOR_Tr, 2},
+        {"Ts", TOKEN_OPERATOR_Ts, 2},
+        {"Tw", TOKEN_OPERATOR_Tw, 2},
+        {"Tz", TOKEN_OPERATOR_Tz, 2},
+        {"W*", TOKEN_OPERATOR_W_star, 2},
+        {"b*", TOKEN_OPERATOR_b_star, 2},
+        {"cm", TOKEN_OPERATOR_cm, 2},
+        {"cs", TOKEN_OPERATOR_cs, 2},
+        {"d0", TOKEN_OPERATOR_d0, 2},
+        {"d1", TOKEN_OPERATOR_d1, 2},
+        {"f*", TOKEN_OPERATOR_f_star, 2},
+        {"gs", TOKEN_OPERATOR_gs, 2},
+        {"re", TOKEN_OPERATOR_re, 2},
+        {"rg", TOKEN_OPERATOR_rg, 2},
+        {"ri", TOKEN_OPERATOR_ri, 2},
+        {"sc", TOKEN_OPERATOR_sc, 2},
+        {"sh", TOKEN_OPERATOR_sh, 2},
     }},
     {9, {
-        {"BDC", TOKEN_OPERATOR, 3},
-        {"BMC", TOKEN_OPERATOR, 3},
-        {"EMC", TOKEN_OPERATOR, 3},
-        {"SCN", TOKEN_OPERATOR, 3},
+        {"BDC", TOKEN_OPERATOR_BDC, 3},
+        {"BMC", TOKEN_OPERATOR_BMC, 3},
+        {"EMC", TOKEN_OPERATOR_EMC, 3},
+        {"SCN", TOKEN_OPERATOR_SCN, 3},
         {"def", TOKEN_DEF, 3},
         {"dup", TOKEN_DUP, 3},
         {"end", TOKEN_END, 3},
         {"obj", TOKEN_OBJ_BEG, 3},
-        {"scn", TOKEN_OPERATOR, 3}
+        {"scn", TOKEN_OPERATOR_scn, 3}
     }},
     {4, {
         {"dict", TOKEN_DICT, 4},
@@ -568,7 +568,13 @@ pdf_parser_token_t* _pdf_parser_next_one_token(pdf_parser_t* parser, const unsig
         }
         if (isfind)
         {
-            tk = pdf_parser_token_init(parser, start, to_compare[mid].type, len);
+            //tk = pdf_parser_token_init(parser, start, to_compare[mid].type, len);
+            tk = (pdf_parser_token_t*)malloc(sizeof(pdf_parser_token_t));
+            tk->next = NULL;
+            tk->token = NULL;
+            tk->token_len = len;
+            tk->steps = len;
+            tk->type = to_compare[mid].type;
             start += len;
             return tk;
         }
@@ -970,8 +976,8 @@ pdf_parser_token_t* _pdf_next_token(pdf_parser_t* parser)
             off++;
             pdf_parser_token_free(parser, parser->cached_tokens[0]);
 
-            memcpy(token->token + off, parser->cached_tokens[1]->token, parser->cached_tokens[1]->token_len);
-            off += parser->cached_tokens[1]->token_len;
+            // memcpy(token->token + off, parser->cached_tokens[1]->token, parser->cached_tokens[1]->token_len);
+            // off += parser->cached_tokens[1]->token_len;
             token->token[off] = '\0';
             pdf_parser_token_free(parser, parser->cached_tokens[1]);
             parser->num_cached_tokens = 0;

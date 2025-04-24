@@ -1,19 +1,35 @@
 #pragma once
 #include "pdf.h"
+#include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <wchar.h>
-#include <ft2build.h>
-#include FT_FREETYPE_H
-#include FT_OUTLINE_H
-#include FT_MODULE_H 
 #include <plutovg.h>
 #include "plutovg-stb-image-write.h"
 #include "plutovg-stb-image.h"
-#define USE_FREETYPE 0
+
+typedef struct pdf_cff_char_render
+{
+    bool fisr_stack_clear;
+    unsigned char* buf;
+    unsigned char* cur;
+    int len;
+    pdf_array_t* charstrings;
+    pdf_array_t* global_subr;
+    uint16_t global_bias;
+    plutovg_canvas_t* canvas;
+    double fontSize;
+    double curX;
+    double curY;
+    double width;
+    int stems;
+    int stemshm;
+    bool open;
+    bool havewidth;
+} pdf_cff_char_render_t;
 
 typedef struct pdf_graphics_state {
     struct {
@@ -45,7 +61,6 @@ typedef struct pdf_graphics_state {
         double textRise;
         double TJValue;
         plutovg_font_face_t* fontface;
-        FT_Face ft_face;
         bool font_face_loaded;
         pdf_font_t* font;
         double textLineWidth;
@@ -55,13 +70,11 @@ typedef struct pdf_graphics_state {
 typedef struct
 {
     pdf_font_t* font;
-    FT_Face ft_face;
     plutovg_font_face_t* fontface;
     bool loaded;
 } pdf_font_cache_t;
 typedef struct context
 {
-    FT_Library ft_library;
     plutovg_surface_t* surface;
     pdf_deque_t* deque;
     plutovg_canvas_t* canvas;
@@ -72,11 +85,6 @@ typedef struct context
     cvector_vector_type(pdf_font_cache_t*) fontcache;
 } pdf_context_t;
 typedef void (*OPERATION_HANDLER)(pdf_context_t* context);
-
-typedef struct {
-    const char* operation;
-    OPERATION_HANDLER handler;
-} handler_entry;
 
 void handle_q(pdf_context_t* context);
 void handle_Q(pdf_context_t* context);
@@ -149,57 +157,47 @@ void handle_DP(pdf_context_t* context);
 void handle_EMC(pdf_context_t* context);
 void handle_MP(pdf_context_t* context);
 
-const static handler_entry handlers[] = {
-    {"\"", handle_quotation}, {"'", handle_apostrophe}, {"B", handle_B},
-    {"B*", handle_B_star},    {"BDC", handle_BDC},      {"BMC", handle_BMC},
-    {"BI", handle_BI},        {"BT", handle_BT},        {"CS", handle_CS},
-    {"DP", handle_DP},        {"Do", handle_Do},        {"EI", handle_EI},
-    {"EMC", handle_EMC},      {"ET", handle_ET},        {"F", handle_F_f},
-    {"G", handle_G},          {"ID", handle_ID},        {"J", handle_J},
-    {"K", handle_K},          {"M", handle_M},          {"MP", handle_MP},
-    {"Q", handle_Q},          {"RG", handle_RG},        {"S", handle_S},
-    {"SC", handle_SC},        {"SCN", handle_SCN},      {"T*", handle_T_star},
-    {"TD", handle_TD},        {"TJ", handle_TJ},        {"TL", handle_TL},
-    {"Tc", handle_Tc},        {"Td", handle_Td},        {"Tf", handle_Tf},
-    {"Tj", handle_Tj},        {"Tm", handle_Tm},        {"Tr", handle_Tr},
-    {"Ts", handle_Ts},        {"Tw", handle_Tw},        {"Tz", handle_Tz},
-    {"W", handle_W},          {"W*", handle_W_star},    {"b", handle_b},
-    {"b*", handle_b_star},    {"c", handle_c},          {"cm", handle_cm},
-    {"cs", handle_cs},        {"d", handle_d},          {"d0", handle_d0},
-    {"d1", handle_d1},        {"f", handle_F_f},        {"f*", handle_f_star},
-    {"g", handle_g},          {"gs", handle_gs},        {"h", handle_h},
-    {"i", handle_i},          {"j", handle_j},          {"k", handle_k},
-    {"l", handle_l},          {"m", handle_m},          {"n", handle_n},
-    {"q", handle_q},          {"re", handle_re},        {"rg", handle_rg},
-    {"ri", handle_ri},        {"s", handle_s},          {"sc", handle_sc},
-    {"scn", handle_scn},      {"sh", handle_sh},        {"v", handle_v},
-    {"w", handle_w},          {"y", handle_y} };
+const static OPERATION_HANDLER handlers[] = {
+    NULL, handle_quotation, handle_apostrophe, handle_B, 
+    handle_B_star, handle_BDC, handle_BMC, handle_BI, 
+    handle_BT, handle_CS, handle_DP, handle_Do, handle_EI,
+    handle_EMC, handle_ET, handle_F_f, handle_G, handle_ID, 
+    handle_J, handle_K, handle_M, handle_MP, handle_Q, handle_RG, 
+    handle_S, handle_SC, handle_SCN, handle_T_star, handle_TD, 
+    handle_TJ, handle_TL,handle_Tc, handle_Td, handle_Tf, handle_Tj, 
+    handle_Tm, handle_Tr, handle_Ts, handle_Tw, handle_Tz, handle_W, 
+    handle_W_star, handle_b, handle_b_star, handle_c, handle_cm, 
+    handle_cs, handle_d, handle_d0, handle_d1, handle_F_f, handle_f_star,
+    handle_g, handle_gs, handle_h, handle_i, handle_j, handle_k, handle_l, 
+    handle_m, handle_n, handle_q, handle_re, handle_rg, handle_ri, handle_s, 
+    handle_sc, handle_scn, handle_sh, handle_v, handle_w, handle_y
+};
 void _do_render_operation(pdf_context_t* context, pdf_parser_token_t* tk);
 void stroke(pdf_context_t* context);
 void _do_text_render(pdf_context_t* context, char* buf, int len);
 
-typedef void (*CFF_HANDLER)(pdf_context_t* context, pdf_deque_t* deque);
-void handle_hstem(pdf_context_t* context, pdf_deque_t* deque);
-void handle_vstem(pdf_context_t* context, pdf_deque_t* deque);
-void handle_vmoveto(pdf_context_t* context, pdf_deque_t* deque);
-void handle_rlineto(pdf_context_t* context, pdf_deque_t* deque);
-void handle_hlineto(pdf_context_t* context, pdf_deque_t* deque);
-void handle_vlineto(pdf_context_t* context, pdf_deque_t* deque);
-void handle_rrcurveto(pdf_context_t* context, pdf_deque_t* deque);
-void handle_callsubr(pdf_context_t* context, pdf_deque_t* deque);
-void handle_hstemhm(pdf_context_t* context, pdf_deque_t* deque);
-void handle_hintmask(pdf_context_t* context, pdf_deque_t* deque);
-void handle_cntrmask(pdf_context_t* context, pdf_deque_t* deque);
-void handle_rmoveto(pdf_context_t* context, pdf_deque_t* deque);
-void handle_hmoveto(pdf_context_t* context, pdf_deque_t* deque);
-void handle_vstemhm(pdf_context_t* context, pdf_deque_t* deque);
-void handle_rcurveline(pdf_context_t* context, pdf_deque_t* deque);
-void handle_rlinecurve(pdf_context_t* context, pdf_deque_t* deque);
-void handle_vvcurveto(pdf_context_t* context, pdf_deque_t* deque);
-void handle_hhcurveto(pdf_context_t* context, pdf_deque_t* deque);
-void handle_callgsubr(pdf_context_t* context, pdf_deque_t* deque);
-void handle_vhcurveto(pdf_context_t* context, pdf_deque_t* deque);
-void handle_hvcurveto(pdf_context_t* context, pdf_deque_t* deque);
+typedef void (*CFF_HANDLER)(pdf_cff_char_render_t* context, pdf_deque_t* deque);
+void handle_hstem(pdf_cff_char_render_t* context, pdf_deque_t* deque);
+void handle_vstem(pdf_cff_char_render_t* context, pdf_deque_t* deque);
+void handle_vmoveto(pdf_cff_char_render_t* context, pdf_deque_t* deque);
+void handle_rlineto(pdf_cff_char_render_t* context, pdf_deque_t* deque);
+void handle_hlineto(pdf_cff_char_render_t* context, pdf_deque_t* deque);
+void handle_vlineto(pdf_cff_char_render_t* context, pdf_deque_t* deque);
+void handle_rrcurveto(pdf_cff_char_render_t* context, pdf_deque_t* deque);
+void handle_callsubr(pdf_cff_char_render_t* context, pdf_deque_t* deque);
+void handle_hstemhm(pdf_cff_char_render_t* context, pdf_deque_t* deque);
+void handle_hintmask(pdf_cff_char_render_t* context, pdf_deque_t* deque);
+void handle_cntrmask(pdf_cff_char_render_t* context, pdf_deque_t* deque);
+void handle_rmoveto(pdf_cff_char_render_t* context, pdf_deque_t* deque);
+void handle_hmoveto(pdf_cff_char_render_t* context, pdf_deque_t* deque);
+void handle_vstemhm(pdf_cff_char_render_t* context, pdf_deque_t* deque);
+void handle_rcurveline(pdf_cff_char_render_t* context, pdf_deque_t* deque);
+void handle_rlinecurve(pdf_cff_char_render_t* context, pdf_deque_t* deque);
+void handle_vvcurveto(pdf_cff_char_render_t* context, pdf_deque_t* deque);
+void handle_hhcurveto(pdf_cff_char_render_t* context, pdf_deque_t* deque);
+void handle_callgsubr(pdf_cff_char_render_t* context, pdf_deque_t* deque);
+void handle_vhcurveto(pdf_cff_char_render_t* context, pdf_deque_t* deque);
+void handle_hvcurveto(pdf_cff_char_render_t* context, pdf_deque_t* deque);
 
 const static CFF_HANDLER CFF_HANDLERS1[] = {
     NULL,
@@ -229,30 +227,30 @@ const static CFF_HANDLER CFF_HANDLERS1[] = {
     handle_vhcurveto,//30
     handle_hvcurveto,
 };
-void handle_and(pdf_context_t* context, pdf_deque_t* deque);
-void handle_or(pdf_context_t* context, pdf_deque_t* deque);
-void handle_not(pdf_context_t* context, pdf_deque_t* deque);
-void handle_abs(pdf_context_t* context, pdf_deque_t* deque);
-void handle_add(pdf_context_t* context, pdf_deque_t* deque);
-void handle_sub(pdf_context_t* context, pdf_deque_t* deque);
-void handle_div(pdf_context_t* context, pdf_deque_t* deque);
-void handle_neg(pdf_context_t* context, pdf_deque_t* deque);
-void handle_eq(pdf_context_t* context, pdf_deque_t* deque);
-void handle_drop(pdf_context_t* context, pdf_deque_t* deque);
-void handle_put(pdf_context_t* context, pdf_deque_t* deque);
-void handle_get(pdf_context_t* context, pdf_deque_t* deque);
-void handle_ifelse(pdf_context_t* context, pdf_deque_t* deque);
-void handle_random(pdf_context_t* context, pdf_deque_t* deque);
-void handle_mul(pdf_context_t* context, pdf_deque_t* deque);
-void handle_sqrt(pdf_context_t* context, pdf_deque_t* deque);
-void handle_dup(pdf_context_t* context, pdf_deque_t* deque);
-void handle_exch(pdf_context_t* context, pdf_deque_t* deque);
-void handle_index(pdf_context_t* context, pdf_deque_t* deque);
-void handle_roll(pdf_context_t* context, pdf_deque_t* deque);
-void handle_hflex(pdf_context_t* context, pdf_deque_t* deque);
-void handle_flex(pdf_context_t* context, pdf_deque_t* deque);
-void handle_hflex1(pdf_context_t* context, pdf_deque_t* deque);
-void handle_flex1(pdf_context_t* context, pdf_deque_t* deque);
+void handle_and(pdf_cff_char_render_t* context, pdf_deque_t* deque);
+void handle_or(pdf_cff_char_render_t* context, pdf_deque_t* deque);
+void handle_not(pdf_cff_char_render_t* context, pdf_deque_t* deque);
+void handle_abs(pdf_cff_char_render_t* context, pdf_deque_t* deque);
+void handle_add(pdf_cff_char_render_t* context, pdf_deque_t* deque);
+void handle_sub(pdf_cff_char_render_t* context, pdf_deque_t* deque);
+void handle_div(pdf_cff_char_render_t* context, pdf_deque_t* deque);
+void handle_neg(pdf_cff_char_render_t* context, pdf_deque_t* deque);
+void handle_eq(pdf_cff_char_render_t* context, pdf_deque_t* deque);
+void handle_drop(pdf_cff_char_render_t* context, pdf_deque_t* deque);
+void handle_put(pdf_cff_char_render_t* context, pdf_deque_t* deque);
+void handle_get(pdf_cff_char_render_t* context, pdf_deque_t* deque);
+void handle_ifelse(pdf_cff_char_render_t* context, pdf_deque_t* deque);
+void handle_random(pdf_cff_char_render_t* context, pdf_deque_t* deque);
+void handle_mul(pdf_cff_char_render_t* context, pdf_deque_t* deque);
+void handle_sqrt(pdf_cff_char_render_t* context, pdf_deque_t* deque);
+void handle_dup(pdf_cff_char_render_t* context, pdf_deque_t* deque);
+void handle_exch(pdf_cff_char_render_t* context, pdf_deque_t* deque);
+void handle_index(pdf_cff_char_render_t* context, pdf_deque_t* deque);
+void handle_roll(pdf_cff_char_render_t* context, pdf_deque_t* deque);
+void handle_hflex(pdf_cff_char_render_t* context, pdf_deque_t* deque);
+void handle_flex(pdf_cff_char_render_t* context, pdf_deque_t* deque);
+void handle_hflex1(pdf_cff_char_render_t* context, pdf_deque_t* deque);
+void handle_flex1(pdf_cff_char_render_t* context, pdf_deque_t* deque);
 
 const static CFF_HANDLER CFF_HANDLERS2[] = {
     NULL, NULL, NULL,

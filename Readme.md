@@ -10,6 +10,12 @@ cmake -S . -B build
 cmake --build build
 ./build/test tiger.pdf
 ```
+## AFDKO extact glyph to svg
+```bash
+python -m venv afdko_env
+python -m pip install afdko
+tx -svg -g 20 f1.cff output.svg
+```
 ## Valgrind
 valgrind --leak-check=full --track-origins=yes --log-file="valgrind.log" ./build/test ./test.pdf
 valgrind --tool=memcheck --leak-check=full --show-leak-kinds=all --log-file="valgrind.log" --vgdb=yes --vgdb-error=0 -s ./build/test test.pdf
