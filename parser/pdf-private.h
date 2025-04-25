@@ -356,7 +356,19 @@ struct pdf_font
     int first_char;
     int last_char;
     pdf_array_t* widths;
+
     pdf_array_t* charstrings;
+    pdf_array_t* font_dict_arr;
+    /*
+        the first element specifies format
+        if == 0 : 
+            fd = font_dict_select_arr[gid + 1];
+        if == 3 :
+            for i in ranges where i > 0:
+                if font_dict_select_arr[i] <= gid <= font_dict_select_arr[i + 1]:
+                    fd = font_dict_select_arr[i + 2]
+    */
+    pdf_array_t* font_dict_select_arr;
     pdf_array_t* global_subr;
     uint16_t global_subr_bias;
     int references;

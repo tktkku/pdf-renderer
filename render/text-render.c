@@ -98,8 +98,7 @@ void _cff_do_render_char(pdf_cff_char_render_t* context, pdf_deque_t* deque)
             if (deque->size > 0 && !context->havewidth)
             {
                 pdf_deque_pop_end(deque, &node);
-                double width = fabs(*((double*)data)) * context->fontSize / 1000.0;
-                context->width = width;
+                context->width = *((double*)data);
                 context->havewidth = true;
             }
             pdf_deque_empty(deque);
@@ -170,8 +169,7 @@ void _cff_do_render_char(pdf_cff_char_render_t* context, pdf_deque_t* deque)
                 if (deque->size > 0 && !context->havewidth)
                 {
                     pdf_deque_pop_end(deque, &node);
-                    double width = fabs(*((double*)data)) * context->fontSize / 1000.0;
-                    context->width = width;
+                    context->width = *((double*)data);
                     context->havewidth = true;
                 }
                 pdf_deque_empty(deque);
@@ -339,12 +337,14 @@ void _do_text_render(pdf_context_t* context, char* buf, int len)
         else
         {
             pdf_array_t* charstrings_index = context->state->textState.font->charstrings;
-
+            pdf_array_t* font_dict_aar = context->state->textState.font->font_dict_arr;
+            pdf_array_t* font_dict_select = context->state->textState.font->font_dict_select_arr;
             if (charstrings_index != NULL)
             {
                 // context->state->textState.textLineWidth += _canvas_fill_text(context, unicode, unicode_cnt,
                 //     PLUTOVG_TEXT_ENCODING_UTF16, context->state->textState.textLineWidth, 0, true);
                 pdf_array_t* font_matrix = context->state->textState.font->font_matrix;
+                plutovg_matrix_t original_matrix = context->state->textState.textMatrix;
                 for (int i = 0; i < unicode_cnt; i++)
                 {
                     pdf_deque_t* deque = pdf_deque_init();
@@ -384,12 +384,45 @@ void _do_text_render(pdf_context_t* context, char* buf, int len)
                     ctx.stemshm = 0;
                     ctx.fisr_stack_clear = true;
                     _cff_do_render_char(&ctx, deque);
-                    context->state->textState.textLineWidth += ctx.width;
-                    plutovg_matrix_translate(&context->state->textState.textMatrix, context->state->textState.textLineWidth, 0); // TODO: width error
+                    pdf_dict_t* font_dict = NULL;
+                    double defaultWidthX = 0;
+                    double nominalWidthX = 0;
+                    if ((int)(font_dict_select->values[0]->val.number) == 0)
+                    {
+                        int fd = font_dict_select->values[unicode[i] + 1];
+                        font_dict = font_dict_aar->values[fd]->val.dict;
+                    }
+                    else
+                    {
+                        for (int j = 1; j < font_dict_select->num_elements; j += 3)
+                        {
+                            if (unicode[i] >= (int)(font_dict_select->values[j]->val.number)
+                            && unicode[i] <= (int)(font_dict_select->values[j + 1]->val.number))
+                            {
+                                int fd = (int)(font_dict_select->values[j + 2]->val.number);
+                                font_dict = font_dict_aar->values[fd]->val.dict;
+                                break;
+                            }
+                        }
+                    }
+                    if (font_dict != NULL)
+                    {
+                        defaultWidthX = pdf_dict_get_number(font_dict, "defaultWidthX");
+                        nominalWidthX = pdf_dict_get_number(font_dict, "nominalWidthX");
+                    }
+                    double advance = defaultWidthX;
+                    if ((int)(ctx.width) != 0)
+                    {
+                        advance = (ctx.width + nominalWidthX) * context->state->textState.fontSize / 1000.0;
+                    }
+
+                    context->state->textState.textLineWidth += advance;
+                    plutovg_matrix_translate(&context->state->textState.textMatrix, advance, 0); // TODO: width error
                     plutovg_canvas_fill(context->canvas);
                     plutovg_canvas_restore(context->canvas); 
                     pdf_deque_free(deque);
                 }
+                context->state->textState.textMatrix = original_matrix;
                 //plutovg_surface_write_to_png(context->surface, "test.png");
             }
         }

@@ -393,4 +393,4 @@ const static char* CFF_STANDARD_STRINGS[] = {
     "Regular",
     "Roman",
     "Semibold"
-};//390
+};//391

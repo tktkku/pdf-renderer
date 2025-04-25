@@ -36,33 +36,46 @@ pdf_array_t* _parse_cff_index(unsigned char** p)
     free(offsets);
     return arr;
 }
-/**
- * return steps
- */
-int _parse_cff_operator_value(unsigned char* p, pdf_value_t* value)
-{
-    unsigned char* start = p;
 
+char* _parse_cff_sid_to_string(uint16_t sid, pdf_array_t* string_index)
+{
+    if (sid >= 0 && sid <= CFF_NUM_STANDARD_STRINGS)
+    {
+        return CFF_STANDARD_STRINGS[sid];
+    }
+    else
+    {
+        return string_index->values[sid - CFF_NUM_STANDARD_STRINGS - 1]->val.string;
+    }
+}
+void _parse_cff_try_skip_value(unsigned char** pp, pdf_deque_t* deque)
+{
+    unsigned char* p = *pp;
     double v = 0;
-    uint8_t b0 = p[0];p++;
+    uint8_t b0 = p[0];
     if (b0 == 28)
     {
+        p++;
         uint8_t b1 = p[0];
         uint8_t b2 = p[1];
         p += 2;
-        v = b1 << 8 | b2; 
+        v = b1 << 8 | b2;
+        pdf_deque_push(deque, &v, sizeof(double)); 
     }
     else if (b0 == 29)
     {
+        p++;
         uint8_t b1 = p[0];
         uint8_t b2 = p[1];
         uint8_t b3 = p[2];
         uint8_t b4 = p[3];
         p += 4;
         v = b1 << 24 | b2 << 16 | b3 << 8 | b4;
+        pdf_deque_push(deque, &v, sizeof(double)); 
     }
     else if (b0 == 30)
     {
+        p++;
         unsigned char buf[66] = {0};
         char h,l;
         int cnt = 0;
@@ -96,283 +109,307 @@ int _parse_cff_operator_value(unsigned char* p, pdf_value_t* value)
             else if (l == 0xF) break;
         } while(h != 0xF && l != 0xF);
         v = strtod(buf, NULL);
+        pdf_deque_push(deque, &v, sizeof(double)); 
     }
     else if (b0 >= 32 && b0 <= 246)
     {
+        p++;
         v = b0 - 139;
+        pdf_deque_push(deque, &v, sizeof(double)); 
     }
     else if (b0 >= 247 && b0 <= 250)
     {
+        p++;
         uint8_t b1 = p[0];
         p++;
         v = (b0 - 247) * 256 + b1 + 108;
+        pdf_deque_push(deque, &v, sizeof(double)); 
     }
     else if (b0 >= 251 && b0 <= 254)
     {
+        p++;
         uint8_t b1 = p[0];
         p++;
         v = -(b0 - 251) * 256 - b1 - 108;
+        pdf_deque_push(deque, &v, sizeof(double)); 
     }
-    else if (b0 == 255);
-    value->type = NUMBER;
-    value->val.number = v;
-    return p - start;
+    *pp = p;
 }
-char* _parse_cff_sid_to_string(uint16_t sid, pdf_array_t* string_index)
+
+void _parse_cff_dict_data(unsigned char* font_data, 
+    unsigned char* p, int len, 
+    pdf_array_t* string_index,
+    pdf_dict_t* ret_dict)
 {
-    if (sid >= 0 && sid < CFF_NUM_STANDARD_STRINGS)
+    uint8_t data[16] = {0};
+    pdf_node_t node;
+    node.data = data;
+    pdf_deque_t* deque = pdf_deque_init();
+    unsigned char* end = p + len;
+    while (p < end)
     {
-        return CFF_STANDARD_STRINGS[sid];
-    }
-    else
-    {
-        return string_index->values[sid - CFF_NUM_STANDARD_STRINGS]->val.string;
-    }
-}
-pdf_dict_t* _parse_cff_dict_data(pdf_array_t* arr, pdf_array_t* string_index)
-{
-    if (arr == NULL || arr->num_elements <= 0) return NULL;
-    pdf_dict_t* ret_dict = pdf_dict_init();
-    for (int i = 0; i < arr->num_elements; i++)
-    {
-        if (arr->values[i]->type == STRING)
+        _parse_cff_try_skip_value(&p, deque);
+        
+        uint8_t operator1 = p[0];
+        switch (operator1)
         {
-            unsigned char* p_operand = arr->values[i]->val.string;
-            unsigned char* p = arr->values[i]->val.string;
-            unsigned char* end = p + arr->values[i]->value_len;
-            while (p < end)
+            case 0:// version SID
+            case 1:// Notice SID
+            case 2:// FullName SID
+            case 3:// FamilyName SID
+            case 4:// Weight SID
             {
-                if (p[0] == 28) p += 3;
-                else if (p[0] == 29) p += 5;
-                else if (p[0] == 30) 
+                char* names[] = {"version", "Notice", "FullName", "FamilyName", "Weight"};
+                pdf_deque_pop_end(deque, &node);
+                uint32_t sid = *((double*)data);
+                pdf_dict_add(ret_dict, names[operator1], STRING, _parse_cff_sid_to_string(sid, string_index)); 
+                p++;
+                break;
+            }
+            case 5: // FontBBox
+            {
+                pdf_array_t* a = pdf_array_init();
+                a->num_elements = 4;
+                a->values = (pdf_array_element_value_t**)malloc(a->num_elements * sizeof(pdf_array_element_value_t*));
+                for (int i = 0; i < 4; i++)
                 {
-                    char h,l;
-                    do
-                    {
-                        h = (p[0] >> 4) & 0x0F;
-                        l = (p[0] & 0x0F);
-                        p++;
-                    } while(h != 0xF && l != 0xF);
+                    pdf_deque_pop_end(deque, &node);
+                    pdf_array_element_value_t* arr_v = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
+                    arr_v->type = NUMBER;
+                    arr_v->val.number = *((double*)data);
+                    a->values[i] = arr_v;
                 }
-                else if (p[0] >= 32 && p[0] <= 246) p ++;
-                else if (p[0] >= 247 && p[0] <= 250) p += 2;
-                else if (p[0] >= 251 && p[0] <= 254) p += 2;
-                else
+                pdf_dict_add(ret_dict, "FontBBox", ARRAY, a);
+                p++;
+                break;
+            }
+            case 6://BlueValues
+            case 7://OtherBlues
+            case 8://FamilyBlues
+            case 9://FamilyOtherBlues
+            {
+                pdf_deque_empty(deque);
+                p++;
+                break;
+            }
+            case 10://StdHW
+            case 11://StdVW
+            {
+                char* names[] = {"StdHW", "StdVW"};
+                pdf_deque_pop_end(deque, &node);
+                pdf_value_t* value = (pdf_value_t*)malloc(sizeof(pdf_value_t));
+                value->type = NUMBER;
+                value->val.number = *((double*)data);
+                pdf_dict_add_value(ret_dict, names[operator1 - 10], value);
+                p++;
+                break;
+            }
+            case 14: // XUID
+            {
+                pdf_deque_empty(deque);
+                p++;
+                break;
+            }
+            case 13: // UniqueID
+            case 15: // charset
+            case 16: // Encoding
+            case 17: // CharStrings
+            {
+                char* names[] = {"UniqueID", "XUID", "charset", "Encoding", "CharStrings"};
+                pdf_deque_pop_end(deque, &node);
+                pdf_value_t* value = (pdf_value_t*)malloc(sizeof(pdf_value_t));
+                value->type = NUMBER;
+                value->val.number = *((double*)data);
+                pdf_dict_add_value(ret_dict, names[operator1 - 13], value);
+                p++;
+                break;
+            }
+            case 18: // Private
+            {
+                
+                pdf_deque_pop_end(deque, &node);
+                uint32_t size = *((double*)data);
+                pdf_deque_pop_end(deque, &node);
+                uint32_t offset = *((double*)data);
+
+                _parse_cff_dict_data(font_data, font_data + offset, size, string_index, ret_dict);
+                p++;
+                break;
+            }
+            case 19:// Subrs(local)
+            case 20:// defaultWidthX
+            case 21:// nominalWidthX
+            {
+                char* names[] = {"Subrs", "defaultWidthX", "nominalWidthX"};
+                pdf_deque_pop_end(deque, &node);
+                pdf_value_t* value = (pdf_value_t*)malloc(sizeof(pdf_value_t));
+                value->type = NUMBER;
+                value->val.number = *((double*)data);
+                pdf_dict_add_value(ret_dict, names[operator1 - 19], value);
+                p++;
+                break;
+            }
+            case 12:
+            {
+                uint8_t operator2 = p[1];
+                switch (operator2)
                 {
-                    uint8_t operator1 = p[0];
-                    switch (operator1)
-                    {
-                    case 0:// version SID
-                    case 1:// Notice SID
-                    case 2:// FullName SID
-                    case 3:// FamilyName SID
-                    case 4:// Weight SID
-                    {
-                        char* names[] = {"version", "Notice", "FullName", "FamilyName", "Weight"};
-                        pdf_value_t* value = (pdf_value_t*)malloc(sizeof(pdf_value_t));
-                        _parse_cff_operator_value(p_operand, value);
-                        uint32_t sid = value->val.number;
-                        pdf_dict_add(ret_dict, names[operator1], STRING, _parse_cff_sid_to_string(sid, string_index)); 
-                        p++;
-                        p_operand = p;
-                        pdf_value_free(value);
-                        break;
-                    }
-                    case 5: // FontBBox
-                    {
-                        pdf_array_t* a = pdf_array_init();
-                        a->num_elements = 4;
-                        a->values = (pdf_array_element_value_t**)malloc(a->num_elements * sizeof(pdf_array_element_value_t*));
-                        for (int i = 0; i < 4; i++)
-                        {
-                            pdf_array_element_value_t* arr_v = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
-                            p_operand += _parse_cff_operator_value(p_operand, arr_v);
-                            a->values[i] = arr_v;
-                        }
-                        pdf_dict_add(ret_dict, "FontBBox", ARRAY, a);
-                        p++;
-                        p_operand = p;
-                        break;
-                    }
-                    case 14: // XUID
-                    {
-                        p++;
-                        p_operand = p;
-                        break;
-                    }
-                    case 13: // UniqueID
-                    case 15: // charset
-                    case 16: // Encoding
-                    case 17: // CharStrings
-                    {
-                        char* names[] = {"UniqueID", "XUID", "charset", "Encoding", "CharStrings"};
-                        pdf_value_t* value = (pdf_value_t*)malloc(sizeof(pdf_value_t));
-                        _parse_cff_operator_value(p_operand, value);
-                        pdf_dict_add_value(ret_dict, names[operator1 - 13], value);
-                        p++;
-                        p_operand = p;
-                        break;
-                    }
-                    case 18: // Private
+                case 0: // Copyright
+                {
+                    p += 2;
+                    pdf_deque_empty(deque);
+                    break;
+                }
+                case 1: // isFixedPitch
+                {
+                    p += 2;
+                    pdf_deque_empty(deque);
+                    break;
+                }
+                case 7: // FontMatrix
+                {
+                    pdf_array_t* fontmatrix = pdf_array_init();
+                    fontmatrix->num_elements = 6;
+                    fontmatrix->values = (pdf_array_element_value_t**)malloc(sizeof(pdf_array_element_value_t*) * fontmatrix->num_elements);
+
+                    for (int i = 0; i < fontmatrix->num_elements; i++)
                     {
                         pdf_value_t* value = (pdf_value_t*)malloc(sizeof(pdf_value_t));
-                        int steps = _parse_cff_operator_value(p_operand, value);
-                        p_operand += steps;
-                        uint32_t size = value->val.number;
-                        steps = _parse_cff_operator_value(p_operand, value);
-                        p_operand += steps;
-                        uint32_t offset = value->val.number;
-                        
-                        value->type = ARRAY;
-                        value->val.array = pdf_array_init();
-                        value->val.array->num_elements = 2;
-                        value->val.array->values = (pdf_array_element_value_t**)malloc(sizeof(pdf_array_element_value_t**) * value->val.array->num_elements);
-
-                        value->val.array->values[0] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
-                        value->val.array->values[0]->type = NUMBER;
-                        value->val.array->values[0]->val.number = size;
-                        
-                        value->val.array->values[1] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
-                        value->val.array->values[1]->type = NUMBER;
-                        value->val.array->values[1]->val.string = offset;
-
-                        pdf_dict_add_value(ret_dict, "Private", value);
-                        p++;
-                        p_operand = p;
-                        break;
+                        value->type = NUMBER;
+                        pdf_deque_pop_end(deque, &node);
+                        value->val.number = *((double*)data);
+                        fontmatrix->values[i] = value;
                     }
-                    case 12:
-                    {
-                        uint8_t operator2 = p[1];
-                        switch (operator2)
-                        {
-                        case 0: // Copyright
-                        {
-                            p += 2;
-                            p_operand = p;
-                            break;
-                        }
-                        case 1: // isFixedPitch
-                        {
-                            p += 2;
-                            p_operand = p;
-                            break;
-                        }
-                        case 7: // FontMatrix
-                        {
-                            pdf_array_t* fontmatrix = pdf_array_init();
-                            fontmatrix->num_elements = 6;
-                            fontmatrix->values = (pdf_array_element_value_t**)malloc(sizeof(pdf_array_element_value_t*) * fontmatrix->num_elements);
+                    pdf_dict_add_array(ret_dict, "FontMatrix", fontmatrix);
+                    p += 2;
+                    break;
+                }
+                case 2: // ItalicAngle
+                case 3: // UnderlinePosition
+                case 4: // UnderlineThickness
+                case 5: // PaintType
+                case 6: // CharstringType
+                case 8: // StrokeWidth
+                {
+                    char* names[] = {"ItalicAngle", "UnderlinePosition", "UnderlineThickness", "PaintType",
+                    "CharstringType", "FontMatrix", "StrokeWidth"};
 
-                            for (int i = 0; i < fontmatrix->num_elements; i++)
-                            {
-                                pdf_value_t* value = (pdf_value_t*)malloc(sizeof(pdf_value_t));
-                                _parse_cff_operator_value(p_operand, value);
-                                fontmatrix->values[i] = value;
-                            }
-                            pdf_dict_add_array(ret_dict, "FontMatrix", fontmatrix);
-                            p += 2;
-                            p_operand = p;
-                            break;
-                        }
-                        case 2: // ItalicAngle
-                        case 3: // UnderlinePosition
-                        case 4: // UnderlineThickness
-                        case 5: // PaintType
-                        case 6: // CharstringType
-                        case 8: // StrokeWidth
-                        {
-                            char* names[] = {"ItalicAngle", "UnderlinePosition", "UnderlineThickness", "PaintType",
-                            "CharstringType", "FontMatrix", "StrokeWidth"};
+                    pdf_value_t* value = (pdf_value_t*)malloc(sizeof(pdf_value_t));
+                    value->type = NUMBER;
+                    pdf_deque_pop_end(deque, &node);
+                    value->val.number = *((double*)data);
+                    pdf_dict_add_value(ret_dict, names[operator2 - 2], value);
+                    p += 2;
+                    break;
+                }
+                case 9://BlueScale
+                case 10://BlueShift
+                case 11://BlueFuzz
+                {
+                    pdf_deque_empty(deque);
+                    p += 2;
+                    break;
+                }
+                case 12://StemSnapH
+                case 13://StemSnapV
+                {
+                    pdf_deque_empty(deque);
+                    p += 2;
+                    break;
+                }
+                case 14: // ForceBold
+                {
+                    pdf_deque_empty(deque);
+                    p += 2;
+                    break;
+                }
+                case 17:// LangiageGroup
+                case 18:// ExpansionFactor
+                case 19://initialRandomSeed
+                case 20: // SyntheticBase
+                {
+                    pdf_deque_empty(deque);
+                    p += 2;
+                    break;
+                }
+                case 21: // PostScript
+                case 22: // BaseFontName
+                case 23: // BaseFontBlend
+                {
+                    p += 2;
+                    pdf_deque_empty(deque);
+                    break;
+                }
+                case 30: // ROS
+                {
+                    
+                    pdf_deque_pop_end(deque, &node);
+                    uint16_t sid1 = *((double*)data);
+                    pdf_deque_pop_end(deque, &node);
+                    uint16_t sid2 = *((double*)data);
+                    pdf_deque_pop_end(deque, &node);
+                    double number = *((double*)data);
 
-                            pdf_value_t* value = (pdf_value_t*)malloc(sizeof(pdf_value_t));
-                            _parse_cff_operator_value(p_operand, value);
-                            pdf_dict_add_value(ret_dict, names[operator2 - 2], value);
-                            p += 2;
-                            p_operand = p;
-                            break;
-                        }
-                        case 20: // SyntheticBase
-                        case 21: // PostScript
-                        case 22: // BaseFontName
-                        case 23: // BaseFontBlend
-                        {
-                            p += 2;
-                            p_operand = p;
-                            break;
-                        }
-                        case 30: // ROS
-                        {
-                            pdf_value_t* value = (pdf_value_t*)malloc(sizeof(pdf_value_t));
-                            int steps = _parse_cff_operator_value(p_operand, value);
-                            p_operand += steps;
-                            uint16_t sid1 = value->val.number;
-                            steps = _parse_cff_operator_value(p_operand, value);
-                            p_operand += steps;
-                            uint16_t sid2 = value->val.number;
-                            steps = _parse_cff_operator_value(p_operand, value);
-                            p_operand += steps;
-                            double number = value->val.number;
-                            value->type = ARRAY;
-                            value->val.array = pdf_array_init();
-                            value->val.array->num_elements = 3;
-                            value->val.array->values = (pdf_array_element_value_t**)malloc(sizeof(pdf_array_element_value_t**) * 3);
+                    pdf_value_t* value = (pdf_value_t*)malloc(sizeof(pdf_value_t));
+                    value->type = ARRAY;
+                    value->val.array = pdf_array_init();
+                    value->val.array->num_elements = 3;
+                    value->val.array->values = (pdf_array_element_value_t**)malloc(sizeof(pdf_array_element_value_t**) * 3);
 
-                            value->val.array->values[0] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
-                            value->val.array->values[0]->type = STRING;
-                            char* s1 = _parse_cff_sid_to_string(sid1, string_index);
-                            value->val.array->values[0]->val.string = strdup(s1);
-                            
-                            value->val.array->values[1] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
-                            value->val.array->values[1]->type = STRING;
-                            char* s2 = _parse_cff_sid_to_string(sid2, string_index);
-                            value->val.array->values[1]->val.string = strdup(s2);
+                    value->val.array->values[0] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
+                    value->val.array->values[0]->type = STRING;
+                    char* s1 = _parse_cff_sid_to_string(sid1, string_index);
+                    value->val.array->values[0]->val.string = strdup(s1);
+                    
+                    value->val.array->values[1] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
+                    value->val.array->values[1]->type = STRING;
+                    char* s2 = _parse_cff_sid_to_string(sid2, string_index);
+                    value->val.array->values[1]->val.string = strdup(s2);
 
-                            value->val.array->values[2] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
-                            value->val.array->values[2]->type = NUMBER;
-                            value->val.array->values[2]->val.number = number;
-                            pdf_dict_add_value(ret_dict, "ROS", value);
-                            p += 2;
-                            p_operand = p;
-                            break;
-                        }
-                        case 31: // CIDFontVersion
-                        case 32: // CIDFontRevision
-                        case 33: // CIDFontType
-                        case 34: // CIDCount
-                        case 35: // UIDBase
-                        case 36: // FDArray
-                        case 37: // FDSelect
-                        {
-                            char* names[] = {"CIDFontVersion", "CIDFontRevision", "CIDFontType",
-                            "CIDCount", "UIDBase", "FDArray", "FDSelect"};
-                            
-                            pdf_value_t* value = (pdf_value_t*)malloc(sizeof(pdf_value_t));
-                            _parse_cff_operator_value(p_operand, value);
-                            pdf_dict_add_value(ret_dict, names[operator2 - 31], value);
-                            p += 2;
-                            p_operand = p;
-                            break;
-                        }
-                        case 38: // FontName
-                        {
-                            p += 2;
-                            p_operand = p;
-                            break;
-                        }
-                        default:
-                            break;
-                        }
-                    }
-                        break;
-                    default:
-                        break;
-                    }
+                    value->val.array->values[2] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
+                    value->val.array->values[2]->type = NUMBER;
+                    value->val.array->values[2]->val.number = number;
+                    pdf_dict_add_value(ret_dict, "ROS", value);
+
+                    p += 2;
+                    break;
+                }
+                case 31: // CIDFontVersion
+                case 32: // CIDFontRevision
+                case 33: // CIDFontType
+                case 34: // CIDCount
+                case 35: // UIDBase
+                case 36: // FDArray
+                case 37: // FDSelect
+                {
+                    char* names[] = {"CIDFontVersion", "CIDFontRevision", "CIDFontType",
+                    "CIDCount", "UIDBase", "FDArray", "FDSelect"};
+                    
+                    pdf_value_t* value = (pdf_value_t*)malloc(sizeof(pdf_value_t));
+                    value->type = NUMBER;
+                    pdf_deque_pop_end(deque, &node);
+                    value->val.number = *((double*)data);
+                    pdf_dict_add_value(ret_dict, names[operator2 - 31], value);
+                    p += 2;
+
+                    break;
+                }
+                case 38: // FontName
+                {
+                    p += 2;
+                    pdf_deque_empty(deque);
+                    break;
+                }
+                default:
+                    break;
                 }
             }
+                break;
+            default:
+                break;
         }
     }
-
+    pdf_deque_free(deque);
     return ret_dict;
 }
 pdf_array_t* _parse_cff_charset(unsigned char* p, int count, pdf_array_t* string_index, bool isCIDFont)
@@ -518,9 +555,94 @@ void pdf_cff_parse(pdf_font_t* font)
     pdf_array_t* top_dict_index = _parse_cff_index(&p);
     pdf_array_t* string_index = _parse_cff_index(&p);
     pdf_array_t* global_suber_index = _parse_cff_index(&p);
+    pdf_dict_t* top_dict = pdf_dict_init();
+    _parse_cff_dict_data(font->font_data, top_dict_index->values[0]->val.string, 
+        top_dict_index->values[0]->value_len, string_index, top_dict);
 
-    pdf_dict_t* top_dict = _parse_cff_dict_data(top_dict_index, string_index);
+    int offCharStrings = pdf_dict_get_number(top_dict, "CharStrings");
+    p = font->font_data + offCharStrings;
+    pdf_array_t* charstrings_index = _parse_cff_index(&p);   
+    font->charstrings = charstrings_index;
+
+    int offFDArray = pdf_dict_get_number(top_dict, "FDArray");
+    p = font->font_data + offFDArray;
+    pdf_array_t* font_dict_index = _parse_cff_index(&p);
+    for (int i = 0; i < font_dict_index->num_elements; i++)
+    {
+        pdf_dict_t* font_dict = pdf_dict_init();
+        _parse_cff_dict_data(font->font_data, font_dict_index->values[i]->val.string, 
+            font_dict_index->values[i]->value_len, string_index, font_dict);
+        
+        font_dict_index->values[i]->type = DICT;
+        free(font_dict_index->values[i]->val.string);
+        font_dict_index->values[i]->val.dict = font_dict;
+    }
     
+    int offFDSelect = pdf_dict_get_number(top_dict, "FDSelect");
+    p = font->font_data + offFDSelect;
+    pdf_array_t* font_select = pdf_array_init();
+    if (p[0] == 0)
+    {
+        p++;
+        font_select->num_elements = charstrings_index->num_elements + 1;
+        font_select->values = (pdf_array_element_value_t**)malloc(font_select->num_elements * sizeof(pdf_array_element_value_t*));
+        font_select->values[0] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
+        font_select->values[0]->type = NUMBER;
+        font_select->values[0]->val.number = 0;
+        for (int i = 1; i < font_select->num_elements; i++)
+        {
+            font_select->values[i] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
+            font_select->values[i]->type = NUMBER;
+            font_select->values[i]->val.number = p[0];
+            p++;
+        }
+    }
+    else if (p[0] == 3)
+    {
+        p++;
+        uint16_t ranges = p[1] << 8 | p[1]; p += 2;
+        font_select->num_elements = ranges * 3 + 1;
+        font_select->values = (pdf_array_element_value_t**)malloc(font_select->num_elements * sizeof(pdf_array_element_value_t*));
+        font_select->values[0] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
+        font_select->values[0]->type = NUMBER;
+        font_select->values[0]->val.number = 3;
+
+        uint16_t first = p[0] << 8 | p[1];
+        uint8_t fd = p[2];
+        uint16_t sentinel = p[3] << 8 | p[4];
+
+        font_select->values[1] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
+        font_select->values[1]->type = NUMBER;
+        font_select->values[1]->val.number = first;
+        font_select->values[2] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
+        font_select->values[2]->type = NUMBER;
+        font_select->values[2]->val.number = sentinel - 1;
+        font_select->values[3] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
+        font_select->values[3]->type = NUMBER;
+        font_select->values[3]->val.number = fd;
+        p += 5;
+        for (int i = 4; i < font_select->num_elements; )
+        {
+            first = sentinel;
+            fd = p[0];
+            sentinel = p[1] << 8 | p[2];
+
+            font_select->values[i] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
+            font_select->values[i]->type = NUMBER;
+            font_select->values[i]->val.number = first;
+            font_select->values[i + 1] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
+            font_select->values[i + 1]->type = NUMBER;
+            font_select->values[i + 1]->val.number = sentinel - 1;
+            font_select->values[i + 2] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
+            font_select->values[i + 2]->type = NUMBER;
+            font_select->values[i + 2]->val.number = fd;
+            p += 3;
+            i += 3;
+        }
+    }
+    font->font_dict_arr = font_dict_index;
+    font->font_dict_select_arr = font_select;
+
     int type = pdf_dict_get_number(top_dict, "CharstringType");
     uint16_t global_bias;
     if (type == -1) type = 2;
@@ -559,18 +681,9 @@ void pdf_cff_parse(pdf_font_t* font)
         fontmatrix->values[5]->val.number = 0.001;
     }
     font->font_matrix = fontmatrix;
-    pdf_array_t* private_arr = pdf_dict_get_array(top_dict, "Private");
-    if (private_arr != NULL)
-    {
-
-    }
     // bool isCIDFont = pdf_dict_get_array(top_dict, "ROS") != NULL;
     // int offEncoding = pdf_dict_get_number(top_dict, "Encoding");
     
-    int offCharStrings = pdf_dict_get_number(top_dict, "CharStrings");
-    p = font->font_data + offCharStrings;
-    pdf_array_t* charstrings_index = _parse_cff_index(&p);   
-    font->charstrings = charstrings_index;
     // int offCharset = pdf_dict_get_number(top_dict, "charset");
     // pdf_array_t* charset_arr = NULL;
     // if (offCharset != -1)

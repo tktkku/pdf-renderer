@@ -13,8 +13,10 @@ cmake --build build
 ## AFDKO extact glyph to svg
 ```bash
 python -m venv afdko_env
+source afdko_env/bin/activate
 python -m pip install afdko
 tx -svg -g 20 f1.cff output.svg
+tx -dump -3 ../f1.cff > dump.txt
 ```
 ## Valgrind
 valgrind --leak-check=full --track-origins=yes --log-file="valgrind.log" ./build/test ./test.pdf

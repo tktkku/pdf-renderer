@@ -68,7 +68,35 @@ void pdf_deque_push(pdf_deque_t* q, const void* data, size_t size)
         q->size++;
     }
 }
-
+void pdf_deque_get(pdf_deque_t* q, pdf_node_t* data, int index)
+{
+    if (q == NULL || q->front == NULL)
+    {
+        data->size = 0;
+        ((char*)data->data)[0] = '\0';
+        return;
+    }
+    // [3]--[2]--[1]
+    //            front
+    pdf_node_t* cur = q->front;
+    int cnt;
+    for (cnt = 0; cur && cnt < index; cnt++)
+    {
+        cur = cur->next;
+    }
+    if (cur == NULL)
+    {
+        data->size = 0;
+        ((char*)data->data)[0] = '\0';
+        return;
+    }
+    else
+    {
+        data->size = cur->size;
+        memcpy(data->data, cur->data, cur->size);
+        ((char*)data->data)[cur->size] = '\0';
+    }
+}
 void pdf_deque_pop_front(pdf_deque_t* q, pdf_node_t* data)
 {
     if (q == NULL || q->front == NULL)

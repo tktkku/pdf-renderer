@@ -82,6 +82,14 @@ void pdf_font_free(pdf_font_t* font)
         {
             pdf_array_free(font->global_subr);
         }
+        if (font->font_dict_arr != NULL)
+        {
+            pdf_array_free(font->font_dict_arr);
+        }
+        if (font->font_dict_select_arr != NULL)
+        {
+            pdf_array_free(font->font_dict_select_arr);
+        }
         free(font);
         font = NULL;
     }

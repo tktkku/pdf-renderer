@@ -29,6 +29,7 @@ typedef struct pdf_cff_char_render
     int stemshm;
     bool open;
     bool havewidth;
+    double transient[32];
 } pdf_cff_char_render_t;
 
 typedef struct pdf_graphics_state {
