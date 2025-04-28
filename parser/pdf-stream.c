@@ -350,7 +350,7 @@ static void _png_paeth(unsigned char* start, unsigned char* up, int columns, int
 }
 void pdf_stream_get_all(pdf_stream_t* stream, unsigned char** buffer, int* size)
 {
-    if (stream == NULL || buffer == NULL || *buffer == NULL) return;
+    if (stream == NULL || buffer == NULL) return;
     unsigned char* start = NULL;
     int ret = 0, off = 0;
     unsigned char tmp[4096];
@@ -380,7 +380,24 @@ void pdf_stream_get_all(pdf_stream_t* stream, unsigned char** buffer, int* size)
         int rows = off / (stride + 1);
         unsigned char* data1 = (unsigned char*)malloc(off);
         memcpy(data1, start, off);
-        for (int i = 0; i < rows; i++)
+        memcpy(start, data1 + 1, stride);
+        switch (data1[0])
+        {
+        case 1:
+            _png_sub(start, stream->columns, stream->colors);
+            break;
+        case 2:
+            _png_up(start, NULL, stream->columns, stream->colors);
+            break;
+        case 3:
+            _png_average(start, NULL, stream->columns, stream->colors);
+            break;
+        case 4:
+            _png_paeth(start, NULL, stream->columns, stream->colors);
+        default:
+            break;
+        }
+        for (int i = 1; i < rows; i++)
         {
             int istride = i * stride;
             memcpy(start + istride, data1 + istride + i + 1, stride);

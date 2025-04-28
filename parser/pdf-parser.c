@@ -4,7 +4,10 @@
 #include <stdarg.h>
 #include <string.h>
 #include <stdlib.h>
-
+const static char* TOKEN_NAMES[] = {
+    #define TOKEN_DEF(v, t) v,
+    #include "pdf-token.def"
+    };
 const char space_tag[] = {
     // 0 9 10 12 13 32
     '\0', '\t', '\n', '\f', '\r', ' '

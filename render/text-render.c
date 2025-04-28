@@ -291,14 +291,6 @@ void _do_text_render(pdf_context_t* context, char* buf, int len)
 
     if (!context->state->textState.font->subtype || strcmp(context->state->textState.font->subtype, "/Type3"))
     {
-#if USE_FREETYPE
-        if (strstr(context->state->textState.font->encoding, "Identity"))
-            context->state->textState.textLineWidth += _canvas_fill_text(context, unicode, unicode_cnt,
-            PLUTOVG_TEXT_ENCODING_UTF16, context->state->textState.textLineWidth, 0, true);
-        else
-        context->state->textState.textLineWidth += _canvas_fill_text(context, unicode, unicode_cnt,
-            PLUTOVG_TEXT_ENCODING_UTF16, context->state->textState.textLineWidth, 0, false);
-#else
         if (context->state->textState.fontface != NULL)
         {
             float x, y;
@@ -316,24 +308,103 @@ void _do_text_render(pdf_context_t* context, char* buf, int len)
             plutovg_canvas_scale(context->canvas, 1, -1);
             plutovg_canvas_set_font_size(context->canvas, context->state->textState.fontSize);
             plutovg_canvas_set_font_face(context->canvas, context->state->textState.fontface);
-            plutovg_canvas_set_rgb(context->canvas,
-                context->state->fill.color[0],
-                context->state->fill.color[1],
-                context->state->fill.color[2]);
-            if (context->state->textState.font_face_loaded)
+            plutovg_canvas_set_line_width(context->canvas, context->state->lineWidth);
+            plutovg_canvas_set_miter_limit(context->canvas, context->state->miterLimit);
+            plutovg_canvas_set_line_cap(context->canvas, context->state->lineCap);
+            plutovg_canvas_set_line_join(context->canvas, context->state->lineJoin);
+
+            plutovg_canvas_new_path(context->canvas);
+            float advance_width = 0;
+            // TODO: bold text support
+            bool bold = context->state->textState.font->font_weight == 700 
+                        || (context->state->textState.textMode == 2 || context->state->textState.textMode == 6);
+            float half_bold_width = 0;
+            if (context->state->textState.font_face_loaded 
+                && 
+                (
+                    context->state->textState.font->encoding == NULL
+                    || 
+                    !strstr(context->state->textState.font->encoding, "Identity")
+                )
+            )
             {
-                if (context->state->textState.font->encoding && strstr(context->state->textState.font->encoding, "Identity"))
-                    context->state->textState.textLineWidth += plutovg_canvas_fill_text1(context->canvas, unicode, unicode_cnt,
-                    PLUTOVG_TEXT_ENCODING_UTF16, context->state->textState.textLineWidth, 0);
-                else
-                    context->state->textState.textLineWidth += plutovg_canvas_fill_text(context->canvas, unicode, unicode_cnt,
-                    PLUTOVG_TEXT_ENCODING_UTF16, context->state->textState.textLineWidth, 0);
+                advance_width = plutovg_canvas_add_text(context->canvas, unicode, unicode_cnt, PLUTOVG_TEXT_ENCODING_UTF16, context->state->textState.textLineWidth, 0);
+                // if (bold)
+                // {
+                //     plutovg_canvas_add_text(context->canvas, unicode, unicode_cnt, PLUTOVG_TEXT_ENCODING_UTF16, context->state->textState.textLineWidth - half_bold_width, -half_bold_width);
+                //     plutovg_canvas_add_text(context->canvas, unicode, unicode_cnt, PLUTOVG_TEXT_ENCODING_UTF16, context->state->textState.textLineWidth + half_bold_width, half_bold_width);
+                // }
             }
             else
             {
-                context->state->textState.textLineWidth += plutovg_canvas_fill_text1(context->canvas, unicode, unicode_cnt,
-                    PLUTOVG_TEXT_ENCODING_UTF16, context->state->textState.textLineWidth, 0);
+                advance_width = plutovg_canvas_add_text1(context->canvas, unicode, unicode_cnt, PLUTOVG_TEXT_ENCODING_UTF16, context->state->textState.textLineWidth, 0);
+                // if (bold)
+                // {
+                //     plutovg_canvas_add_text1(context->canvas, unicode, unicode_cnt, PLUTOVG_TEXT_ENCODING_UTF16, context->state->textState.textLineWidth - half_bold_width, -half_bold_width);
+                //     plutovg_canvas_add_text1(context->canvas, unicode, unicode_cnt, PLUTOVG_TEXT_ENCODING_UTF16, context->state->textState.textLineWidth + half_bold_width, half_bold_width);
+                // }
             }
+            context->state->textState.textLineWidth += advance_width;
+            // TODO: text rendering mode support
+            switch (context->state->textState.textMode)
+            {
+                case 0:// fill
+                case 4:
+                    plutovg_canvas_set_rgb(context->canvas,
+                    context->state->fill.color[0],
+                    context->state->fill.color[1],
+                    context->state->fill.color[2]);
+                    plutovg_canvas_fill(context->canvas);
+                    break;
+                case 1: // stroke
+                case 5:
+                    plutovg_canvas_set_rgb(context->canvas,
+                    context->state->stroke.color[0],
+                    context->state->stroke.color[1],
+                    context->state->stroke.color[2]);
+                    plutovg_canvas_stroke(context->canvas);
+                    break;
+                case 2: // fill and then stroke
+                case 6:
+                    plutovg_canvas_set_rgb(context->canvas,
+                    context->state->stroke.color[0],
+                    context->state->stroke.color[1],
+                    context->state->stroke.color[2]);
+                    plutovg_canvas_fill(context->canvas);
+                    // plutovg_canvas_set_rgb(context->canvas,
+                    // context->state->stroke.color[0],
+                    // context->state->stroke.color[1],
+                    // context->state->stroke.color[2]);
+                    // plutovg_canvas_stroke(context->canvas);
+                    break;
+                // case 3: // invisible
+                //     break;
+                // case 4:
+                //     plutovg_canvas_set_rgb(context->canvas,
+                //     context->state->fill.color[0],
+                //     context->state->fill.color[1],
+                //     context->state->fill.color[2]);
+                //     plutovg_canvas_fill(context->canvas);
+                //     plutovg_canvas_clip_preserve(context->canvas);
+                //     break;
+                // case 5:
+                //     plutovg_canvas_set_rgb(context->canvas,
+                //     context->state->stroke.color[0],
+                //     context->state->stroke.color[1],
+                //     context->state->stroke.color[2]);
+                //     plutovg_canvas_stroke(context->canvas);
+                //     plutovg_canvas_clip_preserve(context->canvas);
+                //     break;
+                // case 6:
+                //     plutovg_canvas_fill_preserve(context->canvas);
+                //     plutovg_canvas_stroke(context->canvas);
+                //     plutovg_canvas_new_path(context->canvas);
+                //     break;
+                // case 7:
+                //     plutovg_canvas_clip_preserve(context->canvas);
+                default:
+                    break;
+            }            
         }
         else
         {
@@ -342,8 +413,6 @@ void _do_text_render(pdf_context_t* context, char* buf, int len)
             pdf_array_t* font_dict_select = context->state->textState.font->font_dict_select_arr;
             if (charstrings_index != NULL)
             {
-                // context->state->textState.textLineWidth += _canvas_fill_text(context, unicode, unicode_cnt,
-                //     PLUTOVG_TEXT_ENCODING_UTF16, context->state->textState.textLineWidth, 0, true);
                 pdf_array_t* font_matrix = context->state->textState.font->font_matrix;
                 plutovg_matrix_t original_matrix = context->state->textState.textMatrix;
                 for (int i = 0; i < unicode_cnt; i++)
@@ -418,7 +487,7 @@ void _do_text_render(pdf_context_t* context, char* buf, int len)
                     }
 
                     context->state->textState.textLineWidth += advance;
-                    plutovg_matrix_translate(&context->state->textState.textMatrix, advance, 0); // TODO: width error
+                    plutovg_matrix_translate(&context->state->textState.textMatrix, advance, 0);
                     plutovg_canvas_fill(context->canvas);
                     plutovg_canvas_restore(context->canvas); 
                     pdf_deque_free(deque);
@@ -427,7 +496,6 @@ void _do_text_render(pdf_context_t* context, char* buf, int len)
                 //plutovg_surface_write_to_png(context->surface, "test.png");
             }
         }
-#endif
     }
     else
     {

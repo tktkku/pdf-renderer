@@ -258,6 +258,7 @@ void handle_w(pdf_context_t* context)
     pdf_deque_pop_front(context->deque, &node);
     float w = strtof(buf, NULL);
     plutovg_canvas_set_line_width(context->canvas, w);
+    context->state->lineWidth = w;
 }
 
 void handle_W(pdf_context_t* context)

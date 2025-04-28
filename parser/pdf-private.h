@@ -13,10 +13,7 @@ enum pdf_parser_token_type
 #define TOKEN_DEF(v, t) t,
 #include "pdf-token.def"
 };
-const static char* TOKEN_NAMES[] = {
-#define TOKEN_DEF(v, t) v,
-#include "pdf-token.def"
-};
+
 struct pdf_parser_token
 {
     pdf_parser_token_type_t type;
@@ -229,7 +226,7 @@ struct pdf_font
     pdf_dict_t* descendant_font_dict;
     pdf_dict_t* font_descriptor;
     int font_weight;
-    int flags;
+    uint32_t flags;
     int italic_angle;
     pdf_array_t* font_matrix;
     pdf_array_t* font_bbox;

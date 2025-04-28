@@ -231,6 +231,7 @@ void handle_Tm(pdf_context_t* context)
     // plutovg_canvas_transform(context->canvas, &m);
     // plutovg_canvas_move_to(context->canvas, 0, 0);
     context->state->textState.textMatrix = m;
+    context->state->textState.textLineWidth = 0;
 }
 
 void handle_Tr(pdf_context_t* context)
@@ -244,20 +245,7 @@ void handle_Tr(pdf_context_t* context)
     int v = strtof(buf, NULL);
     // STROKE FILL BOTH CLIP
 
-    int mode = 0;
-    if ((v & 0x1) == 0)
-    {
-        mode |= 2;
-    }
-    if ((v & 0x4) != 0)
-    {
-        mode |= 4;
-    }
-    if (((v & 0x1) ^ ((v & 0x2) >> 1)) != 0)
-    {
-        mode |= 1;
-    }
-    context->state->textState.textMode = mode;
+    context->state->textState.textMode = v;
 }
 
 void handle_Ts(pdf_context_t* context)

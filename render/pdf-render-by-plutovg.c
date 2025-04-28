@@ -188,10 +188,10 @@ void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
 
 void _do_render_operation(pdf_context_t* context, pdf_parser_token_t* tk)
 {
-    printf("%s", _token_to_string(tk->type));
-    if (tk->token != NULL)
-        printf("%s", tk->token);
-    printf("\n");
+    // printf("%s", _token_to_string(tk->type));
+    // if (tk->token != NULL)
+    //     printf("%s", tk->token);
+    // printf("\n");
 
     if (tk->type < TOKEN_OPERATOR && tk->token != NULL)
     {
@@ -420,6 +420,7 @@ void handle_j(pdf_context_t* context)
     int j = atoi(buf);
 
     plutovg_canvas_set_line_join(context->canvas, j);
+    context->state->lineJoin = j;
 }
 
 void handle_J(pdf_context_t* context)
@@ -433,6 +434,7 @@ void handle_J(pdf_context_t* context)
     int c = atoi(buf);
 
     plutovg_canvas_set_line_cap(context->canvas, c);
+    context->state->lineCap = c;
 }
 
 
@@ -446,6 +448,7 @@ void handle_M(pdf_context_t* context)
     pdf_deque_pop_front(context->deque, &node);
     float m = strtof(buf, NULL);
     plutovg_canvas_set_miter_limit(context->canvas, m);
+    context->state->miterLimit = m;
 }
 
 void handle_MP(pdf_context_t* context)
