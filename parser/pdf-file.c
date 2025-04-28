@@ -175,7 +175,7 @@ bool _read_xref_and_trailer(pdf_file_t* pdf)
         pdf_parser_t* parser = pdf_parser_init(pdf, FILE_READER, pdf->pFile);
         pdf_obj_t* xref_obj = pdf_parser_build_obj(parser);
         pdf_parser_free(parser);
-        if (xref_obj == NULL)
+        if (xref_obj == NULL || xref_obj->value->type != DICT)
         {
             return false;
         }
@@ -213,72 +213,75 @@ bool _read_xref_and_trailer(pdf_file_t* pdf)
         unsigned char* start = NULL;
         int len;
         pdf_stream_get_all(xref_obj->stream, &start, &len);
-        unsigned char* origin = start;
-        for (int i = 0; i < index_arr->num_elements; i += 2)
+        if (start != NULL)
         {
-            int start_index = index_arr->values[i]->val.number;
-            int num = index_arr->values[i + 1]->val.number;
-
-            int seq = start_index;
-
-            for (int j = 0; j < num; j++)
+            unsigned char* origin = start;
+            for (int i = 0; i < index_arr->num_elements; i += 2)
             {
-                int type = 0;
-                for (int i = 0; i < w0; i++)
-                {
-                    type = type << 8;
-                    type = type | *start;
-                    start += 1;
-                }
-                int part2 = 0;
-                for (int i = 0; i < w1; i++)
-                {
-                    part2 = part2 << 8;
-                    part2 = part2 | *start;
-                    start += 1;
-                }
-                int part3 = 0;
-                for (int i = 0; i < w2; i++)
-                {
-                    part3 = part3 << 8;
-                    part3 = part3 | *start;
-                    start += 1;
-                }
-                xref_t* xref = (xref_t*)malloc(sizeof(xref_t));
-                xref->sequence = seq;
-                if (type == 0) // free objects
-                {
-                    // object-ref generation
-                    xref->type = COMPRESSED;
-                    xref->compressed.ref = part2;
-                    xref->compressed.index = 0;
-                    xref->generation = part3;
-                    xref->inuse = 'f';
-                }
-                else if (type == 1) // not be compressed objects
-                {
-                    // offset generation
-                    xref->type = UNCOMPRESSED;
-                    xref->uncompressed.offset = part2;
-                    xref->generation = part3;
-                    xref->inuse = 'n';
-                }
-                else if (type == 2) // compressed objects
-                {
-                    // object-ref index
-                    // generation shall be 0
-                    xref->type = COMPRESSED;
-                    xref->compressed.ref = part2;
-                    xref->compressed.index = part3;
-                    xref->generation = 0;
-                    xref->inuse = 'n';
-                }
+                int start_index = index_arr->values[i]->val.number;
+                int num = index_arr->values[i + 1]->val.number;
 
-                seq++;
-                cvector_push_back(pdf->xref_table, xref);
+                int seq = start_index;
+
+                for (int j = 0; j < num; j++)
+                {
+                    int type = 0;
+                    for (int i = 0; i < w0; i++)
+                    {
+                        type = type << 8;
+                        type = type | *start;
+                        start += 1;
+                    }
+                    int part2 = 0;
+                    for (int i = 0; i < w1; i++)
+                    {
+                        part2 = part2 << 8;
+                        part2 = part2 | *start;
+                        start += 1;
+                    }
+                    int part3 = 0;
+                    for (int i = 0; i < w2; i++)
+                    {
+                        part3 = part3 << 8;
+                        part3 = part3 | *start;
+                        start += 1;
+                    }
+                    xref_t* xref = (xref_t*)malloc(sizeof(xref_t));
+                    xref->sequence = seq;
+                    if (type == 0) // free objects
+                    {
+                        // object-ref generation
+                        xref->type = COMPRESSED;
+                        xref->compressed.ref = part2;
+                        xref->compressed.index = 0;
+                        xref->generation = part3;
+                        xref->inuse = 'f';
+                    }
+                    else if (type == 1) // not be compressed objects
+                    {
+                        // offset generation
+                        xref->type = UNCOMPRESSED;
+                        xref->uncompressed.offset = part2;
+                        xref->generation = part3;
+                        xref->inuse = 'n';
+                    }
+                    else if (type == 2) // compressed objects
+                    {
+                        // object-ref index
+                        // generation shall be 0
+                        xref->type = COMPRESSED;
+                        xref->compressed.ref = part2;
+                        xref->compressed.index = part3;
+                        xref->generation = 0;
+                        xref->inuse = 'n';
+                    }
+
+                    seq++;
+                    cvector_push_back(pdf->xref_table, xref);
+                }
             }
+            free(origin);
         }
-        free(origin);
         pdf_obj_free(xref_obj);
         return true;
     }
@@ -288,7 +291,7 @@ bool _read_xref_and_trailer(pdf_file_t* pdf)
 void _read_pages(pdf_file_t* pdf, pdf_obj_t* pages_obj);
 void _read_pages(pdf_file_t* pdf, pdf_obj_t* pages_obj)
 {
-    if (pdf == NULL || pages_obj == NULL) return;
+    if (pdf == NULL || pages_obj == NULL || pages_obj->value->type != DICT) return;
 
     const char* type = pdf_dict_get_name(pages_obj->value->val.dict, "/Type");
     int count = pdf_dict_get_number(pages_obj->value->val.dict, "/Count");
@@ -300,6 +303,7 @@ void _read_pages(pdf_file_t* pdf, pdf_obj_t* pages_obj)
         pdf_obj_t* obj = pdf_file_get_obj(pdf, ref);
         if (obj == NULL) continue;
         type = pdf_dict_get_name(obj->value->val.dict, "/Type");
+        if (type == NULL) continue;
         if (!strcmp(type, "/Pages"))
         {
             _read_pages(pdf, obj);
@@ -345,7 +349,7 @@ pdf_file_t* pdf_file_read_file(const char* file_name)
     }
 
     pdf_obj_t* root_obj = pdf_file_get_obj(pdf_file, pdf_file->root_obj_ref);
-    if (root_obj == NULL)
+    if (root_obj == NULL || root_obj->value->type != DICT)
     {
         pdf_file_free(pdf_file);
         return NULL;
@@ -365,25 +369,31 @@ pdf_file_t* pdf_file_read_file(const char* file_name)
         if (embedded_ref != -1)
         {
             pdf_obj_t* embedded_obj1 = pdf_file_get_obj(pdf_file, embedded_ref);
-            pdf_array_t* names_aar = pdf_dict_get_array(embedded_obj1->value->val.dict, "/Names");
-            if (names_aar != NULL)
+            if (embedded_obj1 != NULL)
             {
-                for (int i = 0; i < names_aar->num_elements; i++)
+                pdf_array_t* names_aar = pdf_dict_get_array(embedded_obj1->value->val.dict, "/Names");
+                if (names_aar != NULL)
                 {
-                    if (names_aar->values[i]->type == INDIRECT)
+                    for (int i = 0; i < names_aar->num_elements; i++)
                     {
-                        pdf_obj_t* embedded_obj2 = pdf_file_get_obj(pdf_file, names_aar->values[i]->val.indirect);
-                        pdf_dict_t* ef_dict = pdf_dict_get_dict(embedded_obj2->value->val.dict, "/EF");
-                        int ref = pdf_dict_get_ref(ef_dict, "/UF");
-                        pdf_obj_t* embedded_obj = pdf_file_get_obj(pdf_file, ref);
-                        unsigned char* embedded_file = NULL;
-                        int embedded_file_len = 0;
-                        pdf_stream_get_all(embedded_obj->stream, &embedded_file, &embedded_file_len);
-                        embedded_file_len += 1;
-                        free(embedded_file);
+                        if (names_aar->values[i]->type == INDIRECT)
+                        {
+                            pdf_obj_t* embedded_obj2 = pdf_file_get_obj(pdf_file, names_aar->values[i]->val.indirect);
+                            if (embedded_obj2 != NULL)
+                            {
+                                pdf_dict_t* ef_dict = pdf_dict_get_dict(embedded_obj2->value->val.dict, "/EF");
+                                int ref = pdf_dict_get_ref(ef_dict, "/UF");
+                                pdf_obj_t* embedded_obj = pdf_file_get_obj(pdf_file, ref);
+                                unsigned char* embedded_file = NULL;
+                                int embedded_file_len = 0;
+                                pdf_stream_get_all(embedded_obj->stream, &embedded_file, &embedded_file_len);
+                                embedded_file_len += 1;
+                                free(embedded_file);
+                            }
+                        }
                     }
+                    
                 }
-                
             }
         }
         // /AlternatePresentations
@@ -584,7 +594,7 @@ void _fill_resources(pdf_obj_t* obj)
     else
     {
         pdf_obj_t* res_obj = pdf_file_get_obj(obj->pdf, ref);
-        if (res_obj == NULL)
+        if (res_obj == NULL || res_obj->value->type != DICT)
             return;
         resources = res_obj->value->val.dict;
     }
@@ -764,6 +774,7 @@ pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, int ref)
                 unsigned char* start = NULL;
                 int size;
                 pdf_stream_get_all(objs_obj->stream, &start, &size);
+                if (start == NULL) return NULL;
                 pdf_buffer_t b1 = {
                     .buffer = start,
                     .buffer_size = size,

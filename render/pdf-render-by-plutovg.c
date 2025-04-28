@@ -24,7 +24,34 @@ void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
     plutovg_surface_destroy(surface);
     free(pixels);
 }
+void _init_state(pdf_context_t* context)
+{
+    context->state = (pdf_graphics_state_t*)malloc(sizeof(pdf_graphics_state_t));
+    memset(context->state, 0, sizeof(pdf_graphics_state_t));
+    strcpy(context->state->fill.currentColorSpace, "DeviceGray");
+    strcpy(context->state->stroke.currentColorSpace, "DeviceGray");
+    context->state->stroke.color[0] = 0;
+    context->state->stroke.color[1] = 0;
+    context->state->stroke.color[2] = 0;
+    context->state->fill.color[0] = 0;
+    context->state->fill.color[1] = 0;
+    context->state->fill.color[2] = 0;
+    
+    context->state->lineWidth = 1.0;
+    context->state->lineCap = 0;
+    context->state->lineJoin = 0;
+    context->state->miterLimit = 10.0;
 
+    context->state->textState.characterSpacing = 0;
+    context->state->textState.wordSpacing = 0;
+    context->state->textState.horizontalScaling = 100;
+    context->state->textState.textLeading = 0;
+    context->state->textState.textMode = 0;
+    context->state->textState.textRise = 0;
+    
+    context->state->textState.font = NULL;
+    context->state->textState.fontface = NULL;
+}
 void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
     int width, int height, int stride)
 {
@@ -51,32 +78,7 @@ void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
     context.deque = deque;
     context.pdf = page->pdf;
     context.page = page;
-
-    context.state = (pdf_graphics_state_t*)malloc(sizeof(pdf_graphics_state_t));
-    memset(context.state, 0, sizeof(pdf_graphics_state_t));
-    strcpy(context.state->fill.currentColorSpace, "DeviceGray");
-    strcpy(context.state->stroke.currentColorSpace, "DeviceGray");
-    context.state->stroke.color[0] = 0;
-    context.state->stroke.color[1] = 0;
-    context.state->stroke.color[2] = 0;
-    context.state->fill.color[0] = 0;
-    context.state->fill.color[1] = 0;
-    context.state->fill.color[2] = 0;
-    
-    context.state->lineWidth = 1.0;
-    context.state->lineCap = 0;
-    context.state->lineJoin = 0;
-    context.state->miterLimit = 10.0;
-
-    context.state->textState.characterSpacing = 0;
-    context.state->textState.wordSpacing = 0;
-    context.state->textState.horizontalScaling = 100;
-    context.state->textState.textLeading = 0;
-    context.state->textState.textMode = 0;
-    context.state->textState.textRise = 0;
-    
-    context.state->textState.font = NULL;
-    context.state->textState.fontface = NULL;
+    _init_state(&context);
     context.current_obj = page->obj;
     context.fontcache = NULL;
     context.surface = surface;
@@ -91,6 +93,8 @@ void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
         //int count = 0;
         while ((tk = pdf_stream_get_next_token(stream)) != NULL)
         {
+            if (tk->type == TOKEN_STREAM_END)
+                break;
             _do_render_operation(&context, tk);
             pdf_parser_token_free(stream->parser, tk);
         }
@@ -103,58 +107,63 @@ void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
         for (int i = 0; i < page->annots->num_elements; i++)
         {
             pdf_obj_t* anno_obj = pdf_file_get_obj(page->pdf, page->annots->values[i]->val.indirect);
-            pdf_dict_get_name(anno_obj->value->val.dict, "/Type");
-            pdf_dict_get_name(anno_obj->value->val.dict, "/SubType");
-            pdf_array_t* rect_aar = pdf_dict_get_array(anno_obj->value->val.dict, "/Rect");
-            if (rect_aar != NULL)
-            {
-                plutovg_canvas_translate(canvas, rect_aar->values[0]->val.number, rect_aar->values[1]->val.number);
-            }
-            pdf_dict_get_string(anno_obj->value->val.dict, "/Contents");
-            pdf_dict_get_dict(anno_obj->value->val.dict, "/P");
-            pdf_dict_get_string(anno_obj->value->val.dict, "/NM");
-            pdf_dict_get_string(anno_obj->value->val.dict, "/M");
-            int F = pdf_dict_get_number(anno_obj->value->val.dict, "/F");
-            if (F != -1)
-            {
-                if (F & 0b0000000001); // invisible
-                if (F & 0b0000000010); // hidden
-                if (F & 0b0000000100); // print
-                if (F & 0b0000001000); // nozoom
-                if (F & 0b0000010000); // norotate
-                if (F & 0b0000100000); // noview
-                if (F & 0b0001000000); // readonly
-                if (F & 0b0010000000); // locked
-                if (F & 0b0100000000); // togglenoview
-                if (F & 0b1000000000); // lockedcontents
-            }
-            pdf_dict_t* AP = pdf_dict_get_dict(anno_obj->value->val.dict, "/AP");
-            if (AP != NULL)
-            {
-                pdf_dict_t* nomal_dict = pdf_dict_get_dict(AP, "/N"); // required
-                if (nomal_dict == NULL)
+            if (anno_obj != NULL)
+            { 
+                pdf_dict_get_name(anno_obj->value->val.dict, "/Type");
+                pdf_dict_get_name(anno_obj->value->val.dict, "/SubType");
+                pdf_array_t* rect_aar = pdf_dict_get_array(anno_obj->value->val.dict, "/Rect");
+                if (rect_aar != NULL)
                 {
-                    int ref = pdf_dict_get_ref(AP, "/N");
-                    pdf_obj_t* obj = pdf_file_get_obj(page->pdf, ref);
-                    if (obj->stream != NULL)
+                    plutovg_canvas_translate(canvas, rect_aar->values[0]->val.number, rect_aar->values[1]->val.number);
+                }
+                pdf_dict_get_string(anno_obj->value->val.dict, "/Contents");
+                pdf_dict_get_dict(anno_obj->value->val.dict, "/P");
+                pdf_dict_get_string(anno_obj->value->val.dict, "/NM");
+                pdf_dict_get_string(anno_obj->value->val.dict, "/M");
+                int F = pdf_dict_get_number(anno_obj->value->val.dict, "/F");
+                if (F != -1)
+                {
+                    if (F & 0b0000000001); // invisible
+                    if (F & 0b0000000010); // hidden
+                    if (F & 0b0000000100); // print
+                    if (F & 0b0000001000); // nozoom
+                    if (F & 0b0000010000); // norotate
+                    if (F & 0b0000100000); // noview
+                    if (F & 0b0001000000); // readonly
+                    if (F & 0b0010000000); // locked
+                    if (F & 0b0100000000); // togglenoview
+                    if (F & 0b1000000000); // lockedcontents
+                }
+                pdf_dict_t* AP = pdf_dict_get_dict(anno_obj->value->val.dict, "/AP");
+                if (AP != NULL)
+                {
+                    pdf_dict_t* nomal_dict = pdf_dict_get_dict(AP, "/N"); // required
+                    if (nomal_dict == NULL)
                     {
-                        context.current_obj = obj;
-                        pdf_stream_open(obj->stream);
-                        pdf_parser_token_t* tk = NULL;
-                        while ((tk = pdf_stream_get_next_token(obj->stream)) != NULL)
+                        int ref = pdf_dict_get_ref(AP, "/N");
+                        pdf_obj_t* obj = pdf_file_get_obj(page->pdf, ref);
+                        if (obj->stream != NULL)
                         {
-                            _do_render_operation(&context, tk);
-                            pdf_parser_token_free(obj->stream->parser, tk);
+                            context.current_obj = obj;
+                            pdf_stream_open(obj->stream);
+                            pdf_parser_token_t* tk = NULL;
+                            while ((tk = pdf_stream_get_next_token(obj->stream)) != NULL)
+                            {
+                                if (tk->type == TOKEN_STREAM_END)
+                                    break;
+                                _do_render_operation(&context, tk);
+                                pdf_parser_token_free(obj->stream->parser, tk);
+                            }
+                            pdf_stream_close(obj->stream);
                         }
-                        pdf_stream_close(obj->stream);
                     }
                 }
+                pdf_dict_get_name(anno_obj->value->val.dict, "/AS");
+                pdf_dict_get_array(anno_obj->value->val.dict, "/Border");
+                pdf_dict_get_array(anno_obj->value->val.dict, "/C");
+                pdf_dict_get_number(anno_obj->value->val.dict, "/StructParent");
+                pdf_dict_get_dict(anno_obj->value->val.dict, "/OC");
             }
-            pdf_dict_get_name(anno_obj->value->val.dict, "/AS");
-            pdf_dict_get_array(anno_obj->value->val.dict, "/Border");
-            pdf_dict_get_array(anno_obj->value->val.dict, "/C");
-            pdf_dict_get_number(anno_obj->value->val.dict, "/StructParent");
-            pdf_dict_get_dict(anno_obj->value->val.dict, "/OC");
         }
     }
     pdf_deque_free(deque);
@@ -179,13 +188,18 @@ void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
 
 void _do_render_operation(pdf_context_t* context, pdf_parser_token_t* tk)
 {
+    printf("%s", _token_to_string(tk->type));
+    if (tk->token != NULL)
+        printf("%s", tk->token);
+    printf("\n");
+
     if (tk->type < TOKEN_OPERATOR && tk->token != NULL)
     {
         // did not match any operation
         // push data to deque
         pdf_deque_push(context->deque, tk->token, tk->token_len);
     }
-    else
+    else if (tk->type > TOKEN_OPERATOR && tk->type <= TOKEN_OPERATOR_y)
     {
         switch (tk->type)
         {
@@ -208,6 +222,10 @@ void _do_render_operation(pdf_context_t* context, pdf_parser_token_t* tk)
                 break;
         }
         handlers[tk->type - TOKEN_OPERATOR](context);
+    }
+    else
+    {
+        printf("unknow token %d\n", tk->type);
     }
 }
 
@@ -443,6 +461,7 @@ void handle_q(pdf_context_t* context)
 {
     // store state
     plutovg_canvas_save(context->canvas);
+    if (context->state == NULL) _init_state(context);
     pdf_graphics_state_t* new_state = (pdf_graphics_state_t*)malloc(sizeof(pdf_graphics_state_t));
     memcpy(new_state, context->state, sizeof(pdf_graphics_state_t));
     new_state->next = context->state;
@@ -456,6 +475,7 @@ void handle_Q(pdf_context_t* context)
     pdf_graphics_state_t* old_state = context->state;
     context->state = old_state->next;
     free(old_state);
+    if (context->state == NULL) _init_state(context);
     plutovg_canvas_set_line_width(context->canvas, context->state->lineWidth);
     plutovg_canvas_set_line_cap(context->canvas, (plutovg_line_cap_t)context->state->lineCap);
     plutovg_canvas_set_line_join(context->canvas, (plutovg_line_join_t)context->state->lineJoin);

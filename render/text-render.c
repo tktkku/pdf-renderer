@@ -230,7 +230,7 @@ void _do_text_render(pdf_context_t* context, char* buf, int len)
     unsigned char* pbuf = buf;
     if (pbuf[0] == '<')
     {
-        if (strstr(context->state->textState.font->encoding, "Identity"))
+        if (context->state->textState.font->encoding && strstr(context->state->textState.font->encoding, "Identity"))
         {
             for (char* p = &pbuf[1]; *p != '\0'; p += 4)
             {
@@ -256,7 +256,8 @@ void _do_text_render(pdf_context_t* context, char* buf, int len)
     }
     else if (pbuf[0] == '(')
     {
-        if (!strcmp(context->state->textState.font->subtype, "/TrueType") || !strcmp(context->state->textState.font->subtype, "/Type3"))
+        if (context->state->textState.font->subtype 
+            && (!strcmp(context->state->textState.font->subtype, "/TrueType") || !strcmp(context->state->textState.font->subtype, "/Type3")))
         {
             for (int i = 1; i < len; i++)
             {
@@ -288,7 +289,7 @@ void _do_text_render(pdf_context_t* context, char* buf, int len)
         return;
     }
 
-    if (strcmp(context->state->textState.font->subtype, "/Type3"))
+    if (!context->state->textState.font->subtype || strcmp(context->state->textState.font->subtype, "/Type3"))
     {
 #if USE_FREETYPE
         if (strstr(context->state->textState.font->encoding, "Identity"))
@@ -321,7 +322,7 @@ void _do_text_render(pdf_context_t* context, char* buf, int len)
                 context->state->fill.color[2]);
             if (context->state->textState.font_face_loaded)
             {
-                if (strstr(context->state->textState.font->encoding, "Identity"))
+                if (context->state->textState.font->encoding && strstr(context->state->textState.font->encoding, "Identity"))
                     context->state->textState.textLineWidth += plutovg_canvas_fill_text1(context->canvas, unicode, unicode_cnt,
                     PLUTOVG_TEXT_ENCODING_UTF16, context->state->textState.textLineWidth, 0);
                 else
@@ -506,6 +507,8 @@ void _do_text_render(pdf_context_t* context, char* buf, int len)
                                 pdf_parser_token_t* tk = NULL;
                                 while ((tk = pdf_stream_get_next_token(obj->stream)) != NULL) 
                                 {
+                                    if (tk->type == TOKEN_STREAM_END)
+                                        break;
                                     _do_render_operation(context, tk);
                                     pdf_parser_token_free(obj->stream->parser, tk);
                                 }

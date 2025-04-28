@@ -350,6 +350,7 @@ static void _png_paeth(unsigned char* start, unsigned char* up, int columns, int
 }
 void pdf_stream_get_all(pdf_stream_t* stream, unsigned char** buffer, int* size)
 {
+    if (stream == NULL || buffer == NULL || *buffer == NULL) return;
     unsigned char* start = NULL;
     int ret = 0, off = 0;
     unsigned char tmp[4096];

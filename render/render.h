@@ -176,6 +176,7 @@ const static OPERATION_HANDLER handlers[] = {
 void _do_render_operation(pdf_context_t* context, pdf_parser_token_t* tk);
 void stroke(pdf_context_t* context);
 void _do_text_render(pdf_context_t* context, char* buf, int len);
+void _init_state(pdf_context_t* context);
 
 typedef void (*CFF_HANDLER)(pdf_cff_char_render_t* context, pdf_deque_t* deque);
 void handle_hstem(pdf_cff_char_render_t* context, pdf_deque_t* deque);

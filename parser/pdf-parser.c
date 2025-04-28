@@ -72,154 +72,153 @@ bool _is_delimiter(char c)
 
     return false;
 }
-typedef struct
-{
-    const char* token;
-    pdf_parser_token_type_t type;
-    int len;
-} fixed_token;
+
 typedef struct
 {
     int nums;
-    fixed_token tokens[40];
+    pdf_parser_token_type_t tokens[40];
 } fixed_token_map_t;
 #define MAX_FIXED_TOKEN_LEN 19
 const static fixed_token_map_t fixed_token_map[MAX_FIXED_TOKEN_LEN + 1] =
 {
     {0},
     {29, {
-        {"\"", TOKEN_OPERATOR_quotation, 1}, // 34 
-        {"'", TOKEN_OPERATOR_apostrophe, 1}, // 39
-        {"B", TOKEN_OPERATOR_B, 1},// 66
-        {"F", TOKEN_OPERATOR_F, 1}, // 70
-        {"G", TOKEN_OPERATOR_G, 1}, // 71
-        {"J", TOKEN_OPERATOR_J, 1}, // 74
-        {"K", TOKEN_OPERATOR_K, 1}, // 75
-        {"M", TOKEN_OPERATOR_M, 1}, // 77
-        {"Q", TOKEN_OPERATOR_Q, 1}, // 81
-        {"R", TOKEN_INDIRECT, 1}, // 82
-        {"S", TOKEN_OPERATOR_S, 1}, // 83
-        {"W", TOKEN_OPERATOR_W, 1}, // 87
+        TOKEN_OPERATOR_quotation, // 34 
+        TOKEN_OPERATOR_apostrophe, // 39
+        TOKEN_OPERATOR_B,// 66
+        TOKEN_OPERATOR_F, // 70
+        TOKEN_OPERATOR_G, // 71
+        TOKEN_OPERATOR_J, // 74
+        TOKEN_OPERATOR_K, // 75
+        TOKEN_OPERATOR_M, // 77
+        TOKEN_OPERATOR_Q, // 81
+        TOKEN_INDIRECT, // 82
+        TOKEN_OPERATOR_S, // 83
+        TOKEN_OPERATOR_W, // 87
         //{"[", TOKEN_ARRAY_BEG, 1}, // 91
         //{"[", TOKEN_ARRAY_END, 1}, // 93
-        {"b", TOKEN_OPERATOR_b, 1}, //98
-        {"c", TOKEN_OPERATOR_c, 1}, // 99
-        {"d", TOKEN_OPERATOR_d, 1}, // 100
-        {"f", TOKEN_OPERATOR_f, 1}, // 102
-        {"g", TOKEN_OPERATOR_g, 1},  //103
-        {"h", TOKEN_OPERATOR_h, 1}, // 104
-        {"i", TOKEN_OPERATOR_i, 1}, // 105
-        {"j", TOKEN_OPERATOR_j, 1}, // 106
-        {"k", TOKEN_OPERATOR_k, 1}, // 107
-        {"l", TOKEN_OPERATOR_l, 1}, // 108
-        {"m", TOKEN_OPERATOR_m, 1}, //109
-        {"n", TOKEN_OPERATOR_n, 1}, // 110
-        {"q", TOKEN_OPERATOR_q, 1}, // 113
-        {"s", TOKEN_OPERATOR_s, 1}, // 115
-        {"v", TOKEN_OPERATOR_v, 1}, // 118
-        {"w", TOKEN_OPERATOR_w, 1}, // 119
-        {"y", TOKEN_OPERATOR_y, 1} // 121
+        TOKEN_OPERATOR_b, //98
+        TOKEN_OPERATOR_c, // 99
+        TOKEN_OPERATOR_d, // 100
+        TOKEN_OPERATOR_f, // 102
+        TOKEN_OPERATOR_g,  //103
+        TOKEN_OPERATOR_h, // 104
+        TOKEN_OPERATOR_i, // 105
+        TOKEN_OPERATOR_j, // 106
+        TOKEN_OPERATOR_k, // 107
+        TOKEN_OPERATOR_l, // 108
+        TOKEN_OPERATOR_m, //109
+        TOKEN_OPERATOR_n, // 110
+        TOKEN_OPERATOR_q, // 113
+        TOKEN_OPERATOR_s, // 115
+        TOKEN_OPERATOR_v, // 118
+        TOKEN_OPERATOR_w, // 119
+        TOKEN_OPERATOR_y // 121
     }},
     {38, {
         //{"<<", TOKEN_DICT_BEG, 2}, // 60
         //{">>", TOKEN_DICT_END, 2}, // 62
-        {"B*", TOKEN_OPERATOR_B_star, 2},
-        {"BI", TOKEN_OPERATOR_BI, 2},
-        {"BT", TOKEN_OPERATOR_BT, 2},
-        {"CS", TOKEN_OPERATOR_CS, 2},
-        {"DP", TOKEN_OPERATOR_DP, 2},
-        {"Do", TOKEN_OPERATOR_Do, 2},
-        {"EI", TOKEN_OPERATOR_EI, 2},
-        {"ET", TOKEN_OPERATOR_ET, 2},
-        {"ID", TOKEN_OPERATOR_ID, 2},
-        {"MP", TOKEN_OPERATOR_MP, 2},
-        {"RG", TOKEN_OPERATOR_RG, 2},
-        {"SC", TOKEN_OPERATOR_SC, 2},
-        {"T*", TOKEN_OPERATOR_T_star, 2},
-        {"TD", TOKEN_OPERATOR_TD, 2},
-        {"TJ", TOKEN_OPERATOR_TJ, 2},
-        {"TL", TOKEN_OPERATOR_TL, 2},
-        {"Tc", TOKEN_OPERATOR_Tc, 2},
-        {"Td", TOKEN_OPERATOR_Td, 2},
-        {"Tf", TOKEN_OPERATOR_Tf, 2},
-        {"Tj", TOKEN_OPERATOR_Tj, 2},
-        {"Tm", TOKEN_OPERATOR_Tm, 2},
-        {"Tr", TOKEN_OPERATOR_Tr, 2},
-        {"Ts", TOKEN_OPERATOR_Ts, 2},
-        {"Tw", TOKEN_OPERATOR_Tw, 2},
-        {"Tz", TOKEN_OPERATOR_Tz, 2},
-        {"W*", TOKEN_OPERATOR_W_star, 2},
-        {"b*", TOKEN_OPERATOR_b_star, 2},
-        {"cm", TOKEN_OPERATOR_cm, 2},
-        {"cs", TOKEN_OPERATOR_cs, 2},
-        {"d0", TOKEN_OPERATOR_d0, 2},
-        {"d1", TOKEN_OPERATOR_d1, 2},
-        {"f*", TOKEN_OPERATOR_f_star, 2},
-        {"gs", TOKEN_OPERATOR_gs, 2},
-        {"re", TOKEN_OPERATOR_re, 2},
-        {"rg", TOKEN_OPERATOR_rg, 2},
-        {"ri", TOKEN_OPERATOR_ri, 2},
-        {"sc", TOKEN_OPERATOR_sc, 2},
-        {"sh", TOKEN_OPERATOR_sh, 2},
+        TOKEN_OPERATOR_B_star,
+        TOKEN_OPERATOR_BI,
+        TOKEN_OPERATOR_BT,
+        TOKEN_OPERATOR_CS,
+        TOKEN_OPERATOR_DP,
+        TOKEN_OPERATOR_Do,
+        TOKEN_OPERATOR_EI,
+        TOKEN_OPERATOR_ET,
+        TOKEN_OPERATOR_ID,
+        TOKEN_OPERATOR_MP,
+        TOKEN_OPERATOR_RG,
+        TOKEN_OPERATOR_SC,
+        TOKEN_OPERATOR_T_star,
+        TOKEN_OPERATOR_TD,
+        TOKEN_OPERATOR_TJ,
+        TOKEN_OPERATOR_TL,
+        TOKEN_OPERATOR_Tc,
+        TOKEN_OPERATOR_Td,
+        TOKEN_OPERATOR_Tf,
+        TOKEN_OPERATOR_Tj,
+        TOKEN_OPERATOR_Tm,
+        TOKEN_OPERATOR_Tr,
+        TOKEN_OPERATOR_Ts,
+        TOKEN_OPERATOR_Tw,
+        TOKEN_OPERATOR_Tz,
+        TOKEN_OPERATOR_W_star,
+        TOKEN_OPERATOR_b_star,
+        TOKEN_OPERATOR_cm,
+        TOKEN_OPERATOR_cs,
+        TOKEN_OPERATOR_d0,
+        TOKEN_OPERATOR_d1,
+        TOKEN_OPERATOR_f_star,
+        TOKEN_OPERATOR_gs,
+        TOKEN_OPERATOR_re,
+        TOKEN_OPERATOR_rg,
+        TOKEN_OPERATOR_ri,
+        TOKEN_OPERATOR_sc,
+        TOKEN_OPERATOR_sh,
     }},
     {9, {
-        {"BDC", TOKEN_OPERATOR_BDC, 3},
-        {"BMC", TOKEN_OPERATOR_BMC, 3},
-        {"EMC", TOKEN_OPERATOR_EMC, 3},
-        {"SCN", TOKEN_OPERATOR_SCN, 3},
-        {"def", TOKEN_DEF, 3},
-        {"dup", TOKEN_DUP, 3},
-        {"end", TOKEN_END, 3},
-        {"obj", TOKEN_OBJ_BEG, 3},
-        {"scn", TOKEN_OPERATOR_scn, 3}
+        TOKEN_OPERATOR_BDC,
+        TOKEN_OPERATOR_BMC,
+        TOKEN_OPERATOR_EMC,
+        TOKEN_OPERATOR_SCN,
+        TOKEN_DEF,
+        TOKEN_DUP,
+        TOKEN_END,
+        TOKEN_OBJ_BEG,
+        TOKEN_OPERATOR_scn
     }},
     {4, {
-        {"dict", TOKEN_DICT, 4},
-        {"null", TOKEN_NULL, 4},
-        {"true", TOKEN_BOOLEAN_TRUE, 4},
-        {"xref", TOKEN_XREF, 4},
+        TOKEN_DICT,
+        TOKEN_NULL,
+        TOKEN_BOOLEAN_TRUE,
+        TOKEN_XREF,
     }},
     {2,{
-        {"begin", TOKEN_BEGIN, 5},
-        {"false", TOKEN_BOOLEAN_FALSE, 5}
+        TOKEN_BEGIN,
+        TOKEN_BOOLEAN_FALSE
     }},
     {2, {
-        {"endobj", TOKEN_OBJ_END, 6},
-        {"stream", TOKEN_STREAM_BEG, 6},
+        TOKEN_OBJ_END,
+        TOKEN_STREAM_BEG,
     }},
     {1, {
-        {"endcmap", TOKEN_ENDCMAP, 7},
+        TOKEN_ENDCMAP,
     }},
     {0},
     {3, {
-        {"begincmap", TOKEN_BEGINCMAP, 9},
-        {"endbfchar", TOKEN_ENDBFCHAR, 9},
-        {"endstream", TOKEN_STREAM_END, 9},
+        TOKEN_BEGINCMAP,
+        TOKEN_ENDBFCHAR,
+        TOKEN_STREAM_END,
     }},
     {2, {
-        {"endbfrange", TOKEN_ENDBFRANGE, 10},
-        {"endcidchar", TOKEN_ENDCIDCHAR, 10},
+        TOKEN_ENDBFRANGE,
+        TOKEN_ENDCIDCHAR,
     }},
     {2, {
-        {"beginbfchar", TOKEN_BEGINBFCHAR, 11},
-        {"endcidrange", TOKEN_ENDCIDRANGE, 11},
+        TOKEN_BEGINBFCHAR,
+        TOKEN_ENDCIDRANGE,
     }},
     {3, {
-        {"beginbfrange", TOKEN_BEGINBFRANGE, 12},
-        {"begincidchar", TOKEN_BEGINCIDCHAR, 12},
-        {"findresource", TOKEN_FINDRESOURCE, 12},
+        TOKEN_BEGINBFRANGE,
+        TOKEN_BEGINCIDCHAR,
+        TOKEN_FINDRESOURCE,
     }},
     {1, {
-        {"begincidrange", TOKEN_BEGINCIDRANGE, 13},
+        TOKEN_BEGINCIDRANGE,
     }},
     {0}, {0}, {0},
     {1, {
-        {"endcodespacerange", TOKEN_ENDCODESPACERANGE, 17},
+        TOKEN_ENDCODESPACERANGE,
     }}, {0},
     {1, {
-        {"begincodespacerange", TOKEN_BEGINCODESPACERANGE, 19},
+        TOKEN_BEGINCODESPACERANGE,
     }}
 };
+const char* _token_to_string(pdf_parser_token_type_t type)
+{
+    return TOKEN_NAMES[type];
+}
 
 pdf_parser_token_t* _parse_number(pdf_parser_t* parser, const unsigned char* start, const unsigned char* end)
 {
@@ -431,6 +430,37 @@ void _decode_hex_string(char* str, int len, int* out_len)
     *out_len = ol;
     free(out);
 }
+void _decode_name(char* str, int len, int* out_len)
+{
+    char* p = str + 1; // skip '/'
+    char* end = str + len;
+    char* out = (char*)malloc(len);
+    int ol = 0;
+    out[ol++] = *str; //'/'
+    while (p < end)
+    {
+        if (*p == '#')
+        {
+            if (p + 1 >= end)
+            {
+                out[ol++] = *p;
+                break;
+            }
+            p++;
+            uint8_t c = _hex_str_to_8bit(p); p += 2;
+            out[ol++] = c;
+        }
+        else
+        {
+            out[ol++] = *p;
+        }
+        p++;
+    }
+    memcpy(str, out, ol);
+    str[ol] = '\0';
+    *out_len = ol;
+    free(out);
+}
 void _decode_string(char* str, int len, int* out_len)
 {
     char* p = str + 1; // skip '('
@@ -542,7 +572,7 @@ pdf_parser_token_t* _pdf_parser_next_one_token(pdf_parser_t* parser, const unsig
         if (len > MAX_FIXED_TOKEN_LEN)
             return NULL;
 
-        const fixed_token* to_compare = fixed_token_map[len].tokens;
+        const pdf_parser_token_type_t* to_compare = fixed_token_map[len].tokens;
         int operator_count = fixed_token_map[len].nums;
         bool isfind = false;
         int left = 0;
@@ -551,7 +581,7 @@ pdf_parser_token_t* _pdf_parser_next_one_token(pdf_parser_t* parser, const unsig
         while (left <= right)
         {
             mid = left + (right - left) / 2;
-            int cmp = memcmp(start, to_compare[mid].token, len);
+            int cmp = memcmp(start, TOKEN_NAMES[to_compare[mid]], len);
             if (cmp < 0)
             {
                 right = mid - 1;
@@ -574,7 +604,7 @@ pdf_parser_token_t* _pdf_parser_next_one_token(pdf_parser_t* parser, const unsig
             tk->token = NULL;
             tk->token_len = len;
             tk->steps = len;
-            tk->type = to_compare[mid].type;
+            tk->type = to_compare[mid];
             start += len;
             return tk;
         }
@@ -602,7 +632,8 @@ NOT_OPERATOR:
 
         tk = pdf_parser_token_init(parser, start, TOKEN_NAME, len);
         start += len;
-
+        // decode name
+        _decode_name(tk->token, tk->token_len, &tk->token_len);
     }
     else if (c == '(') // parse string
     {
@@ -722,7 +753,8 @@ NOT_OPERATOR:
     {
     PARSE_NUMBER:
         tk = _parse_number(parser, start, end);
-        start += tk->steps;
+        if (tk != NULL)
+            start += tk->steps;
     }
     else if (_is_space(c))
     {
@@ -928,10 +960,16 @@ pdf_parser_token_t* _pdf_next_token(pdf_parser_t* parser)
     pdf_parser_token_t* tk = parser->cached_tokens[0];
     parser->cached_tokens[0] = parser->cached_tokens[1];
     parser->cached_tokens[1] = parser->cached_tokens[2];
+    parser->cached_tokens[2] = NULL;
     parser->num_cached_tokens--;
     if (parser->num_cached_tokens == 0)
     {
         return tk;
+    }
+    else if (tk->type == TOKEN_INDIRECT || tk->type == TOKEN_OBJ_BEG)
+    {
+        pdf_parser_token_free(parser, tk);
+        return NULL;
     }
     else if (tk->type == TOKEN_NUMBER)
     {
@@ -1152,7 +1190,7 @@ pdf_cmap_t* pdf_parser_build_cmap(pdf_parser_t* parser)
     }
     return cmap;
 }
-void _set_common_value(pdf_parser_t* parser, pdf_parser_token_t* tk, struct pdf_value* p)
+bool _set_common_value(pdf_parser_t* parser, pdf_parser_token_t* tk, struct pdf_value* p)
 {
     if (tk->type == TOKEN_NULL)
     {
@@ -1160,13 +1198,17 @@ void _set_common_value(pdf_parser_t* parser, pdf_parser_token_t* tk, struct pdf_
     }
     else if (tk->type == TOKEN_ARRAY_BEG)
     {
+        pdf_array_t* arr = pdf_parser_build_array(parser);
+        if (arr == NULL) return false;
         p->type = ARRAY;
-        p->val.array = pdf_parser_build_array(parser);
+        p->val.array = arr;
     }
     else if (tk->type == TOKEN_DICT_BEG)
     {
+        pdf_dict_t* dict = pdf_parser_build_dict(parser);
+        if (dict == NULL) return false;
         p->type = DICT;
-        p->val.dict = pdf_parser_build_dict(parser);
+        p->val.dict = dict;
     }
     else if (tk->type == TOKEN_BOOLEAN_TRUE)
     {
@@ -1180,6 +1222,7 @@ void _set_common_value(pdf_parser_t* parser, pdf_parser_token_t* tk, struct pdf_
     }
     else if (tk->type == TOKEN_NAME)
     {
+        if (tk->token == NULL) return false;
         p->type = NAME;
         p->value_len = tk->token_len;
         p->val.name = (char*)malloc(p->value_len + 1);
@@ -1188,6 +1231,7 @@ void _set_common_value(pdf_parser_t* parser, pdf_parser_token_t* tk, struct pdf_
     }
     else if (tk->type == TOKEN_INDIRECT)
     {
+        if (tk->token == NULL) return false;
         p->type = INDIRECT;
         char ref[256] = { 0 };
         memcpy(ref, tk->token, tk->token_len);
@@ -1196,17 +1240,20 @@ void _set_common_value(pdf_parser_t* parser, pdf_parser_token_t* tk, struct pdf_
     }
     else if (tk->type == TOKEN_NUMBER)
     {
+        if (tk->token == NULL) return false;
         p->type = NUMBER;
         p->val.number = strtod(tk->token, NULL);
     }
     else if (tk->type == TOKEN_STRING || tk->type == TOKEN_HEX_STRING)
     {
+        if (tk->token == NULL) return false;
         p->type = STRING;
         p->value_len = tk->token_len;
         p->val.string = (char*)malloc(p->value_len + 1);
         memcpy(p->val.string, tk->token, p->value_len);
         p->val.string[p->value_len] = '\0';
     }
+    return true;
 }
 pdf_obj_t* pdf_parser_build_obj(pdf_parser_t* parser)
 {
@@ -1243,9 +1290,21 @@ pdf_obj_t* pdf_parser_build_obj(pdf_parser_t* parser)
             if (len == -1)
             {
                 int ref = pdf_dict_get_ref(obj->value->val.dict, "/Length");
-                pdf_obj_t* l_obj = pdf_file_get_obj(parser->pdf, ref);
-                len = l_obj->value->val.number;
-                fseek(parser->pdf->pFile, offset, SEEK_SET);
+                if (ref != -1)
+                {
+                    pdf_obj_t* l_obj = pdf_file_get_obj(parser->pdf, ref);
+                    if (l_obj != NULL && l_obj->value->type == NUMBER)
+                    {
+                        len = l_obj->value->val.number;
+                        fseek(parser->pdf->pFile, offset, SEEK_SET);
+                    }
+                    else
+                    {
+                        pdf_parser_token_free(parser, tk);
+                        pdf_obj_free(obj);
+                        return NULL;
+                    }
+                } 
             }
             //int offset = ftell(parser->pdf->pFile);
             obj->stream = pdf_stream_init(parser->pdf, obj, len, offset);
@@ -1267,7 +1326,12 @@ pdf_obj_t* pdf_parser_build_obj(pdf_parser_t* parser)
         }
         else
         {
-            _set_common_value(parser, tk, obj->value);
+            if (!_set_common_value(parser, tk, obj->value))
+            {
+                pdf_parser_token_free(parser, tk);
+                pdf_obj_free(obj);
+                return NULL;
+            }
         }
 
         pdf_parser_token_free(parser, tk);
@@ -1289,10 +1353,17 @@ pdf_dict_t* pdf_parser_build_dict(pdf_parser_t* parser)
             pdf_parser_token_free(parser, tk);
             break;
         }
+        else if (tk->token == NULL)
+        {
+            pdf_parser_token_free(parser, tk);
+            pdf_dict_free(dict);
+            return NULL;
+        }
         tk1 = pdf_parser_next_token(parser);
         if (tk1 == NULL)
         {
             pdf_parser_token_free(parser, tk);
+            pdf_dict_free(dict);
             return NULL;
         }
         pdf_dict_pair_t* p = (pdf_dict_pair_t*)malloc(sizeof(pdf_dict_pair_t));
@@ -1301,7 +1372,16 @@ pdf_dict_t* pdf_parser_build_dict(pdf_parser_t* parser)
         memcpy(p->name, tk->token, p->name_len);
         p->name[p->name_len] = '\0';
         p->value = (pdf_dict_pair_value_t*)malloc(sizeof(pdf_dict_pair_value_t));
-        _set_common_value(parser, tk1, p->value);
+        if (!_set_common_value(parser, tk1, p->value))
+        {
+            pdf_parser_token_free(parser, tk);
+            pdf_parser_token_free(parser, tk1);
+            free(p->name);
+            pdf_value_free(p->value);
+            free(p);
+            pdf_dict_free(dict);
+            return NULL;
+        }
 
         pdf_parser_token_free(parser, tk);
         pdf_parser_token_free(parser, tk1);
@@ -1352,7 +1432,16 @@ pdf_array_t* pdf_parser_build_array(pdf_parser_t* parser)
                 head[index] = v;
             }
 
-            _set_common_value(parser, tk, v);
+            if (!_set_common_value(parser, tk, v))
+            {
+                pdf_parser_token_free(parser, tk);
+                for (int i = 0; i < ele_nums; i++)
+                {
+                    free(head[i]);
+                }
+                free(head);
+                return NULL;
+            }
             index++;
         }
 

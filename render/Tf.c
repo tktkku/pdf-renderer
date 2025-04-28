@@ -41,7 +41,7 @@ void handle_Tf(pdf_context_t* context)
     // context->fontface = plutovg_font_face_load_from_file("fonts/SimSun.ttf",
     // 0); FT_Face face;
     context->state->textState.font_face_loaded = false;
-    if (strcmp(font->subtype, "/TrueType") == 0)
+    if (font->subtype && strcmp(font->subtype, "/TrueType") == 0)
     {
         if (font->font_data == NULL)
         {
