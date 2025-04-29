@@ -673,6 +673,96 @@ void pdf_obj_get_colorspace(pdf_obj_t* obj, const char* name, char* value)
     }
 
 }
+const static char* STANDARD_14_FONTS[][2] = {
+    // "/Arial-BoldMT", "n019004l.pfb",
+    // "/ArialMT", "n019003l.pfb",
+    // "/Arial", "n019003l.pfb",
+    // "/Arial-ItalicMT", "n019023l.pfb",
+    // "/Arial-Italic", "n019023l.pfb"
+    // "/CourierNewPSMT", "n022003l.pfb",
+
+    {"/Courier", "n022003l.pfb"},
+    {"/Courier-Bold", "n022004l.pfb"},
+    {"/Courier-BoldOblique", "n022024l.pfb"},
+    {"/Courier-Oblique", "n022023l.pfb"},
+    
+    {"/Symbol", "s050000l.pfb"},
+
+    {"/Times-Bold", "p052004l.pfb"},
+    {"/Times-BoldItalic", "p052024l.pfb"},
+    {"/Times-Italic", "p052023l.pfb"},
+    {"/Times-Roman", "p052003l.pfb"},
+    // "/Times New Roman", "p052003l.pfb",
+    // "/TimesNewRomanPSMT", "p052003l.pfb",
+    // "/TimesNewRoman", "p052003l.pfb",
+    // "/Times New Roman,Bold", "p052004l.pfb",
+    // "/TimesNewRomanPS-BoldMT", "p052004l.pfb",
+    // "/TimesNewRoman,Bold", "p052004l.pfb",
+    // "/TimesNewRoman,Italic", "p052023l.pfb",
+    // "/TimesNewRomanPS-ItalicMT", "p052023l.pfb",
+    // "/TimesNewRomanPS-BoldItalicMT", "p052024l.pfb",
+    // "/TimesNewRoman,BoldItalic", "p052024l.pfb",
+    
+    {"/Helvetica", "n019003l.pfb"},
+    {"/Helvetica-Bold", "n019004l.pfb"},
+    {"/Helvetica-BoldOblique", "n019024l.pfb"},
+    {"/Helvetica-Oblique", "n019023l.pfb"},
+    
+    {"/ZapfDingbats", "d050000l.pfb"},
+};
+pdf_font_t* _load_type1_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
+{
+    char* type = (char*)pdf_dict_get_name(font_dict, "/Type");
+    char* subtype = (char*)pdf_dict_get_name(font_dict, "/Subtype");
+    char* basefont = (char*)pdf_dict_get_name(font_dict, "/BaseFont");
+    int left = 0;
+    int right = 13;
+    int mid = 0;
+    while (left <= right)
+    {
+        mid = left + (right - left) / 2;
+        int cmp = strcmp(basefont, STANDARD_14_FONTS[mid][0]);
+        if (cmp < 0)
+        {
+            right = mid - 1;
+        }
+        else if (cmp > 0)
+        {
+            left = mid + 1;
+        }
+        else
+        {
+            break;
+        }
+    }
+    char filename[64] = {0};
+    sprintf(filename, "fonts/%s", STANDARD_14_FONTS[mid][1]);
+    FILE* f = fopen(filename, "rb");
+    if (f == NULL) return NULL;
+    fseek(f, 0, SEEK_END);
+    long filesize = ftell(f);
+    rewind(f);
+    unsigned char* buffer = (unsigned char*)malloc(filesize);
+    fread(buffer, filesize, 1, f);
+    fclose(f);
+
+    unsigned char* p = buffer + 6;
+    pdf_buffer_t b1 = {
+        .buffer = p,
+        .buffer_size = filesize - 6,
+        .processed = 0
+    };
+    pdf_parser_t* parser = pdf_parser_init(obj->pdf, BUFFER_READER, &b1);
+    pdf_parser_token_t* tk = NULL;
+    while ((tk = pdf_parser_next_token(parser)) != NULL)
+    {
+
+        pdf_parser_token_free(parser, tk);
+    }
+    pdf_parser_free(parser);
+    free(buffer);
+    return NULL;
+}
 pdf_font_t* pdf_obj_get_font(pdf_obj_t* obj, const char* name)
 {
     if (obj == NULL || name == NULL || obj->resources.font_dict == NULL) return NULL;
@@ -712,7 +802,7 @@ pdf_font_t* pdf_obj_get_font(pdf_obj_t* obj, const char* name)
     {
         font_obj->font = _load_type3_font(obj, font_dict);
     }
-    else if (!strcmp(subtype, "/Type1"))
+    else if (!strcmp(subtype, "/Type1") || !strcmp(subtype, "/MMType1"))
     {
         return NULL;
     }
