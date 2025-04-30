@@ -12,6 +12,8 @@ add_subdirectory(plutovg)
 add_subdirectory(zlib)
 add_subdirectory(parser)
 add_subdirectory(render)
+add_subdirectory(ippd)
+
 add_executable(test test.c)
 target_link_libraries(test render)
 target_include_directories(test PRIVATE ./parser)

@@ -7,3 +7,9 @@
 [submodule "c-vector"]
 	path = c-vector
 	url = https://github.com/tktkku/c-vector.git
+[submodule "uuid4"]
+	path = uuid4
+	url = https://github.com/tktkku/uuid4.git
+[submodule "mdns"]
+	path = mdns
+	url = https://github.com/mjansson/mdns.git
