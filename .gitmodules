@@ -10,3 +10,6 @@
 [submodule "uuid4"]
 	path = uuid4
 	url = https://github.com/tktkku/uuid4.git
+[submodule "ippd"]
+	path = ippd
+	url = https://github.com/tktkku/ippd.git
