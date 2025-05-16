@@ -31,6 +31,16 @@ echo core >/proc/sys/kernel/core_pattern
 exit
 gdb --args ./build/test ./output/default/crashes/<your_filename>
 ```
+## fix git error
+```bash
+git fsck --full
+rm .git/object/xxxxx
+git fsck --full
+tail -n 2 .git/logs/refs/heads/${BRANCH_NAME}
+git show ${hash}
+git update-ref HEAD ${hash}
+
+```
 ## Valgrind
 valgrind --leak-check=full --track-origins=yes --log-file="valgrind.log" ./build/test ./test.pdf
 valgrind --tool=memcheck --leak-check=full --show-leak-kinds=all --log-file="valgrind.log" --vgdb=yes --vgdb-error=0 -s ./build/test test.pdf

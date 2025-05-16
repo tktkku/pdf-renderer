@@ -1,0 +1,268 @@
+"ipp-tests.test":
+    I-1. RFC 8011 section 4.1.1: Bad request-id value 0                  [PASS]
+    I-2. RFC 8011 section 4.1.4: No Operation Attributes                 [PASS]
+    I-3. RFC 8011 section 4.1.4: attributes-charset                      [PASS]
+    I-4. RFC 8011 section 4.1.4: attributes-natural-language             [PASS]
+    I-5. RFC 8011 section 4.1.4: attributes-natural-language + attribute [FAIL]
+        RECEIVED: 4497 bytes in response
+        status-code = successful-ok (successful-ok)
+        EXPECTED: STATUS client-error-bad-request (got successful-ok)
+        NOT EXPECTED: printer-uri-supported
+    I-6. RFC 8011 section 4.1.4: attributes-charset + attributes-natural [PASS]
+    I-7. RFC 8011 section 4.1.8: Unsupported IPP version 0.0             [PASS]
+    I-8. RFC 8011 section 4.2: No printer-uri operation attribute        [PASS]
+    I-9. Identify-Printer Operation                                      [SKIP]
+    I-10. Get-Printer-Attributes Operation (default)                     [FAIL]
+        RECEIVED: 4497 bytes in response
+        status-code = successful-ok (successful-ok)
+        EXPECTED: ipp-features-supported
+        EXPECTED: operations-supported WITH-VALUE "0x0039"
+        GOT: operations-supported=2
+        GOT: operations-supported=4
+        GOT: operations-supported=5
+        GOT: operations-supported=6
+        GOT: operations-supported=8
+        GOT: operations-supported=9
+        GOT: operations-supported=10
+        GOT: operations-supported=11
+        EXPECTED: operations-supported WITH-VALUE "0x003b"
+        GOT: operations-supported=2
+        GOT: operations-supported=4
+        GOT: operations-supported=5
+        GOT: operations-supported=6
+        GOT: operations-supported=8
+        GOT: operations-supported=9
+        GOT: operations-supported=10
+        GOT: operations-supported=11
+        EXPECTED: operations-supported WITH-VALUE "0x003c"
+        GOT: operations-supported=2
+        GOT: operations-supported=4
+        GOT: operations-supported=5
+        GOT: operations-supported=6
+        GOT: operations-supported=8
+        GOT: operations-supported=9
+        GOT: operations-supported=10
+        GOT: operations-supported=11
+        NOT EXPECTED: media-col-database
+        EXPECTED: document-password-supported
+        EXPECTED: job-creation-attributes-supported
+        EXPECTED: job-ids-supported
+        EXPECTED: multiple-operation-time-out-action
+        EXPECTED: preferred-attributes-supported
+        EXPECTED: printer-config-change-date-time
+        EXPECTED: printer-config-change-time
+        EXPECTED: printer-current-time
+        EXPECTED: printer-geo-location
+        EXPECTED: printer-get-attributes-supported
+        EXPECTED: printer-icons
+        EXPECTED: printer-icons
+        EXPECTED: printer-more-info WITH-HOSTNAME "john-computer.local"
+        GOT: printer-more-info="http://192.168.44.132:7777"
+        EXPECTED: printer-organization
+        EXPECTED: printer-organizational-unit
+        EXPECTED: printer-state-change-date-time
+        EXPECTED: printer-state-change-time
+        EXPECTED: printer-state-message
+        EXPECTED: printer-state-reasons OF-TYPE keyword (got textWithoutLanguage)
+        EXPECTED: printer-up-time
+        EXPECTED: queued-job-count
+        EXPECTED: which-jobs-supported
+        EXPECTED: which-jobs-supported
+        EXPECTED: media-ready
+        EXPECTED: media-size-supported
+        EXPECTED: media-size-supported/x-dimension
+        EXPECTED: media-size-supported/y-dimension
+        EXPECTED: media-supported WITH-ALL-VALUES /^(choice(_((custom|na|asme|roc|oe|roll)_[a-z0-9][-.a-z0-9]*_([1-9][0-9]*(.[0-9]*[1-9])?|0.[0-9]*[1-9])x([1-9][0-9]*(.[0-9]*[1-9])?|0.[0-9]*[1-9])in|(custom|iso|jis|jpn|prc|om|roll)_[a-z0-9][-.a-z0-9]*_([1-9][0-9]*(.[0-9]*[1-9])?|0.[0-9]*[1-9])x([1-9][0-9]*(.[0-9]*[1-9])?|0.[0-9]*[1-9])mm)){2,}|(custom|na|asme|roc|oe|roll)_[a-z0-9][-.a-z0-9]*_([1-9][0-9]*(.[0-9]*[1-9])?|0.[0-9]*[1-9])x([1-9][0-9]*(.[0-9]*[1-9])?|0.[0-9]*[1-9])in|(custom|iso|jis|jpn|prc|om|roll)_[a-z0-9][-.a-z0-9]*_([1-9][0-9]*(.[0-9]*[1-9])?|0.[0-9]*[1-9])x([1-9][0-9]*(.[0-9]*[1-9])?|0.[0-9]*[1-9])mm)$/
+        GOT: media-supported="iso_a4_210x297mm"
+        GOT: media-supported="iso_a5_148x210mm"
+        GOT: media-supported="custom_a5_rotated_210x148mm"
+        EXPECTED: media-col-default/media-source
+        EXPECTED: media-col-default/media-type
+        EXPECTED: media-col-ready/media-source
+        EXPECTED: media-col-ready/media-type
+        EXPECTED: overrides-supported
+        EXPECTED: print-quality-default WITH-VALUES-FROM print-quality-supported
+        GOT: print-quality-default OF-TYPE enum
+        EXPECTED: print-quality-supported
+        EXPECTED: printer-output-tray OF-TYPE octetString (got keyword)
+    I-10.1 Get-Printer-Attributes Operation (all)                        [FAIL]
+        RECEIVED: 4497 bytes in response
+        status-code = successful-ok (successful-ok)
+        NOT EXPECTED: media-col-database
+        EXPECTED: identify-actions-default
+        EXPECTED: identify-actions-supported
+        EXPECTED: ipp-features-supported
+        EXPECTED: job-creation-attributes-supported
+        EXPECTED: job-ids-supported
+        EXPECTED: multiple-operation-time-out-action
+        EXPECTED: preferred-attributes-supported
+        EXPECTED: printer-config-change-date-time
+        EXPECTED: printer-config-change-time
+        EXPECTED: printer-current-time
+        EXPECTED: printer-geo-location
+        EXPECTED: printer-get-attributes-supported
+        EXPECTED: printer-icons
+        EXPECTED: printer-organization
+        EXPECTED: printer-organizational-unit
+        EXPECTED: printer-state-change-date-time
+        EXPECTED: printer-state-change-time
+        EXPECTED: printer-state-message
+        EXPECTED: printer-up-time
+        EXPECTED: queued-job-count
+        EXPECTED: which-jobs-supported
+        EXPECTED: media-ready
+        EXPECTED: media-size-supported
+        EXPECTED: overrides-supported
+        EXPECTED: print-quality-supported
+    I-10.2. Get-Printer-Attributes Operation (all, media-col-database)   [FAIL]
+        RECEIVED: 4497 bytes in response
+        status-code = successful-ok (successful-ok)
+        EXPECTED: identify-actions-default
+        EXPECTED: identify-actions-supported
+        EXPECTED: ipp-features-supported
+        EXPECTED: job-creation-attributes-supported
+        EXPECTED: job-ids-supported
+        EXPECTED: multiple-operation-time-out-action
+        EXPECTED: preferred-attributes-supported
+        EXPECTED: printer-config-change-date-time
+        EXPECTED: printer-config-change-time
+        EXPECTED: printer-current-time
+        EXPECTED: printer-geo-location
+        EXPECTED: printer-get-attributes-supported
+        EXPECTED: printer-icons
+        EXPECTED: printer-organization
+        EXPECTED: printer-organizational-unit
+        EXPECTED: printer-state-change-date-time
+        EXPECTED: printer-state-change-time
+        EXPECTED: printer-state-message
+        EXPECTED: printer-up-time
+        EXPECTED: queued-job-count
+        EXPECTED: which-jobs-supported
+        EXPECTED: media-ready
+        EXPECTED: media-size-supported
+        EXPECTED: overrides-supported
+        EXPECTED: print-quality-supported
+    I-10.3. Get-Printer-Attributes Operation (none)                      [PASS]
+    I-10.4. Get-Printer-Attributes Operation (media-col-database)        [PASS]
+    I-10.5. Get-Printer-Attributes Operation (printer-description)       [FAIL]
+        RECEIVED: 104 bytes in response
+        status-code = successful-ok (successful-ok)
+        EXPECTED: charset-configured
+        EXPECTED: charset-supported
+        EXPECTED: color-supported
+        EXPECTED: compression-supported
+        EXPECTED: document-format-default
+        EXPECTED: document-format-supported
+        EXPECTED: generated-natural-language-supported
+        EXPECTED: identify-actions-default
+        EXPECTED: identify-actions-supported
+        EXPECTED: ipp-features-supported
+        EXPECTED: ipp-versions-supported
+        EXPECTED: job-creation-attributes-supported
+        EXPECTED: job-ids-supported
+        EXPECTED: multiple-document-jobs-supported
+        EXPECTED: multiple-operation-time-out
+        EXPECTED: multiple-operation-time-out-action
+        EXPECTED: natural-language-configured
+        EXPECTED: operations-supported
+        EXPECTED: pages-per-minute
+        EXPECTED: pages-per-minute-color
+        EXPECTED: pdl-override-supported
+        EXPECTED: preferred-attributes-supported
+        EXPECTED: printer-config-change-date-time
+        EXPECTED: printer-config-change-time
+        EXPECTED: printer-current-time
+        EXPECTED: printer-geo-location
+        EXPECTED: printer-get-attributes-supported
+        EXPECTED: printer-icons
+        EXPECTED: printer-info
+        EXPECTED: printer-is-accepting-jobs
+        EXPECTED: printer-location
+        EXPECTED: printer-make-and-model
+        EXPECTED: printer-more-info
+        EXPECTED: printer-name
+        EXPECTED: printer-organization
+        EXPECTED: printer-organizational-unit
+        EXPECTED: printer-state
+        EXPECTED: printer-state-change-date-time
+        EXPECTED: printer-state-change-time
+        EXPECTED: printer-state-message
+        EXPECTED: printer-state-reasons
+        EXPECTED: printer-up-time
+        EXPECTED: printer-uri-supported
+        EXPECTED: printer-uuid
+        EXPECTED: pwg-raster-document-resolution-supported
+        EXPECTED: pwg-raster-document-type-supported
+        EXPECTED: queued-job-count
+        EXPECTED: uri-authentication-supported
+        EXPECTED: uri-security-supported
+        EXPECTED: which-jobs-supported
+    I-10.6. Get-Printer-Attributes Operation (job-template)              [FAIL]
+        RECEIVED: 97 bytes in response
+        status-code = successful-ok (successful-ok)
+        EXPECTED: copies-default
+        EXPECTED: copies-supported
+        EXPECTED: media-bottom-margin-supported
+        EXPECTED: media-col-default
+        EXPECTED: media-col-ready
+        EXPECTED: media-col-supported
+        EXPECTED: media-default
+        EXPECTED: media-left-margin-supported
+        EXPECTED: media-ready
+        EXPECTED: media-right-margin-supported
+        EXPECTED: media-size-supported
+        EXPECTED: media-source-supported
+        EXPECTED: media-supported
+        EXPECTED: media-top-margin-supported
+        EXPECTED: media-type-supported
+        EXPECTED: orientation-requested-default
+        EXPECTED: orientation-requested-supported
+        EXPECTED: output-bin-default
+        EXPECTED: output-bin-supported
+        EXPECTED: overrides-supported
+        EXPECTED: page-ranges-supported
+        EXPECTED: print-color-mode-default
+        EXPECTED: print-color-mode-supported
+        EXPECTED: print-quality-default
+        EXPECTED: print-quality-supported
+        EXPECTED: printer-resolution-default
+        EXPECTED: printer-resolution-supported
+    I-10.7 Get-Printer-Attributes Operation (media-col-database, printer [PASS]
+    I-11. Validate-Job Operation                                         [FAIL]
+        RECEIVED: 104 bytes in response
+        status-code = successful-ok (successful-ok)
+        status-message (text(255)) has wrong value tag keyword (RFC 8011 section 4.1.6.2).
+    I-12. Print-Job Operation (Print-Job Test onepage)                   [FAIL]
+        RECEIVED: 0 bytes in response
+        status-code = server-error-service-unavailable (主机已关闭)
+        IPP request failed with status server-error-service-unavailable (主机已关闭)
+    I-13. Get-Jobs Operation (default)                                   [FAIL]
+        RECEIVED: 0 bytes in response
+        status-code = server-error-service-unavailable (主机已关闭)
+        IPP request failed with status server-error-service-unavailable (主机已关闭)
+    I-13.1 Get-Jobs Operation (requested-attributes)                     [FAIL]
+        RECEIVED: 0 bytes in response
+        status-code = server-error-service-unavailable (主机已关闭)
+        IPP request failed with status server-error-service-unavailable (主机已关闭)
+    I-13.2 Get-Jobs Operation (which-jobs=not-completed)                 [FAIL]
+        RECEIVED: 0 bytes in response
+        status-code = server-error-service-unavailable (主机已关闭)
+        IPP request failed with status server-error-service-unavailable (主机已关闭)
+    I-14. Get-Job-Attributes Operation (until job complete)              [SKIP]
+    I-15. Get-Jobs Operation (which-jobs=completed)                      [FAIL]
+        RECEIVED: 0 bytes in response
+        status-code = server-error-service-unavailable (主机已关闭)
+        IPP request failed with status server-error-service-unavailable (主机已关闭)
+    I-15.1 Get-Jobs Operation (which-jobs, requested-attributes)         [FAIL]
+        RECEIVED: 0 bytes in response
+        status-code = server-error-service-unavailable (主机已关闭)
+        IPP request failed with status server-error-service-unavailable (主机已关闭)
+    I-16. Cancel-Job Operation (completed job)                           [FAIL]
+        RECEIVED: 0 bytes in response
+        status-code = server-error-service-unavailable (主机已关闭)
+        IPP request failed with status server-error-service-unavailable (主机已关闭)
+ipptool: Unable to connect to printer for GENERATE-FILE on line 1624 of "ipp-tests.test".
+ipptool: Error: 主机已关闭
+
+Summary: 26 tests, 10 passed, 14 failed, 2 skipped
+Score: 46%
