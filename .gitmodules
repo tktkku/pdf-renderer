@@ -13,3 +13,6 @@
 [submodule "ippd"]
 	path = ippd
 	url = https://github.com/tktkku/ippd.git
+[submodule "mdns"]
+	path = mdns
+	url = https://github.com/mjansson/mdns.git
