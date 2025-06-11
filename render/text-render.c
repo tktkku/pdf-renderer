@@ -31,10 +31,10 @@ uint16_t _get_unicode_from_cmap(pdf_cmap_t* cmap, uint16_t code)
 
 void _cff_do_render_char(pdf_cff_char_render_t* context, pdf_deque_t* deque)
 {
-    plutovg_canvas_t* canvas = context->canvas;
-    pdf_array_t* charstrings_index = context->charstrings;
-    pdf_array_t* global_subr_index = context->global_subr;
-    uint16_t global_bias = context->global_bias;
+    //plutovg_canvas_t* canvas = context->canvas;
+    //pdf_array_t* charstrings_index = context->charstrings;
+    //pdf_array_t* global_subr_index = context->global_subr;
+    //uint16_t global_bias = context->global_bias;
 
     unsigned char* end = context->buf + context->len;
 
@@ -47,7 +47,7 @@ void _cff_do_render_char(pdf_cff_char_render_t* context, pdf_deque_t* deque)
     pdf_node_t node;
     char data[16] = {0};
     node.data = data;
-    static double width = 0;
+    //static double width = 0;
     while (context->cur < end)
     {
         double v = 0;
@@ -227,7 +227,7 @@ void _do_text_render(pdf_context_t* context, char* buf, int len)
     plutovg_canvas_save(context->canvas);
     int unicode_cnt = 0;
     uint16_t unicode[1024] = { 0 };
-    unsigned char* pbuf = buf;
+    unsigned char* pbuf = (unsigned char*)buf;
     if (pbuf[0] == '<')
     {
         if (context->state->textState.font->encoding && strstr(context->state->textState.font->encoding, "Identity"))
@@ -235,6 +235,14 @@ void _do_text_render(pdf_context_t* context, char* buf, int len)
             for (char* p = &pbuf[1]; *p != '\0'; p += 4)
             {
                 uint16_t t = _hex_str_to_16bit(p);
+                unicode[unicode_cnt++] = t;
+            }
+        }
+        else if (context->state->textState.font->encoding == NULL)
+        {
+            for (char* p = &pbuf[1]; *p != '\0'; p += 2)
+            {
+                uint8_t t = _hex_str_to_8bit(p);
                 unicode[unicode_cnt++] = t;
             }
         }
@@ -316,9 +324,9 @@ void _do_text_render(pdf_context_t* context, char* buf, int len)
             plutovg_canvas_new_path(context->canvas);
             float advance_width = 0;
             // TODO: bold text support
-            bool bold = context->state->textState.font->font_weight == 700 
-                        || (context->state->textState.textMode == 2 || context->state->textState.textMode == 6);
-            float half_bold_width = 0;
+            // bool bold = context->state->textState.font->font_weight == 700 
+            //             || (context->state->textState.textMode == 2 || context->state->textState.textMode == 6);
+            //float half_bold_width = 0;
             if (context->state->textState.font_face_loaded 
                 && 
                 (
@@ -438,7 +446,7 @@ void _do_text_render(pdf_context_t* context, char* buf, int len)
                         context->state->fill.color[2]);
                     plutovg_canvas_new_path(context->canvas);
                     pdf_cff_char_render_t ctx;
-                    ctx.buf = charstrings_index->values[unicode[i]]->val.string;
+                    ctx.buf = (unsigned char*)charstrings_index->values[unicode[i]]->val.string;
                     ctx.cur = ctx.buf;
                     ctx.len = charstrings_index->values[unicode[i]]->value_len;
                     ctx.canvas = context->canvas;
@@ -459,7 +467,7 @@ void _do_text_render(pdf_context_t* context, char* buf, int len)
                     double nominalWidthX = 0;
                     if ((int)(font_dict_select->values[0]->val.number) == 0)
                     {
-                        int fd = font_dict_select->values[unicode[i] + 1];
+                        int fd = font_dict_select->values[unicode[i] + 1]->val.number;
                         font_dict = font_dict_aar->values[fd]->val.dict;
                     }
                     else
@@ -505,7 +513,7 @@ void _do_text_render(pdf_context_t* context, char* buf, int len)
         pdf_array_t* differences = context->state->textState.font->differences;
         if (differences != NULL)
         {
-            pdf_array_t* font_bbox = context->state->textState.font->font_bbox;
+            // pdf_array_t* font_bbox = context->state->textState.font->font_bbox;
             pdf_array_t* font_matrix = context->state->textState.font->font_matrix;
             pdf_array_t* widths = context->state->textState.font->widths;
             // plutovg_canvas_scale(context->canvas, 1, -1);

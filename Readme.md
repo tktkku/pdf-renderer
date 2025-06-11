@@ -41,6 +41,13 @@ git show ${hash}
 git update-ref HEAD ${hash}
 
 ```
+## delete submodule
+```
+rm -rf mod
+vim .gitmodules
+vim .git/config
+rm -rf .git/module/mode
+```
 ## Valgrind
 valgrind --leak-check=full --track-origins=yes --log-file="valgrind.log" ./build/test ./test.pdf
 valgrind --tool=memcheck --leak-check=full --show-leak-kinds=all --log-file="valgrind.log" --vgdb=yes --vgdb-error=0 -s ./build/test test.pdf
