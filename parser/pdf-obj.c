@@ -85,6 +85,7 @@ void pdf_obj_get_extgstate(pdf_obj_t* obj, const char* name)
 {
 
 }
+#include "CMap/CMaps.h"
 pdf_font_t* _load_type0_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
 {
     pdf_font_t* font = pdf_font_init();
@@ -95,8 +96,29 @@ pdf_font_t* _load_type0_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
     font->encoding = (char*)pdf_dict_get_name(font_dict, "/Encoding");
     if (font->encoding != NULL)
     {
-        pdf_cmap_t* cmap = pdf_file_get_cmap(obj->pdf, font->encoding);
-        font->cmap = cmap;
+        // pdf_cmap_t* cmap = pdf_file_get_cmap(obj->pdf, font->encoding);
+        // font->cmap = cmap;
+        int count = ARRAY_COUNT(g_CMAP_INDEX);
+        int left = 0;
+        int right = count - 1;
+        while (left <= right)
+        {
+            int mid = left + (right - left) / 2;
+            int cmp = strcmp(g_CMAP_INDEX[mid].name, font->encoding + 1);
+            if (cmp < 0)
+            {
+                left = mid + 1;
+            }
+            else if (cmp > 0)
+            {
+                right = mid - 1;
+            }
+            else
+            {
+                font->cmap = g_CMAP_INDEX[mid].cmap;
+                break;
+            }
+        }
     }
     int to_unicode_ref = pdf_dict_get_ref(font_dict, "/ToUnicode");
     if (to_unicode_ref != -1)
@@ -113,12 +135,10 @@ pdf_font_t* _load_type0_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
         pdf_stream_get_all(obj1->stream, &data, &len);
         if (data != NULL)
         {
-            pdf_buffer_t b1;
-            b1.buffer = data;
-            b1.buffer_size = len;
-            b1.processed = 0;
+            pdf_input_t* input = NULL;
+            pdf_input_buffer(&input, data, len);
             unsigned char* origin = data;
-            pdf_parser_t* parser = pdf_parser_init(obj->pdf, BUFFER_READER, &b1);
+            pdf_parser_t* parser = pdf_parser_init(obj->pdf, INPUT_READER, input);
 
             pdf_cmap_t* cmap = pdf_parser_build_cmap(parser);
             cmap->worldwide = false;
@@ -330,12 +350,10 @@ pdf_font_t* _load_truetype_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
         pdf_stream_get_all(obj1->stream, &data, &len);
         if (data == NULL)
         {
-            pdf_buffer_t b1;
-            b1.buffer = data;
-            b1.buffer_size = len;
-            b1.processed = 0;
+            pdf_input_t* input = NULL;
+            pdf_input_buffer(&input, data, len);
             unsigned char* origin = data;
-            pdf_parser_t* parser = pdf_parser_init(obj->pdf, BUFFER_READER, &b1);
+            pdf_parser_t* parser = pdf_parser_init(obj->pdf, INPUT_READER, input);
 
             pdf_cmap_t* cmap = pdf_parser_build_cmap(parser);
             cmap->worldwide = false;
@@ -525,12 +543,10 @@ pdf_font_t* _load_type3_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
         pdf_stream_get_all(obj1->stream, &data, &len);
         if (data != NULL)
         {
-            pdf_buffer_t b1;
-            b1.buffer = data;
-            b1.buffer_size = len;
-            b1.processed = 0;
+            pdf_input_t* input = NULL;
+            pdf_input_buffer(&input, data, len);
             unsigned char* origin = data;
-            pdf_parser_t* parser = pdf_parser_init(obj->pdf, BUFFER_READER, &b1);
+            pdf_parser_t* parser = pdf_parser_init(obj->pdf, INPUT_READER, input);
     
             pdf_cmap_t* cmap = pdf_parser_build_cmap(parser);
             cmap->worldwide = false;
@@ -747,12 +763,9 @@ pdf_font_t* _load_type1_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
     fclose(f);
 
     unsigned char* p = buffer + 6;
-    pdf_buffer_t b1 = {
-        .buffer = p,
-        .buffer_size = filesize - 6,
-        .processed = 0
-    };
-    pdf_parser_t* parser = pdf_parser_init(obj->pdf, BUFFER_READER, &b1);
+    pdf_input_t* input = NULL;
+    pdf_input_buffer(&input, p, filesize - 6);
+    pdf_parser_t* parser = pdf_parser_init(obj->pdf, INPUT_READER, input);
     pdf_parser_token_t* tk = NULL;
     while ((tk = pdf_parser_next_token(parser)) != NULL)
     {
@@ -1083,8 +1096,8 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj, const char* name)
             {
                 strcpy(img->color_space, color_space);
             }
-            fseek(xobject->pdf->pFile, xobject->stream->stream_offset, SEEK_SET);
-            int ret = fread(img->data, 1, length, xobject->pdf->pFile);
+            pdf_input_seek(xobject->pdf->input, xobject->stream->stream_offset, SEEK_SET);
+            int ret = pdf_input_read(xobject->pdf->input, img->data, length);
             if (ret != length)
             {
                 free(img);

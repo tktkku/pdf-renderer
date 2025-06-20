@@ -13,6 +13,7 @@ set(PARSER_SOURCES
     pdf-page.c
     pdf-parser.c
     pdf-stream.c
+    pdf-input.c
     pdf-private.h
     pdf.h
 )

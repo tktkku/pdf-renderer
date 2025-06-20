@@ -1,27 +1,26 @@
 #include "render.h"
 #include "pdf-private.h"
 #include "plutovg-private.h"
-uint16_t _get_unicode_from_cmap(pdf_cmap_t* cmap, uint16_t code)
+uint32_t _get_unicode_from_cmap(pdf_cmap_t* cmap, uint32_t code)
 {
     bool found = false;
     while (cmap != NULL && !found)
     {
-        int nums = cvector_size(cmap->unicode_map);
-        for (int k = 0; k < nums; k++)
+        for (int k = 0; k < cmap->unicode_map_len; k++)
         {
-            if (code == cmap->unicode_map[k]->cid)
+            if (code == cmap->unicode_map[k].cid)
             {
-                return cmap->unicode_map[k]->unicode;
+                return cmap->unicode_map[k].unicode;
             }
         }
-        nums = cvector_size(cmap->char_range_map);
-        for (int k = 0; k < nums && !found; k++)
+ 
+        for (int k = 0; k < cmap->char_range_map_len && !found; k++)
         {
-            if (code >= cmap->char_range_map[k]->dstStart &&
-                code <= cmap->char_range_map[k]->srcEnd)
+            if (code >= cmap->char_range_map[k].dstStart &&
+                code <= cmap->char_range_map[k].srcEnd)
             {
-                return cmap->char_range_map[k]->dstStart +
-                    (code - cmap->char_range_map[k]->srcStart);
+                return cmap->char_range_map[k].dstStart +
+                    (code - cmap->char_range_map[k].srcStart);
             }
         }
         cmap = cmap->next;
@@ -221,37 +220,96 @@ void _cff_do_render_char(pdf_cff_char_render_t* context, pdf_deque_t* deque)
         }
     }
 }
-
+typedef struct unicode_text
+{
+    union {
+        uint8_t utf8;
+        uint16_t utf16;
+        uint32_t utf32;
+    };
+    plutovg_text_encoding_t encoding;
+} unicode_text_t;
 void _do_text_render(pdf_context_t* context, char* buf, int len)
 {
     plutovg_canvas_save(context->canvas);
     int unicode_cnt = 0;
-    uint16_t unicode[1024] = { 0 };
+    unicode_text_t unicode[1024] = { 0 };
     unsigned char* pbuf = (unsigned char*)buf;
     if (pbuf[0] == '<')
     {
-        if (context->state->textState.font->encoding && strstr(context->state->textState.font->encoding, "Identity"))
-        {
-            for (char* p = &pbuf[1]; *p != '\0'; p += 4)
-            {
-                uint16_t t = _hex_str_to_16bit(p);
-                unicode[unicode_cnt++] = t;
-            }
-        }
-        else if (context->state->textState.font->encoding == NULL)
+        // if (context->state->textState.font->encoding && strstr(context->state->textState.font->encoding, "Identity"))
+        // {
+        //     for (char* p = &pbuf[1]; *p != '\0'; p += 4)
+        //     {
+        //         uint16_t t = _hex_str_to_16bit(p);
+        //         unicode[unicode_cnt].utf16 = t;
+        //         unicode[unicode_cnt].encoding = PLUTOVG_TEXT_ENCODING_UTF16;
+        //         unicode_cnt++;
+        //     }
+        // }
+        // else 
+        if (context->state->textState.font->encoding == NULL)
         {
             for (char* p = &pbuf[1]; *p != '\0'; p += 2)
             {
                 uint8_t t = _hex_str_to_8bit(p);
-                unicode[unicode_cnt++] = t;
+                unicode[unicode_cnt].utf8 = t;
+                unicode[unicode_cnt].encoding = PLUTOVG_TEXT_ENCODING_UTF8;
+                unicode_cnt++;
             }
         }
-        else
+        else if (context->state->textState.font->basefont && !strcmp(context->state->textState.font->basefont, "/SimSun"))
         {
             for (char* p = &pbuf[1]; *p != '\0'; p += 4)
             {
                 uint16_t t = _hex_str_to_16bit(p);
-                unicode[unicode_cnt++] = _get_unicode_from_cmap(context->state->textState.font->cmap, t);
+                unicode[unicode_cnt].utf16 = t;
+                unicode[unicode_cnt].encoding = PLUTOVG_TEXT_ENCODING_UTF16;
+                unicode_cnt++;
+            }
+        }
+        else if (context->state->textState.font->cmap)
+        {
+            pdf_cmap_t* cmap = context->state->textState.font->cmap;
+            unsigned char* p = pbuf + 1;
+            unsigned char* end = pbuf + len;
+            while (p < end)
+            {
+                bool found = false;
+                for (int len = 8; len >= 2; len /= 2)
+                {
+                    if (p + len > end) continue;
+                    uint32_t code = _hex_str_to_32bit(p, len);
+                    for (int i = 0; i < cmap->code_range_map_len; i++)
+                    {
+                        if (cmap->code_range_map[i].byte_len != (len / 2)) continue;
+                        if (code >= cmap->code_range_map[i].srcStart && code <= cmap->code_range_map[i].srcEnd)
+                        {
+                            if (len == 8)
+                            {
+                                unicode[unicode_cnt].utf32 = _get_unicode_from_cmap(cmap, code);
+                                unicode[unicode_cnt].encoding = PLUTOVG_TEXT_ENCODING_UTF32;
+                            }
+                            else if (len == 4)
+                            {
+                                unicode[unicode_cnt].utf16 = (uint16_t)_get_unicode_from_cmap(cmap, code);
+                                unicode[unicode_cnt].encoding = PLUTOVG_TEXT_ENCODING_UTF16;
+                            }
+                            else
+                            {
+                                unicode[unicode_cnt].utf8 = (uint8_t)_get_unicode_from_cmap(cmap, code);
+                                unicode[unicode_cnt].encoding = PLUTOVG_TEXT_ENCODING_UTF8;
+                            }
+                            unicode_cnt++;
+                            p += len;
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (found) break;
+                }
+                // uint16_t t = _hex_str_to_16bit(p);
+                // unicode[unicode_cnt++] = _get_unicode_from_cmap(context->state->textState.font->cmap, t);
             }
         }
         // for (char* p = &pbuf[1]; *p != '\0'; p += 4)
@@ -269,7 +327,9 @@ void _do_text_render(pdf_context_t* context, char* buf, int len)
         {
             for (int i = 1; i < len; i++)
             {
-                unicode[unicode_cnt++] = pbuf[i];
+                unicode[unicode_cnt].utf8 = pbuf[i];
+                unicode[unicode_cnt].encoding = PLUTOVG_TEXT_ENCODING_UTF8;
+                unicode_cnt++;
             }
         }
         else
@@ -278,7 +338,9 @@ void _do_text_render(pdf_context_t* context, char* buf, int len)
             {
                 for (int i = 1; i < len; i += 2)
                 {
-                    unicode[unicode_cnt++] = ((pbuf[i] << 8) & 0xFF00) | (pbuf[i + 1] & 0x00FF);
+                    unicode[unicode_cnt].utf16 = ((pbuf[i] << 8) & 0xFF00) | (pbuf[i + 1] & 0x00FF);
+                    unicode[unicode_cnt].encoding = PLUTOVG_TEXT_ENCODING_UTF16;
+                    unicode_cnt++;
                 }
             }
             else
@@ -286,7 +348,9 @@ void _do_text_render(pdf_context_t* context, char* buf, int len)
                 for (int i = 1; i < len; i += 2)
                 {
                     uint16_t t = ((pbuf[i] << 8) & 0xFF00) | (pbuf[i + 1] & 0x00FF);
-                    unicode[unicode_cnt++] = _get_unicode_from_cmap(context->state->textState.font->cmap, t);
+                    unicode[unicode_cnt].utf16 = _get_unicode_from_cmap(context->state->textState.font->cmap, t);
+                    unicode[unicode_cnt].encoding = PLUTOVG_TEXT_ENCODING_UTF16;
+                    unicode_cnt++;
                 }
             }
         }
@@ -336,7 +400,24 @@ void _do_text_render(pdf_context_t* context, char* buf, int len)
                 )
             )
             {
-                advance_width = plutovg_canvas_add_text(context->canvas, unicode, unicode_cnt, PLUTOVG_TEXT_ENCODING_UTF16, context->state->textState.textLineWidth, 0);
+                for (int i = 0; i < unicode_cnt; i++)
+                {
+                    if (unicode[i].encoding == PLUTOVG_TEXT_ENCODING_UTF8)
+                    {
+                        advance_width = plutovg_canvas_add_text(context->canvas, &unicode[i].utf8, 1, unicode[i].encoding, context->state->textState.textLineWidth, 0);
+                    }
+                    else if (unicode[i].encoding == PLUTOVG_TEXT_ENCODING_UTF16)
+                    {
+                        advance_width = plutovg_canvas_add_text(context->canvas, &unicode[i].utf16, 1, unicode[i].encoding, context->state->textState.textLineWidth, 0);
+                    }
+                    else
+                    {
+                        advance_width = plutovg_canvas_add_text(context->canvas, &unicode[i].utf32, 1, unicode[i].encoding, context->state->textState.textLineWidth, 0);
+                    }
+                    context->state->textState.textLineWidth += advance_width;
+                }
+                
+                
                 // if (bold)
                 // {
                 //     plutovg_canvas_add_text(context->canvas, unicode, unicode_cnt, PLUTOVG_TEXT_ENCODING_UTF16, context->state->textState.textLineWidth - half_bold_width, -half_bold_width);
@@ -345,14 +426,29 @@ void _do_text_render(pdf_context_t* context, char* buf, int len)
             }
             else
             {
-                advance_width = plutovg_canvas_add_text1(context->canvas, unicode, unicode_cnt, PLUTOVG_TEXT_ENCODING_UTF16, context->state->textState.textLineWidth, 0);
+                for (int i = 0; i < unicode_cnt; i++)
+                {
+                    if (unicode[i].encoding == PLUTOVG_TEXT_ENCODING_UTF8)
+                    {
+                        advance_width = plutovg_canvas_add_text1(context->canvas, &unicode[i].utf8, 1, unicode[i].encoding, context->state->textState.textLineWidth, 0);
+                    }
+                    else if (unicode[i].encoding == PLUTOVG_TEXT_ENCODING_UTF16)
+                    {
+                        advance_width = plutovg_canvas_add_text1(context->canvas, &unicode[i].utf16, 1, unicode[i].encoding, context->state->textState.textLineWidth, 0);
+                    }
+                    else
+                    {
+                        advance_width = plutovg_canvas_add_text1(context->canvas, &unicode[i].utf32, 1, unicode[i].encoding, context->state->textState.textLineWidth, 0);
+                    }
+                    context->state->textState.textLineWidth += advance_width;
+                }
                 // if (bold)
                 // {
                 //     plutovg_canvas_add_text1(context->canvas, unicode, unicode_cnt, PLUTOVG_TEXT_ENCODING_UTF16, context->state->textState.textLineWidth - half_bold_width, -half_bold_width);
                 //     plutovg_canvas_add_text1(context->canvas, unicode, unicode_cnt, PLUTOVG_TEXT_ENCODING_UTF16, context->state->textState.textLineWidth + half_bold_width, half_bold_width);
                 // }
             }
-            context->state->textState.textLineWidth += advance_width;
+            //context->state->textState.textLineWidth += advance_width;
             // TODO: text rendering mode support
             switch (context->state->textState.textMode)
             {
@@ -446,9 +542,9 @@ void _do_text_render(pdf_context_t* context, char* buf, int len)
                         context->state->fill.color[2]);
                     plutovg_canvas_new_path(context->canvas);
                     pdf_cff_char_render_t ctx;
-                    ctx.buf = (unsigned char*)charstrings_index->values[unicode[i]]->val.string;
+                    ctx.buf = (unsigned char*)charstrings_index->values[unicode[i].utf32]->val.string;
                     ctx.cur = ctx.buf;
-                    ctx.len = charstrings_index->values[unicode[i]]->value_len;
+                    ctx.len = charstrings_index->values[unicode[i].utf32]->value_len;
                     ctx.canvas = context->canvas;
                     ctx.fontSize = context->state->textState.fontSize;
                     ctx.global_bias = context->state->textState.font->global_subr_bias;
@@ -467,15 +563,15 @@ void _do_text_render(pdf_context_t* context, char* buf, int len)
                     double nominalWidthX = 0;
                     if ((int)(font_dict_select->values[0]->val.number) == 0)
                     {
-                        int fd = font_dict_select->values[unicode[i] + 1]->val.number;
+                        int fd = font_dict_select->values[unicode[i].utf32 + 1]->val.number;
                         font_dict = font_dict_aar->values[fd]->val.dict;
                     }
                     else
                     {
                         for (int j = 1; j < font_dict_select->num_elements; j += 3)
                         {
-                            if (unicode[i] >= (int)(font_dict_select->values[j]->val.number)
-                            && unicode[i] <= (int)(font_dict_select->values[j + 1]->val.number))
+                            if (unicode[i].utf32 >= (int)(font_dict_select->values[j]->val.number)
+                            && unicode[i].utf32 <= (int)(font_dict_select->values[j + 1]->val.number))
                             {
                                 int fd = (int)(font_dict_select->values[j + 2]->val.number);
                                 font_dict = font_dict_aar->values[fd]->val.dict;
@@ -523,10 +619,10 @@ void _do_text_render(pdf_context_t* context, char* buf, int len)
             plutovg_matrix_t original_matrix = context->state->textState.textMatrix;
             for (int i = 0; i < unicode_cnt; i++) 
             {
-                uint16_t c = unicode[i];
+                uint32_t c = unicode[i].utf32;
                 for (int j = 0; j < differences->num_elements; j += 2) 
                 {
-                    if ((int)differences->values[j]->val.number == c) 
+                    if ((uint32_t)differences->values[j]->val.number == c) 
                     {
                         const char* name = differences->values[j + 1]->val.name;
                         int ref = pdf_dict_get_ref(context->state->textState.font->charProcs, name);

@@ -13,3 +13,6 @@
 [submodule "c-vector"]
 	path = c-vector
 	url = https://github.com/tktkku/c-vector.git
+[submodule "cmap-resources"]
+	path = cmap-resources
+	url = https://github.com/adobe-type-tools/cmap-resources.git

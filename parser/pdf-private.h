@@ -131,42 +131,60 @@ typedef struct xref_table {
 
 typedef struct
 {
-    uint16_t cid;
-    uint16_t unicode;
+    uint32_t cid;
+    uint32_t unicode;
 } pdf_unicode_map_t;
 
 typedef struct
 {
-    uint16_t srcStart;
-    uint16_t srcEnd;
-    uint16_t dstStart;
+    uint32_t srcStart;
+    uint32_t srcEnd;
+    uint32_t dstStart;
 } pdf_char_range_map_t;
 
 typedef struct
 {
-    uint16_t srcStart;
-    uint16_t srcEnd;
+    uint8_t byte_len;
+    uint32_t srcStart;
+    uint32_t srcEnd;
 } pdf_code_range_map_t;
 
 struct pdf_cmap
 {
     char name[256];
     bool worldwide;
-    // int unicode_map_len;
-    // pdf_unicode_map_t* unicode_map;
-    cvector_vector_type(pdf_unicode_map_t*) unicode_map;
-    // int char_range_map_len;
-    // pdf_char_range_map_t* char_range_map;
-    cvector_vector_type(pdf_char_range_map_t*) char_range_map;
-    // int code_range_map_len;
-    // pdf_code_range_map_t* code_range_map;
-    cvector_vector_type(pdf_code_range_map_t*) code_range_map;
+    int unicode_map_len;
+    pdf_unicode_map_t* unicode_map;
+    int char_range_map_len;
+    pdf_char_range_map_t* char_range_map;
+    int not_def_range_len;
+    pdf_char_range_map_t* not_def_range;
+    int code_range_map_len;
+    pdf_code_range_map_t* code_range_map;
     struct pdf_cmap* next;
 };
+typedef enum {
+    PDF_INPUT_TYPE_FILE,
+    PDF_INPUT_TYPE_BUFFER
+} pdf_input_type_t;
 
+typedef struct pdf_input
+{
+    pdf_input_type_t type;
+    union 
+    {
+        FILE* file;
+        struct
+        {
+            const char* data;
+            size_t size;
+            size_t pos;
+        } buffer;
+    };
+} pdf_input_t;
 struct pdf_file
 {
-    FILE* pFile;
+    pdf_input_t* input;
     long data_len;
     long current_index;
     //int num_read_objs;
@@ -300,8 +318,7 @@ struct pdf_xobject
     pdf_obj_t* obj;
 };
 enum pdf_parser_reader_type {
-    BUFFER_READER,
-    FILE_READER,
+    INPUT_READER,
     STREAM_READER
 };
 
@@ -368,9 +385,9 @@ bool _is_space(char c);
 bool _is_hex(char c);
 bool _is_digit(char c);
 bool _is_delimiter(char c);
-void _pdf_parser_read_file(pdf_parser_t* parser, void* source);
-void _pdf_parser_read_buffer(pdf_parser_t* parser, void* source);
+void _pdf_parser_read_input(pdf_parser_t* parser, void* source);
 void _pdf_parser_read_stream(pdf_parser_t* parser, void* source);
+uint32_t _hex_str_to_32bit(char* hexStr, int len);
 uint16_t _hex_str_to_16bit(char hexStr[4]);
 uint8_t _hex_str_to_8bit(char hexStr[2]);
 const char* _token_to_string(pdf_parser_token_type_t type);
@@ -388,3 +405,10 @@ struct pdf_deque
     pdf_node_t* rear;
     size_t size;
 };
+
+int pdf_input_file(pdf_input_t** input, const char* filename);
+int pdf_input_buffer(pdf_input_t** input, const char* data, size_t size);
+size_t pdf_input_read(pdf_input_t* input, void* ptr, size_t size);
+int pdf_input_seek(pdf_input_t* input, long offset, int whence);
+long pdf_input_tell(pdf_input_t* input);
+void pdf_input_close(pdf_input_t* input);

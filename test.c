@@ -48,7 +48,17 @@ int main(int argc, char* argv[])
 
     double wall_start, wall_end;
     wall_start = get_wall_time();
-    pdf_file_t* pdf = pdf_file_read_file(filename);
+    // pdf_file_t* pdf = pdf_file_read_file(filename);
+    FILE* f = fopen(filename, "rb");
+    if (f == NULL)
+        return -1;
+    fseek(f, 0, SEEK_END);
+    long filesize = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    char* filebuffer = malloc(filesize);
+    fread(filebuffer, 1, filebuffer, f);
+    fclose(f);
+    pdf_file_t* pdf = pdf_file_read_buffer(filebuffer, filesize);
     int num_pages = pdf_file_get_pages(pdf);
 
     if (pages == NULL)
@@ -107,6 +117,7 @@ int main(int argc, char* argv[])
     }
 
     pdf_file_free(pdf);
+    free(filebuffer);
     wall_end = get_wall_time();
     printf("Elapsed %.3lf seconds.\n", wall_end - wall_start);
 

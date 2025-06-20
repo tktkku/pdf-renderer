@@ -222,6 +222,11 @@ void _do_render_operation(pdf_context_t* context, pdf_parser_token_t* tk)
                 break;
         }
         handlers[tk->type - TOKEN_OPERATOR](context);
+        // if (tk->type == TOKEN_OPERATOR_TJ || tk->type == TOKEN_OPERATOR_Tj)
+        // {
+        //     plutovg_surface_write_to_png(context->surface, "test.png");
+        //     getchar();
+        // }
     }
     else
     {

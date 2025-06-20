@@ -1,0 +1,35 @@
+#include "../pdf-private.h"
+
+static pdf_char_range_map_t char_range_map_KSC_JOHAB_V[] = {
+    {0xd932, 0xd933, 0x1f78},
+    {0xd935, 0xd935, 0x1f7a},
+    {0xd936, 0xd936, 0x2080},
+    {0xd939, 0xd93b, 0x1f7b},
+    {0xd93d, 0xd93d, 0x1f7e},
+    {0xd942, 0xd94d, 0x1f7f},
+    {0xd97b, 0xd97b, 0x1f8b},
+    {0xda31, 0xda31, 0x1f8c},
+    {0xda38, 0xda39, 0x1f8d},
+    {0xda3c, 0xda3c, 0x1f8f},
+    {0xda3e, 0xda3e, 0x1f90},
+    {0xda4a, 0xda4f, 0x1f91},
+    {0xda6b, 0xda6b, 0x1f97},
+    {0xda6d, 0xda6d, 0x1f98},
+    {0xda6f, 0xda6f, 0x1f99},
+    {0xda9d, 0xdaa0, 0x1f9a},
+};
+
+pdf_cmap_t cmap_KSC_JOHAB_V = {
+    .name = "KSC-Johab-V",
+    .worldwide = true,
+    .unicode_map_len = 0,
+    .unicode_map = NULL,
+    .char_range_map_len = 16,
+    .char_range_map = char_range_map_KSC_JOHAB_V,
+    .not_def_range_len = 0,
+    .not_def_range = NULL,
+    .code_range_map_len = 0,
+    .code_range_map = NULL,
+    .next = NULL
+};
+

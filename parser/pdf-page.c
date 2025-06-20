@@ -78,6 +78,34 @@ int pdf_page_get_streams(pdf_page_t* page)
 //     // int AIS = pdf_dict_get_bool(ext_gstate, "/AIS");
 //     // int TK = pdf_dict_get_bool(ext_gstate, "/TK");
 // }
+uint32_t _hex_str_to_32bit(char* hexStr, int len)
+{
+    if (hexStr == NULL || len <= 0 || (len != 2 && len != 4 && len != 8)) return 0;
+    // convert every 8 bit to hex value
+    uint8_t tmp[8] = {0};
+    for (int i = 0; i < len; i++)
+    {
+        if (hexStr[i] >= '0' && hexStr[i] <= '9')
+        {
+            tmp[i] = hexStr[i] - '0';
+        }
+        else if (hexStr[i] >= 'A' && hexStr[i] <= 'F')
+        {
+            tmp[i] = hexStr[i] - 'A' + 10;
+        }
+        else if (hexStr[i] >= 'a' && hexStr[i] <= 'f')
+        {
+            tmp[i] = hexStr[i] - 'a' + 10;
+        }
+    }
+    uint32_t ret = 0;
+    for (int i = 0; i < len; i++)
+    {
+        ret = (ret << 4) | tmp[i];
+    }
+    
+    return ret;
+}
 
 uint16_t _hex_str_to_16bit(char hexStr[4])
 {

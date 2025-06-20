@@ -45,9 +45,6 @@ struct pdf_parser;
 typedef struct pdf_parser pdf_parser_t;
 typedef enum pdf_parser_reader_type pdf_parser_reader_type_t;
 
-struct pdf_buffer;
-typedef struct pdf_buffer pdf_buffer_t;
-
 struct pdf_cmap;
 typedef struct pdf_cmap pdf_cmap_t;
 
@@ -100,6 +97,7 @@ pdf_font_t* pdf_obj_get_font(pdf_obj_t* obj, const char* name);
 void pdf_obj_get_colorspace(pdf_obj_t* obj, const char* name, char* value);
 
 pdf_file_t* pdf_file_read_file(const char* file_name);
+pdf_file_t* pdf_file_read_buffer(const char* data, size_t size);
 void pdf_file_free(pdf_file_t* file);
 pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, int ref);
 int pdf_file_get_pages(pdf_file_t* pdf);

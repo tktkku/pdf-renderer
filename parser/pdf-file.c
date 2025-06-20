@@ -8,17 +8,17 @@
 
 int _read_line(pdf_file_t* pdf, char* buf, int size)
 {
-    if (pdf == NULL || pdf->pFile == NULL)
+    if (pdf == NULL || pdf->input == NULL)
         return false;
     memset(buf, 0, size);
     size_t ret = 0;
     char c = '\0';
     int cnt = 0;
-    while ((ret = fread(&c, 1, 1, pdf->pFile)) > 0 && cnt < size)
+    while ((ret = pdf_input_read(pdf->input, &c, 1)) > 0 && cnt < size)
     {
         if (c == '\n' || c == '\r')
         {
-            while ((ret = fread(&c, 1, 1, pdf->pFile)) > 0)
+            while ((ret = pdf_input_read(pdf->input, &c, 1)) > 0)
             {
                 if (c == '\n' || c == '\r')
                 {
@@ -26,7 +26,7 @@ int _read_line(pdf_file_t* pdf, char* buf, int size)
                 }
                 else
                 {
-                    fseek(pdf->pFile, -1, SEEK_CUR);
+                    pdf_input_seek(pdf->input, -1, SEEK_CUR);
                     break;
                 }
             }
@@ -45,7 +45,7 @@ int _read_line(pdf_file_t* pdf, char* buf, int size)
 bool _check_version(pdf_file_t* pdf)
 {
     char buffer[1024] = { 0 };
-    fseek(pdf->pFile, 0, SEEK_SET);
+    pdf_input_seek(pdf->input, 0, SEEK_SET);
     _read_line(pdf, buffer, sizeof(buffer));
     if (memcmp(buffer, "%PDF-", 5) != 0)
     {
@@ -93,13 +93,13 @@ bool _read_xref_table(pdf_file_t* pdf)
 
 bool _read_xref_and_trailer(pdf_file_t* pdf)
 {
-    if (pdf == NULL || pdf->pFile == NULL || pdf->data_len == 0)
+    if (pdf == NULL || pdf->input == NULL || pdf->data_len == 0)
     {
         return false;
     }
 
     char buffer[1024] = { 0 };
-    fseek(pdf->pFile, pdf->data_len - 128, SEEK_SET);
+    pdf_input_seek(pdf->input, pdf->data_len - 128, SEEK_SET);
     int ret = 0;
     while ((ret = _read_line(pdf, buffer, sizeof(buffer))) > 0)
     {
@@ -110,7 +110,7 @@ bool _read_xref_and_trailer(pdf_file_t* pdf)
     }
     ret = _read_line(pdf, buffer, sizeof(buffer));
     long xref_offset = strtol(buffer, NULL, 10);
-    fseek(pdf->pFile, xref_offset, SEEK_SET);
+    pdf_input_seek(pdf->input, xref_offset, SEEK_SET);
     ret = _read_line(pdf, buffer, sizeof(buffer));
 
     if (strcmp(buffer, "xref") == 0)
@@ -121,10 +121,10 @@ bool _read_xref_and_trailer(pdf_file_t* pdf)
             if (memcmp(buffer, "trailer", 7) == 0)
             {
                 if (ret != 7)
-                    fseek(pdf->pFile, -ret+7, SEEK_CUR);
+                    pdf_input_seek(pdf->input, -ret + 7, SEEK_CUR);
                 break;
             }
-            fseek(pdf->pFile, -(ret), SEEK_CUR);
+            pdf_input_seek(pdf->input, -ret, SEEK_CUR);
             if (!_read_xref_table(pdf))
             {
                 return false;
@@ -132,7 +132,7 @@ bool _read_xref_and_trailer(pdf_file_t* pdf)
 
         }
         // read trailer
-        pdf_parser_t* parser = pdf_parser_init(pdf, FILE_READER, pdf->pFile);
+        pdf_parser_t* parser = pdf_parser_init(pdf, INPUT_READER, pdf->input);
         pdf_parser_token_t* tk = pdf_parser_next_token(parser);
         if (tk == NULL || tk->type != TOKEN_DICT_BEG)
         {
@@ -158,7 +158,7 @@ bool _read_xref_and_trailer(pdf_file_t* pdf)
             if (pre_offset != -1)
             {
                 pdf->current_index = pre_offset;
-                fseek(pdf->pFile, pre_offset, SEEK_SET);
+                pdf_input_seek(pdf->input, pre_offset, SEEK_SET);
                 _read_line(pdf, buffer, sizeof(buffer));// xref skip this line
                 if (!_read_xref_table(pdf))
                 {
@@ -172,7 +172,7 @@ bool _read_xref_and_trailer(pdf_file_t* pdf)
     }
     else //if (strstr(buffer, "obj") != NULL)
     {
-        pdf_parser_t* parser = pdf_parser_init(pdf, FILE_READER, pdf->pFile);
+        pdf_parser_t* parser = pdf_parser_init(pdf, INPUT_READER, pdf->input);
         pdf_obj_t* xref_obj = pdf_parser_build_obj(parser);
         pdf_parser_free(parser);
         if (xref_obj == NULL || xref_obj->value->type != DICT)
@@ -314,44 +314,28 @@ void _read_pages(pdf_file_t* pdf, pdf_obj_t* pages_obj)
         }
     } 
 }
-pdf_file_t* pdf_file_read_file(const char* file_name)
+pdf_file_t* _fill_pdf_file(pdf_file_t* pdf)
 {
-    if (file_name == NULL)
-    {
-        return NULL;
-    }
-    FILE* file = fopen(file_name, "rb");
-    if (file == NULL)
-    {
-        return NULL;
-    }
-    fseek(file, 0, SEEK_END);
-    long file_size = ftell(file);
-    rewind(file); //fseek(file, 0, SEEK_SET);
+    pdf->current_index = 0;
+    pdf->xref_table = NULL;
+    pdf->read_objs = NULL;
+    pdf->pages = NULL;
 
-    pdf_file_t* pdf_file = (pdf_file_t*)malloc(sizeof(pdf_file_t));
-    memset(pdf_file, 0, sizeof(pdf_file_t));
-    pdf_file->pFile = file;
-    pdf_file->data_len = file_size;
-    pdf_file->current_index = 0;
-    pdf_file->xref_table = NULL;
-    pdf_file->read_objs = NULL;
-    pdf_file->pages = NULL;
-    if (!_check_version(pdf_file))
+    if (!_check_version(pdf))
     {
-        pdf_file_free(pdf_file);
+        pdf_file_free(pdf);
         return NULL;
     }
-    if (!_read_xref_and_trailer(pdf_file))
+    if (!_read_xref_and_trailer(pdf))
     {
-        pdf_file_free(pdf_file);
+        pdf_file_free(pdf);
         return NULL;
     }
 
-    pdf_obj_t* root_obj = pdf_file_get_obj(pdf_file, pdf_file->root_obj_ref);
+    pdf_obj_t* root_obj = pdf_file_get_obj(pdf, pdf->root_obj_ref);
     if (root_obj == NULL || root_obj->value->type != DICT)
     {
-        pdf_file_free(pdf_file);
+        pdf_file_free(pdf);
         return NULL;
     }
     pdf_dict_t* names_dict = pdf_dict_get_dict(root_obj->value->val.dict, "/Names");
@@ -368,7 +352,7 @@ pdf_file_t* pdf_file_read_file(const char* file_name)
         int embedded_ref = pdf_dict_get_ref(names_dict, "/EmbeddedFiles");
         if (embedded_ref != -1)
         {
-            pdf_obj_t* embedded_obj1 = pdf_file_get_obj(pdf_file, embedded_ref);
+            pdf_obj_t* embedded_obj1 = pdf_file_get_obj(pdf, embedded_ref);
             if (embedded_obj1 != NULL)
             {
                 pdf_array_t* names_aar = pdf_dict_get_array(embedded_obj1->value->val.dict, "/Names");
@@ -378,12 +362,12 @@ pdf_file_t* pdf_file_read_file(const char* file_name)
                     {
                         if (names_aar->values[i]->type == INDIRECT)
                         {
-                            pdf_obj_t* embedded_obj2 = pdf_file_get_obj(pdf_file, names_aar->values[i]->val.indirect);
+                            pdf_obj_t* embedded_obj2 = pdf_file_get_obj(pdf, names_aar->values[i]->val.indirect);
                             if (embedded_obj2 != NULL)
                             {
                                 pdf_dict_t* ef_dict = pdf_dict_get_dict(embedded_obj2->value->val.dict, "/EF");
                                 int ref = pdf_dict_get_ref(ef_dict, "/UF");
-                                pdf_obj_t* embedded_obj = pdf_file_get_obj(pdf_file, ref);
+                                pdf_obj_t* embedded_obj = pdf_file_get_obj(pdf, ref);
                                 unsigned char* embedded_file = NULL;
                                 int embedded_file_len = 0;
                                 pdf_stream_get_all(embedded_obj->stream, &embedded_file, &embedded_file_len);
@@ -406,16 +390,54 @@ pdf_file_t* pdf_file_read_file(const char* file_name)
     }
 
     int ref = pdf_dict_get_ref(root_obj->value->val.dict, "/Pages");
-    pdf_obj_t* pages_obj = pdf_file_get_obj(pdf_file, ref);
+    pdf_obj_t* pages_obj = pdf_file_get_obj(pdf, ref);
     if (pages_obj == NULL)
     {
-        pdf_file_free(pdf_file);
+        pdf_file_free(pdf);
         return NULL;
     }
 
-    _read_pages(pdf_file, pages_obj);
+    _read_pages(pdf, pages_obj);
+    return pdf;
+}
+pdf_file_t* pdf_file_read_buffer(const char* data, size_t size)
+{
+    if (data == NULL || size <= 0) return NULL;
+    pdf_input_t* input = NULL;
+    if (pdf_input_buffer(&input, data, size) != 0)
+    {
+        return NULL;
+    }
+    pdf_file_t* pdf_file = (pdf_file_t*)malloc(sizeof(pdf_file_t));
+    memset(pdf_file, 0, sizeof(pdf_file_t));
+    
+    pdf_file->input = input;
+    pdf_file->data_len = size;
 
-    return pdf_file;
+    return _fill_pdf_file(pdf_file);
+}
+pdf_file_t* pdf_file_read_file(const char* file_name)
+{
+    if (file_name == NULL)
+    {
+        return NULL;
+    }
+    
+    pdf_input_t* input = NULL;
+    if (pdf_input_file(&input, file_name) != 0)
+    {
+        return NULL;
+    }
+    pdf_file_t* pdf_file = (pdf_file_t*)malloc(sizeof(pdf_file_t));
+    memset(pdf_file, 0, sizeof(pdf_file_t));
+    
+    pdf_file->input = input;
+    pdf_input_seek(pdf_file->input, 0, SEEK_END);
+    long file_size = pdf_input_tell(pdf_file->input);
+    pdf_input_seek(pdf_file->input, 0, SEEK_SET);
+    pdf_file->data_len = file_size;
+
+    return _fill_pdf_file(pdf_file);
 }
 int pdf_file_get_pages(pdf_file_t* pdf)
 {
@@ -733,8 +755,8 @@ pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, int ref)
                 {
                     return NULL;
                 }
-                fseek(pdf->pFile, offset, SEEK_SET);
-                pdf_parser_t* parser = pdf_parser_init(pdf, FILE_READER, pdf->pFile);
+                pdf_input_seek(pdf->input, offset, SEEK_SET);
+                pdf_parser_t* parser = pdf_parser_init(pdf, INPUT_READER, pdf->input);
                 pdf_parser_token_t* tk = pdf_parser_next_token(parser);
                 if (tk == NULL || tk->type != TOKEN_OBJ_BEG)
                 {
@@ -775,13 +797,10 @@ pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, int ref)
                 int size;
                 pdf_stream_get_all(objs_obj->stream, &start, &size);
                 if (start == NULL) return NULL;
-                pdf_buffer_t b1 = {
-                    .buffer = start,
-                    .buffer_size = size,
-                    .processed = 0
-                };
+                pdf_input_t* input = NULL;
+                pdf_input_buffer(&input, start, size);
                 unsigned char* origin = start;
-                pdf_parser_t* parser = pdf_parser_init(pdf, BUFFER_READER, &b1);
+                pdf_parser_t* parser = pdf_parser_init(pdf, INPUT_READER, input);
                 pdf_parser_token_t* tk = NULL;
                 for (int j = 0; j < num_pairs; j++)
                 {
@@ -796,12 +815,9 @@ pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, int ref)
                     tk = NULL;
 
                     unsigned char* p1 = start + first_offset + offset;
-                    pdf_buffer_t b2 = {
-                        .buffer = p1,
-                        .buffer_size = size - (first_offset + offset),
-                        .processed = 0
-                    };
-                    pdf_parser_t* val_parser = pdf_parser_init(pdf, BUFFER_READER, &b2);
+                    pdf_input_t* input2 = NULL;
+                    pdf_input_buffer(&input2, p1, size - (first_offset + offset));
+                    pdf_parser_t* val_parser = pdf_parser_init(pdf, INPUT_READER, input2);
 
                     pdf_parser_token_t* tk1 = pdf_parser_next_token(val_parser);
                     if (tk1 == NULL)
@@ -894,12 +910,9 @@ pdf_cmap_t* pdf_file_get_cmap(pdf_file_t* pdf, char* name)
     }
     fread(filedata, filesize, 1, f);
     fclose(f);
-    pdf_buffer_t b1 = {
-        .buffer = filedata,
-        .buffer_size = filesize,
-        .processed = 0
-    };
-    pdf_parser_t* parser = pdf_parser_init(pdf, BUFFER_READER, &b1);
+    pdf_input_t* input = NULL;
+    pdf_input_buffer(&input, filedata, filesize);
+    pdf_parser_t* parser = pdf_parser_init(pdf, INPUT_READER, input);
     pdf_cmap_t* cmap = pdf_parser_build_cmap(parser);
     pdf_parser_free(parser);
     free(filedata);
@@ -968,10 +981,10 @@ void pdf_file_free(pdf_file_t* file)
     //     pdf_parser_token_free(NULL, file->freed_tokens);
     //     file->freed_tokens = NULL;
     // }
-    if (file->pFile)
+    if (file->input)
     {
-        fclose(file->pFile);
-        file->pFile = NULL;
+        pdf_input_close(file->input);
+        file->input = NULL;
     }
     free(file);
     file = NULL;

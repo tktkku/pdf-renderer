@@ -10,26 +10,29 @@ void pdf_cmap_free(pdf_cmap_t* cmap)
 {
     if (cmap == NULL)
         return;
-    int nums = cvector_size(cmap->char_range_map);
-    for (int i = 0; i < nums; i++)
+    if (cmap->char_range_map)
     {
-        free(cmap->char_range_map[i]);
+        free(cmap->char_range_map);
+        cmap->char_range_map = NULL;
     }
-    cvector_free(cmap->char_range_map);
-    cmap->char_range_map = NULL;
-    nums = cvector_size(cmap->code_range_map);
-    for (int i = 0; i < nums; i++)
+    
+    if (cmap->not_def_range)
     {
-        free(cmap->code_range_map[i]);
+        free(cmap->not_def_range);
+        cmap->not_def_range = NULL;
     }
-    cvector_free(cmap->code_range_map);
-    cmap->code_range_map = NULL;
-    nums = cvector_size(cmap->unicode_map);
-    for (int i = 0; i < nums; i++)
+
+    if (cmap->code_range_map)
     {
-        free(cmap->unicode_map[i]);
+        free(cmap->code_range_map);
+        cmap->code_range_map = NULL;
     }
-    cvector_free(cmap->unicode_map);
-    cmap->unicode_map = NULL;
+
+    if (cmap->unicode_map)
+    {
+        free(cmap->unicode_map);
+        cmap->unicode_map = NULL;
+    }
+
     free(cmap);
 }
