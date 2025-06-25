@@ -110,11 +110,11 @@ double pdf_dict_get_number(pdf_dict_t* dict, const char* name);
 int pdf_dict_get_ref(pdf_dict_t* dict, const char* name);
 pdf_array_t* pdf_dict_get_array(pdf_dict_t* dict, const char* name);
 pdf_dict_t* pdf_dict_get_dict(pdf_dict_t* dict, const char* name);
-const char* pdf_dict_get_name(pdf_dict_t* dict, const char* name);
+char* pdf_dict_get_name(pdf_dict_t* dict, const char* name);
 int pdf_dict_get_bool(pdf_dict_t* dict, const char* name);
 bool pdf_dict_add_array(pdf_dict_t* dict, const char* name, pdf_array_t* array);
 bool pdf_dict_add(pdf_dict_t* dict, const char* name, pdf_value_type_t type, void* data);
-const char* pdf_dict_get_string(pdf_dict_t* dict, const char* name);
+char* pdf_dict_get_string(pdf_dict_t* dict, const char* name);
 bool pdf_dict_add_value(pdf_dict_t* dict, const char* name, pdf_value_t* value);
 
 pdf_font_t* pdf_font_init(void);

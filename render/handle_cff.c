@@ -833,7 +833,7 @@ void handle_mul(pdf_cff_char_render_t* context, pdf_deque_t* deque)
     double s1 = *((double*)data);
     pdf_deque_pop_front(deque, &node);
     double s2 = *((double*)data);
-    double s3 = s1 * s3;
+    double s3 = s1 * s2;
     pdf_deque_push(deque, &s3, sizeof(double));
 }
 void handle_sqrt(pdf_cff_char_render_t* context, pdf_deque_t* deque)

@@ -109,7 +109,7 @@ pdf_dict_t* pdf_dict_get_dict(pdf_dict_t* dict, const char* name)
     return NULL;
 }
 
-const char* pdf_dict_get_name(pdf_dict_t* dict, const char* name)
+char* pdf_dict_get_name(pdf_dict_t* dict, const char* name)
 {
     if (dict == NULL || name == NULL) return NULL;
     int nums = cvector_size(dict->pairs);
@@ -127,7 +127,7 @@ const char* pdf_dict_get_name(pdf_dict_t* dict, const char* name)
     return NULL;
 }
 
-const char* pdf_dict_get_string(pdf_dict_t* dict, const char* name)
+char* pdf_dict_get_string(pdf_dict_t* dict, const char* name)
 {
     if (dict == NULL || name == NULL) return NULL;
     int nums = cvector_size(dict->pairs);

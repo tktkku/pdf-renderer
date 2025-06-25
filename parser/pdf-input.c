@@ -32,6 +32,7 @@ size_t pdf_input_read(pdf_input_t* input, void* ptr, size_t size)
             return fread(ptr, 1, size, input->file);
             break;
         case PDF_INPUT_TYPE_BUFFER:
+        {
             size_t remaining = input->buffer.size - input->buffer.pos;
             size_t read_size = (size < remaining) ? size : remaining;
             if (read_size > 0)
@@ -40,7 +41,7 @@ size_t pdf_input_read(pdf_input_t* input, void* ptr, size_t size)
                 input->buffer.pos += read_size;
             }
             return read_size;
-            break;
+        }
         default:
             return 0;
     }
@@ -54,6 +55,7 @@ int pdf_input_seek(pdf_input_t* input, long offset, int whence)
             return fseek(input->file, offset, whence);
             break;
         case PDF_INPUT_TYPE_BUFFER:
+        {
             size_t new_pos;
             switch (whence)
             {
@@ -72,6 +74,7 @@ int pdf_input_seek(pdf_input_t* input, long offset, int whence)
             if (new_pos > input->buffer.size) return -1;
             input->buffer.pos = new_pos;
             return 0;
+        }  
         default:
             return -1;
     }

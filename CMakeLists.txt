@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 3.10)
-
+set(CMAKE_C_COMPILER /usr/bin/clang)
+set(CMAKE_CXX_COMPILER /usr/bin/clang++)
 project(pdf-renderer VERSION 0.0.1 LANGUAGES C CXX)
-add_compile_options(-Wall)
+add_compile_options(-Wall -Wno-unused-variable -Wno-int-conversion -Wno-unused-function -Wno-pointer-sign -Wno-unused-but-set-variable -Wno-unused-private-field)
 set(BUILD_SHARED_LIBS OFF)
 set(LIBUSB_BUILD_SHARED_LIBS ON)
 add_subdirectory(c-vector)

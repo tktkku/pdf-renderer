@@ -123,16 +123,26 @@ void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
                 int F = pdf_dict_get_number(anno_obj->value->val.dict, "/F");
                 if (F != -1)
                 {
-                    if (F & 0b0000000001); // invisible
-                    if (F & 0b0000000010); // hidden
-                    if (F & 0b0000000100); // print
-                    if (F & 0b0000001000); // nozoom
-                    if (F & 0b0000010000); // norotate
-                    if (F & 0b0000100000); // noview
-                    if (F & 0b0001000000); // readonly
-                    if (F & 0b0010000000); // locked
-                    if (F & 0b0100000000); // togglenoview
-                    if (F & 0b1000000000); // lockedcontents
+                    if (F & 0b0000000001)
+                        ; // invisible
+                    if (F & 0b0000000010)
+                        ; // hidden
+                    if (F & 0b0000000100)
+                        ; // print
+                    if (F & 0b0000001000)
+                        ; // nozoom
+                    if (F & 0b0000010000)
+                        ; // norotate
+                    if (F & 0b0000100000)
+                        ; // noview
+                    if (F & 0b0001000000)
+                        ; // readonly
+                    if (F & 0b0010000000)
+                        ; // locked
+                    if (F & 0b0100000000)
+                        ; // togglenoview
+                    if (F & 0b1000000000)
+                        ; // lockedcontents
                 }
                 pdf_dict_t* AP = pdf_dict_get_dict(anno_obj->value->val.dict, "/AP");
                 if (AP != NULL)

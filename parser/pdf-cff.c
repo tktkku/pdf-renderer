@@ -410,7 +410,7 @@ void _parse_cff_dict_data(unsigned char* font_data,
         }
     }
     pdf_deque_free(deque);
-    return ret_dict;
+    //return ret_dict;
 }
 pdf_array_t* _parse_cff_charset(unsigned char* p, int count, pdf_array_t* string_index, bool isCIDFont)
 {

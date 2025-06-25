@@ -287,3 +287,4 @@ const static CFF_HANDLER CFF_HANDLERS2[] = {
     handle_hflex1,
     handle_flex1
 };
+void _cff_do_render_char(pdf_cff_char_render_t* context, pdf_deque_t* deque);
