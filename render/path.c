@@ -1,7 +1,8 @@
-#include "render.h"
+#include "pdf-render.h"
+#include "pdf-render-private.h"
 #include "pdf-private.h"
 
-void stroke(pdf_context_t* context)
+void stroke(pdf_render_t* context)
 {
     //double r, g, b, a;
     plutovg_color_t color;
@@ -17,7 +18,7 @@ void stroke(pdf_context_t* context)
 }
 
 
-void handle_b_star(pdf_context_t* context)
+void handle_b_star(pdf_render_t* context)
 {
     // close fill and then stroke the path using the even-odd rule
     // same as the sequence
@@ -33,7 +34,7 @@ void handle_b_star(pdf_context_t* context)
     stroke(context);
 }
 
-void handle_B_star(pdf_context_t* context)
+void handle_B_star(pdf_render_t* context)
 {
     // fill and then stroke the path, using the even-odd rule
     plutovg_color_t c;
@@ -46,7 +47,7 @@ void handle_B_star(pdf_context_t* context)
     stroke(context);
 }
 
-void handle_b(pdf_context_t* context)
+void handle_b(pdf_render_t* context)
 {
     // close fill and then stroke the path, using nonzero winding number rule
     // same as the sequence
@@ -62,7 +63,7 @@ void handle_b(pdf_context_t* context)
     stroke(context);
 }
 
-void handle_B(pdf_context_t* context)
+void handle_B(pdf_render_t* context)
 {
     // fill and then stroke the path, using the nonzero winding number rule
     plutovg_color_t c;
@@ -75,7 +76,7 @@ void handle_B(pdf_context_t* context)
     stroke(context);
 }
 
-void handle_c(pdf_context_t* context)
+void handle_c(pdf_render_t* context)
 {
     // append a cubic Bezier curve to the current point
     // the curve shall extend from the current point to (x3, y3)
@@ -100,7 +101,7 @@ void handle_c(pdf_context_t* context)
     plutovg_canvas_cubic_to(context->canvas, x1, y1, x2, y2, x3, y3);
 }
 
-void handle_F_f(pdf_context_t* context)
+void handle_F_f(pdf_render_t* context)
 {
     // fill the path, using the nonzero winding number rule
     // to determine the region to fill
@@ -112,7 +113,7 @@ void handle_F_f(pdf_context_t* context)
     plutovg_canvas_set_color(context->canvas, &c);
 }
 
-void handle_f_star(pdf_context_t* context)
+void handle_f_star(pdf_render_t* context)
 {
     // fill the path, using the even-odd rule
     // to determine the region to fill
@@ -124,7 +125,7 @@ void handle_f_star(pdf_context_t* context)
     plutovg_canvas_set_color(context->canvas, &c);
 }
 
-void handle_h(pdf_context_t* context)
+void handle_h(pdf_render_t* context)
 {
     // close the current subpath by appending a straight line segment
     // from the current point to the starting point of the subpath
@@ -133,7 +134,7 @@ void handle_h(pdf_context_t* context)
     plutovg_canvas_close_path(context->canvas);
 }
 
-void handle_l(pdf_context_t* context)
+void handle_l(pdf_render_t* context)
 {
     // append a straight line segment from the current point to (x, y)
     // x y
@@ -147,7 +148,7 @@ void handle_l(pdf_context_t* context)
     plutovg_canvas_line_to(context->canvas, x, y);
 }
 
-void handle_m(pdf_context_t* context)
+void handle_m(pdf_render_t* context)
 {
     // begin a new subpath by moving the current point to (x,y)
     // x y
@@ -161,14 +162,14 @@ void handle_m(pdf_context_t* context)
     plutovg_canvas_move_to(context->canvas, x, y);
 }
 
-void handle_n(pdf_context_t* context)
+void handle_n(pdf_render_t* context)
 {
     // end the path object without filling or stroking it
     // plutovg_canvas_close_path(context->canvas);
     plutovg_canvas_new_path(context->canvas);
 }
 
-void handle_re(pdf_context_t* context)
+void handle_re(pdf_render_t* context)
 {
     // append a rectangle to the current path as a complete subpath
     // lower-left corner (x, y)
@@ -200,7 +201,7 @@ void handle_re(pdf_context_t* context)
     plutovg_canvas_rect(context->canvas, x, y, width, height);
 }
 
-void handle_s(pdf_context_t* context)
+void handle_s(pdf_render_t* context)
 {
     // close and stroke the path
     // same as the sequence h S
@@ -210,14 +211,14 @@ void handle_s(pdf_context_t* context)
     stroke(context);
 }
 
-void handle_S(pdf_context_t* context)
+void handle_S(pdf_render_t* context)
 {
     // stroke the path
     // plutovg_canvas_stroke(context->canvas);
     stroke(context);
 }
 
-void handle_v(pdf_context_t* context)
+void handle_v(pdf_render_t* context)
 {
     // append a cubic Bezier curve to the current point
     // the curve shall extend from the current point to (x3 ,y3)
@@ -240,7 +241,7 @@ void handle_v(pdf_context_t* context)
     plutovg_canvas_get_current_point(context->canvas, &x1, &y1);
     plutovg_canvas_cubic_to(context->canvas, x1, y1, x2, y2, x3, y3);
 }
-void handle_W_star(pdf_context_t* context)
+void handle_W_star(pdf_render_t* context)
 {
     // modify the current clipping path by intersecting it with the curerent path
     // using the even-odd rule
@@ -248,7 +249,7 @@ void handle_W_star(pdf_context_t* context)
     plutovg_canvas_clip(context->canvas);
 }
 
-void handle_w(pdf_context_t* context)
+void handle_w(pdf_render_t* context)
 {
     // set line width
     // lineWidth
@@ -261,7 +262,7 @@ void handle_w(pdf_context_t* context)
     context->state->lineWidth = w;
 }
 
-void handle_W(pdf_context_t* context)
+void handle_W(pdf_render_t* context)
 {
     // modify the current clipping path by intersecting it with the current path
     // using nonzero winding number rule
@@ -269,7 +270,7 @@ void handle_W(pdf_context_t* context)
     plutovg_canvas_clip(context->canvas);
 }
 
-void handle_y(pdf_context_t* context)
+void handle_y(pdf_render_t* context)
 {
     // append a cubic Bezier curve to the current path
     // the curve shall extend from the current point to (x3, y3)

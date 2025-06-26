@@ -1,7 +1,8 @@
-#include "render.h"
+#include "pdf-render.h"
+#include "pdf-render-private.h"
 #include "pdf-private.h"
 #include <plutovg-private.h>
-void handle_apostrophe(pdf_context_t* context)
+void handle_apostrophe(pdf_render_t* context)
 {
     // move to the next line and show a text string
     // string
@@ -13,7 +14,7 @@ void handle_apostrophe(pdf_context_t* context)
     handle_Tj(context);
 }
 
-void handle_BT(pdf_context_t* context)
+void handle_BT(pdf_render_t* context)
 {
     // begin text
     plutovg_canvas_save(context->canvas);
@@ -24,7 +25,7 @@ void handle_BT(pdf_context_t* context)
     plutovg_matrix_init_identity(&context->state->textState.textMatrix);
 }
 
-void handle_ET(pdf_context_t* context)
+void handle_ET(pdf_render_t* context)
 {
     // end text
     plutovg_canvas_restore(context->canvas);
@@ -40,7 +41,7 @@ void handle_ET(pdf_context_t* context)
     // }
 }
 
-void handle_quotation(pdf_context_t* context)
+void handle_quotation(pdf_render_t* context)
 {
     // move to the next line and show a text string
     // aw as the word spacing
@@ -56,7 +57,7 @@ void handle_quotation(pdf_context_t* context)
     // TODO
 }
 
-void handle_T_star(pdf_context_t* context)
+void handle_T_star(pdf_render_t* context)
 {
     // move to the start of the next line
     // has the same effects as the code
@@ -70,7 +71,7 @@ void handle_T_star(pdf_context_t* context)
     context->state->textState.textLineWidth = 0;
 }
 
-void handle_Tc(pdf_context_t* context)
+void handle_Tc(pdf_render_t* context)
 {
     // character spacing
     // used by Tj TJ '
@@ -83,7 +84,7 @@ void handle_Tc(pdf_context_t* context)
     context->state->textState.characterSpacing = c;
 }
 
-void handle_Td(pdf_context_t* context)
+void handle_Td(pdf_render_t* context)
 {
     // set start position on the page
     // tx ty
@@ -101,7 +102,7 @@ void handle_Td(pdf_context_t* context)
     context->state->textState.textLineWidth = 0;
 }
 
-void handle_TD(pdf_context_t* context)
+void handle_TD(pdf_render_t* context)
 {
     // move to the start of the next line
     // offset form the start of the current line
@@ -124,7 +125,7 @@ void handle_TD(pdf_context_t* context)
     // tx ty Td
 }
 
-void handle_Tj(pdf_context_t* context)
+void handle_Tj(pdf_render_t* context)
 {
     // show / paint the glyphs for a string
     // string
@@ -138,7 +139,7 @@ void handle_Tj(pdf_context_t* context)
     _do_text_render(context, node.data, node.size);
 }
 
-void handle_TJ(pdf_context_t* context)
+void handle_TJ(pdf_render_t* context)
 {
     // show one or more text strings
     // array
@@ -189,7 +190,7 @@ void handle_TJ(pdf_context_t* context)
     pdf_deque_free(tmp_deque);
 }
 
-void handle_TL(pdf_context_t* context)
+void handle_TL(pdf_render_t* context)
 {
     // text leading
     // used by T* ' "
@@ -202,7 +203,7 @@ void handle_TL(pdf_context_t* context)
     context->state->textState.textLeading = t;
 }
 
-void handle_Tm(pdf_context_t* context)
+void handle_Tm(pdf_render_t* context)
 {
     // set the text matrix, and the text line matrix
     // a b c d e f
@@ -234,7 +235,7 @@ void handle_Tm(pdf_context_t* context)
     context->state->textState.textLineWidth = 0;
 }
 
-void handle_Tr(pdf_context_t* context)
+void handle_Tr(pdf_render_t* context)
 {
     // set text rendering mode
     // mode initial value =0
@@ -248,7 +249,7 @@ void handle_Tr(pdf_context_t* context)
     context->state->textState.textMode = v;
 }
 
-void handle_Ts(pdf_context_t* context)
+void handle_Ts(pdf_render_t* context)
 {
     // set text rise
     // rise initial value=0
@@ -261,7 +262,7 @@ void handle_Ts(pdf_context_t* context)
     context->state->textState.textRise = r;
 }
 
-void handle_Tw(pdf_context_t* context)
+void handle_Tw(pdf_render_t* context)
 {
     // word spacing
     // used by Tj TJ '
@@ -274,7 +275,7 @@ void handle_Tw(pdf_context_t* context)
     context->state->textState.wordSpacing = w;
 }
 
-void handle_Tz(pdf_context_t* context)
+void handle_Tz(pdf_render_t* context)
 {
     // horizontal scaling
     // scale initial value=100

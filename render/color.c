@@ -1,6 +1,7 @@
-#include "render.h"
+#include "pdf-render.h"
+#include "pdf-render-private.h"
 #include "pdf-private.h"
-void handle_cs(pdf_context_t* context)
+void handle_cs(pdf_render_t* context)
 {
     // for nonstroking
     // char buf[1024] = { 0 };
@@ -22,7 +23,7 @@ void handle_cs(pdf_context_t* context)
     }
 }
 
-void handle_CS(pdf_context_t* context)
+void handle_CS(pdf_render_t* context)
 {
     // set color space
     // /DeviceGray
@@ -46,7 +47,7 @@ void handle_CS(pdf_context_t* context)
     }
 }
 
-void handle_g(pdf_context_t* context)
+void handle_g(pdf_render_t* context)
 {
     // for nonstroking
     char buf[1024] = { 0 };
@@ -62,7 +63,7 @@ void handle_g(pdf_context_t* context)
     strcpy(context->state->fill.currentColorSpace, "/DeviceGray");
 }
 
-void handle_G(pdf_context_t* context)
+void handle_G(pdf_render_t* context)
 {
     // set both in one operation
     // gray
@@ -77,7 +78,7 @@ void handle_G(pdf_context_t* context)
     strcpy(context->state->stroke.currentColorSpace, "/DeviceGray");
 }
 
-void handle_k(pdf_context_t* context)
+void handle_k(pdf_render_t* context)
 {
     // for nonstroking
     char buf[1024] = { 0 };
@@ -102,7 +103,7 @@ void handle_k(pdf_context_t* context)
     strcpy(context->state->fill.currentColorSpace, "/DeviceCMYK");
 }
 
-void handle_K(pdf_context_t* context)
+void handle_K(pdf_render_t* context)
 {
     // combine CS and SC for DeviceCMYK
     char buf[1024] = { 0 };
@@ -122,7 +123,7 @@ void handle_K(pdf_context_t* context)
     strcpy(context->state->stroke.currentColorSpace, "/DeviceCMYK");
 }
 
-void handle_rg(pdf_context_t* context)
+void handle_rg(pdf_render_t* context)
 {
     // for nonstroking
     char buf[1024] = { 0 };
@@ -143,7 +144,7 @@ void handle_rg(pdf_context_t* context)
 }
 
 
-void handle_RG(pdf_context_t* context)
+void handle_RG(pdf_render_t* context)
 {
     // combine CS and SC for DeviceRGB
     char buf[1024] = { 0 };
@@ -162,7 +163,7 @@ void handle_RG(pdf_context_t* context)
     strcpy(context->state->stroke.currentColorSpace, "/DeviceRGB");
 }
 
-void handle_sc(pdf_context_t* context)
+void handle_sc(pdf_render_t* context)
 {
     // for nonstroking
     // char buf[1024] = { 0 };
@@ -223,7 +224,7 @@ void handle_sc(pdf_context_t* context)
 }
 
 
-void handle_SC(pdf_context_t* context)
+void handle_SC(pdf_render_t* context)
 {
     // set gray level, 0.0 to balck 1.0 to white
 
@@ -280,7 +281,7 @@ void handle_SC(pdf_context_t* context)
     }
 }
 
-void handle_scn(pdf_context_t* context)
+void handle_scn(pdf_render_t* context)
 {
     // char buf[1024] = { 0 };
     // pdf_node_t node;
@@ -302,7 +303,7 @@ void handle_scn(pdf_context_t* context)
     pdf_deque_pop_front(context->deque, &node);
 }
 
-void handle_SCN(pdf_context_t* context)
+void handle_SCN(pdf_render_t* context)
 {
     if (!strcmp(context->state->stroke.currentColorSpace, "/DeviceGray") 
     || !strcmp(context->state->stroke.currentColorSpace, "/DeviceRGB") 

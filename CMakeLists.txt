@@ -15,4 +15,4 @@ add_subdirectory(libusb-cmake)
 
 add_executable(test test.c)
 target_link_libraries(test render)
-target_include_directories(test PRIVATE ./parser)
+target_include_directories(test PRIVATE ./parser ./render)

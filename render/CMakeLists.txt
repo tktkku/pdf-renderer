@@ -9,7 +9,7 @@ set(RENDER_SOURCES
     text-render.c
     path.c
     pdf-render-by-plutovg.c
-    render.h
+    pdf-render.h
 )
 set(RENDER_DEP pdf-parser plutovg)
 add_library(${PROJECT_NAME} ${RENDER_SOURCES})

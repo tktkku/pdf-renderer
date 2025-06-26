@@ -1,6 +1,7 @@
-#include "render.h"
+#include "pdf-render.h"
+#include "pdf-render-private.h"
 #include "pdf-private.h"
-void handle_Tf(pdf_context_t* context)
+void handle_Tf(pdf_render_t* context)
 {
     // set font and font size to use
     // fontname fontsize
@@ -45,16 +46,23 @@ void handle_Tf(pdf_context_t* context)
     {
         if (font->font_data == NULL)
         {
-            if (strcmp(font->basefont, "/SimSun") == 0)
+            if (context->fontloadCB != NULL)
             {
-                context->state->textState.fontface = plutovg_font_face_load_from_file("fonts/SimSun.ttf", 0);
-                context->state->textState.font_face_loaded = true;
+                char* data = NULL;
+                long len = 0;
+                context->fontloadCB(font->basefont + 1, &data, &len);
+                if (data != NULL)
+                {
+                    context->state->textState.fontface = context->state->textState.fontface = plutovg_font_face_load_from_data(
+                    data, len, 0, NULL, NULL);
+                    context->state->textState.font_face_loaded = true;
+                }
             }
             else
             {
-                context->state->textState.fontface = plutovg_font_face_load_from_file("fonts/SimSun.ttf", 0);
-                context->state->textState.font_face_loaded = true;
+                context->state->textState.fontface = NULL;
             }
+            context->state->textState.font_face_loaded = true;
         }
         else
         {
@@ -67,7 +75,22 @@ void handle_Tf(pdf_context_t* context)
     {
         if (font->font_data == NULL)
         {
-            context->state->textState.fontface = plutovg_font_face_load_from_file("fonts/SimSun.ttf", 0);
+            if (context->fontloadCB != NULL)
+            {
+                char* data = NULL;
+                long len = 0;
+                context->fontloadCB(font->basefont + 1, &data, &len);
+                if (data != NULL)
+                {
+                    context->state->textState.fontface = plutovg_font_face_load_from_data(
+                    data, len, 0, NULL, NULL);
+                    context->state->textState.font_face_loaded = true;
+                }
+            }
+            else
+            {
+                context->state->textState.fontface = NULL;
+            }
             context->state->textState.font_face_loaded = true;
         }
         else

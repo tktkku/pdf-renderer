@@ -1,4 +1,5 @@
-#include "render.h"
+#include "pdf-render.h"
+#include "pdf-render-private.h"
 #include "pdf-private.h"
 #include <math.h>
 #include <stdlib.h>

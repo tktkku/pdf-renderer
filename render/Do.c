@@ -1,8 +1,9 @@
-#include "render.h"
+#include "pdf-render.h"
+#include "pdf-render-private.h"
 #include "pdf-private.h"
 #include "plutovg-stb-image-write.h"
 #include "plutovg-stb-image.h"
-void handle_Do(pdf_context_t* context)
+void handle_Do(pdf_render_t* context)
 {
     // paint a specified XObject
     // name

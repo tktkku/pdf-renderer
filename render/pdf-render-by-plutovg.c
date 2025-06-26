@@ -1,4 +1,5 @@
-#include "render.h"
+#include "pdf-render.h"
+#include "pdf-render-private.h"
 #include "pdf-private.h"
 #include <plutovg-private.h>
 #include <math.h>
@@ -6,25 +7,7 @@
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
-void render_to_png_by_plutovg(pdf_page_t* page, char* filename)
-{
-    if (page == NULL || filename == NULL)
-    {
-        return;
-    }
-    int width = pdf_page_get_media_width(page) * PIXELS_PER_POINT;
-    int height = pdf_page_get_media_height(page) * PIXELS_PER_POINT;
-    int stride = width * 4;
-    unsigned char* pixels = (unsigned char*)malloc(stride * height);
-    memset(pixels, 0xFF, stride * height);
-    render_to_buffer_by_plutovg(page, pixels, width, height, stride);
-    plutovg_surface_t* surface =
-        plutovg_surface_create_for_data(pixels, width, height, stride);
-    plutovg_surface_write_to_png(surface, filename);
-    plutovg_surface_destroy(surface);
-    free(pixels);
-}
-void _init_state(pdf_context_t* context)
+void _init_state(pdf_render_t* context)
 {
     context->state = (pdf_graphics_state_t*)malloc(sizeof(pdf_graphics_state_t));
     memset(context->state, 0, sizeof(pdf_graphics_state_t));
@@ -52,11 +35,26 @@ void _init_state(pdf_context_t* context)
     context->state->textState.font = NULL;
     context->state->textState.fontface = NULL;
 }
-void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
-    int width, int height, int stride)
+pdf_render_t* pdf_render_init(pdf_page_t* page)
 {
+    if (page == NULL) return NULL;
+    pdf_render_t* r = (pdf_render_t*)malloc(sizeof(pdf_render_t));
+    memset(r, 0, sizeof(pdf_render_t));
+    r->page = page;
+    r->pdf = page->pdf;
+    r->current_obj = page->obj;
+
+    int width = pdf_page_get_media_width(r->page) * PIXELS_PER_POINT;
+    int height = pdf_page_get_media_height(r->page) * PIXELS_PER_POINT;
+    int stride = width * 4;
+    unsigned char* pixels = (unsigned char*)malloc(stride * height);
+    memset(pixels, 0xFF, stride * height);
+    r->pixels = pixels;
+    r->width = width;
+    r->height = height;
+    r->stride = stride;
+
     pdf_deque_t* deque = pdf_deque_init();
-    pdf_context_t context;
 
     plutovg_surface_t* surface =
         plutovg_surface_create_for_data(pixels, width, height, stride);
@@ -74,18 +72,68 @@ void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
     // Flip the Y-axis
     plutovg_canvas_translate(canvas, 0, height);
     plutovg_canvas_scale(canvas, PIXELS_PER_POINT, -PIXELS_PER_POINT);
-    context.canvas = canvas;
-    context.deque = deque;
-    context.pdf = page->pdf;
-    context.page = page;
-    _init_state(&context);
-    context.current_obj = page->obj;
-    context.fontcache = NULL;
-    context.surface = surface;
-    int numStreams = pdf_page_get_streams(page);
+    r->canvas = canvas;
+    r->deque = deque;
+    _init_state(r);
+    
+    r->fontcache = NULL;
+    r->surface = surface;
+    return r;
+}
+void pdf_render_set_load_font_callback(pdf_render_t* render, PDF_RENDER_FONT_LOAD_CB cb)
+{
+    if (render == NULL || cb == NULL) return;
+    render->fontloadCB = cb;
+}
+void pdf_render_free(pdf_render_t* context)
+{
+    if (context == NULL) return;
+    pdf_deque_free(context->deque);
+    for (int i = 0; i < cvector_size(context->fontcache); i++)
+    {
+        pdf_font_cache_t* fontcache = context->fontcache[i];
+        if (fontcache->font != NULL)
+        {
+            pdf_font_free(fontcache->font);
+        }
+        if (fontcache->fontface != NULL)
+        {
+            plutovg_font_face_destroy(fontcache->fontface);
+        }
+        free(fontcache);
+    }
+    cvector_free(context->fontcache);
+    free(context->state);
+    plutovg_canvas_destroy(context->canvas);
+    plutovg_surface_destroy(context->surface);
+    free(context->pixels);
+    free(context);
+}
+void pdf_render_save_to_png(pdf_render_t* context, char* filename)
+{
+    if (context == NULL || filename == NULL)
+    {
+        return;
+    }
+    
+    plutovg_surface_t* surface =
+        plutovg_surface_create_for_data(context->pixels, context->width, context->height, context->stride);
+    plutovg_surface_write_to_png(surface, filename);
+}
+int pdf_render_copy_to_buffer(pdf_render_t* context, void* data, int len)
+{
+    if (context == NULL) return -1;
+    int need = context->stride * context->height;
+    if (data == NULL || len <= need) return need;
+    memcpy(data, context->pixels, need);
+    return 0;
+}
+void pdf_render_do(pdf_render_t* context)
+{
+    int numStreams = pdf_page_get_streams(context->page);
     for (int j = 0; j < numStreams; j++)
     {
-        pdf_stream_t* stream = pdf_page_get_stream(page, j);
+        pdf_stream_t* stream = pdf_page_get_stream(context->page, j);
         if (stream == NULL)
             continue;
         pdf_stream_open(stream);
@@ -95,18 +143,18 @@ void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
         {
             if (tk->type == TOKEN_STREAM_END)
                 break;
-            _do_render_operation(&context, tk);
+            _do_render_operation(context, tk);
             pdf_parser_token_free(stream->parser, tk);
         }
 
         pdf_stream_close(stream);
     }
     // Annots
-    if (page->annots != NULL)
+    if (context->page->annots != NULL)
     {
-        for (int i = 0; i < page->annots->num_elements; i++)
+        for (int i = 0; i < context->page->annots->num_elements; i++)
         {
-            pdf_obj_t* anno_obj = pdf_file_get_obj(page->pdf, page->annots->values[i]->val.indirect);
+            pdf_obj_t* anno_obj = pdf_file_get_obj(context->page->pdf, context->page->annots->values[i]->val.indirect);
             if (anno_obj != NULL)
             { 
                 pdf_dict_get_name(anno_obj->value->val.dict, "/Type");
@@ -114,7 +162,7 @@ void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
                 pdf_array_t* rect_aar = pdf_dict_get_array(anno_obj->value->val.dict, "/Rect");
                 if (rect_aar != NULL)
                 {
-                    plutovg_canvas_translate(canvas, rect_aar->values[0]->val.number, rect_aar->values[1]->val.number);
+                    plutovg_canvas_translate(context->canvas, rect_aar->values[0]->val.number, rect_aar->values[1]->val.number);
                 }
                 pdf_dict_get_string(anno_obj->value->val.dict, "/Contents");
                 pdf_dict_get_dict(anno_obj->value->val.dict, "/P");
@@ -151,17 +199,17 @@ void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
                     if (nomal_dict == NULL)
                     {
                         int ref = pdf_dict_get_ref(AP, "/N");
-                        pdf_obj_t* obj = pdf_file_get_obj(page->pdf, ref);
+                        pdf_obj_t* obj = pdf_file_get_obj(context->page->pdf, ref);
                         if (obj->stream != NULL)
                         {
-                            context.current_obj = obj;
+                            context->current_obj = obj;
                             pdf_stream_open(obj->stream);
                             pdf_parser_token_t* tk = NULL;
                             while ((tk = pdf_stream_get_next_token(obj->stream)) != NULL)
                             {
                                 if (tk->type == TOKEN_STREAM_END)
                                     break;
-                                _do_render_operation(&context, tk);
+                                _do_render_operation(context, tk);
                                 pdf_parser_token_free(obj->stream->parser, tk);
                             }
                             pdf_stream_close(obj->stream);
@@ -176,32 +224,14 @@ void render_to_buffer_by_plutovg(pdf_page_t* page, unsigned char* pixels,
             }
         }
     }
-    pdf_deque_free(deque);
-    for (int i = 0; i < cvector_size(context.fontcache); i++)
-    {
-        pdf_font_cache_t* fontcache = context.fontcache[i];
-        if (fontcache->font != NULL)
-        {
-            pdf_font_free(fontcache->font);
-        }
-        if (fontcache->fontface != NULL)
-        {
-            plutovg_font_face_destroy(fontcache->fontface);
-        }
-        free(fontcache);
-    }
-    cvector_free(context.fontcache);
-    free(context.state);
-    plutovg_canvas_destroy(canvas);
-    plutovg_surface_destroy(surface);
 }
 
-void _do_render_operation(pdf_context_t* context, pdf_parser_token_t* tk)
+void _do_render_operation(pdf_render_t* context, pdf_parser_token_t* tk)
 {
-    // printf("%s", _token_to_string(tk->type));
-    // if (tk->token != NULL)
-    //     printf("%s", tk->token);
-    // printf("\n");
+    printf("%s", _token_to_string(tk->type));
+    if (tk->token != NULL)
+        printf("%s", tk->token);
+    printf("\n");
 
     if (tk->type < TOKEN_OPERATOR && tk->token != NULL)
     {
@@ -244,7 +274,7 @@ void _do_render_operation(pdf_context_t* context, pdf_parser_token_t* tk)
     }
 }
 
-void handle_BDC(pdf_context_t* context)
+void handle_BDC(pdf_render_t* context)
 {
     // tag properties
     char buf[1024] = { 0 };
@@ -264,12 +294,12 @@ void handle_BDC(pdf_context_t* context)
     pdf_deque_pop_front(context->deque, &node); // tag
     
 }
-void handle_BI(pdf_context_t* context)
+void handle_BI(pdf_render_t* context)
 {
     // begin an inline image object
 }
 
-void handle_BMC(pdf_context_t* context)
+void handle_BMC(pdf_render_t* context)
 {
     // tag
     char buf[1024] = { 0 };
@@ -279,7 +309,7 @@ void handle_BMC(pdf_context_t* context)
 }
 
 
-void handle_cm(pdf_context_t* context)
+void handle_cm(pdf_render_t* context)
 {
     // change matrix CTM
     // a b c d e f
@@ -306,7 +336,7 @@ void handle_cm(pdf_context_t* context)
 
 
 
-void handle_d(pdf_context_t* context)
+void handle_d(pdf_render_t* context)
 {
     // set line dash pattern
     // dashArray dashPhase
@@ -341,7 +371,7 @@ void handle_d(pdf_context_t* context)
     plutovg_canvas_set_dash_array(context->canvas, dashs, 2);
 }
 
-void handle_d0(pdf_context_t* context)
+void handle_d0(pdf_render_t* context)
 {
     // wx wy
     char buf[1024] = { 0 };
@@ -354,7 +384,7 @@ void handle_d0(pdf_context_t* context)
     // plutovg_canvas_translate(context->canvas, wx, wy);
 }
 
-void handle_d1(pdf_context_t* context)
+void handle_d1(pdf_render_t* context)
 {
     // wx wy llx lly urx ury
     char buf[1024] = { 0 };
@@ -376,7 +406,7 @@ void handle_d1(pdf_context_t* context)
     // plutovg_canvas_rect(context->canvas, llx, lly, urx - llx, ury - lly);
 }
 
-void handle_DP(pdf_context_t* context)
+void handle_DP(pdf_render_t* context)
 {
     // tag properties
     char buf[1024] = { 0 };
@@ -385,14 +415,14 @@ void handle_DP(pdf_context_t* context)
     pdf_deque_pop_front(context->deque, &node);
     pdf_deque_pop_front(context->deque, &node);
 }
-void handle_EI(pdf_context_t* context)
+void handle_EI(pdf_render_t* context)
 {
     // end an inline image object
 }
 
-void handle_EMC(pdf_context_t* context) {}
+void handle_EMC(pdf_render_t* context) {}
 
-void handle_gs(pdf_context_t* context)
+void handle_gs(pdf_render_t* context)
 {
     // set specified parameters
     // dictName shall be the name of
@@ -406,7 +436,7 @@ void handle_gs(pdf_context_t* context)
     // pdf_page_get_ext_gstate(context->page, buf);
 }
 
-void handle_i(pdf_context_t* context)
+void handle_i(pdf_render_t* context)
 {
     // set flatness tolerance
     // flatness
@@ -418,12 +448,12 @@ void handle_i(pdf_context_t* context)
     // context->graphics_state.flatness = i;
 }
 
-void handle_ID(pdf_context_t* context)
+void handle_ID(pdf_render_t* context)
 {
     // begin the image data for an inline image object
 }
 
-void handle_j(pdf_context_t* context)
+void handle_j(pdf_render_t* context)
 {
     // set join style
     // lineJoin
@@ -438,7 +468,7 @@ void handle_j(pdf_context_t* context)
     context->state->lineJoin = j;
 }
 
-void handle_J(pdf_context_t* context)
+void handle_J(pdf_render_t* context)
 {
     // set cap style
     // lineCap
@@ -453,7 +483,7 @@ void handle_J(pdf_context_t* context)
 }
 
 
-void handle_M(pdf_context_t* context)
+void handle_M(pdf_render_t* context)
 {
     // set miter limit
     // miterLimit
@@ -466,7 +496,7 @@ void handle_M(pdf_context_t* context)
     context->state->miterLimit = m;
 }
 
-void handle_MP(pdf_context_t* context)
+void handle_MP(pdf_render_t* context)
 {
     // tag
     char buf[1024] = { 0 };
@@ -475,7 +505,7 @@ void handle_MP(pdf_context_t* context)
     pdf_deque_pop_front(context->deque, &node);
 }
 
-void handle_q(pdf_context_t* context)
+void handle_q(pdf_render_t* context)
 {
     // store state
     plutovg_canvas_save(context->canvas);
@@ -486,7 +516,7 @@ void handle_q(pdf_context_t* context)
     context->state = new_state;
 }
 
-void handle_Q(pdf_context_t* context)
+void handle_Q(pdf_render_t* context)
 {
     // restore state
     plutovg_canvas_restore(context->canvas);
@@ -501,7 +531,7 @@ void handle_Q(pdf_context_t* context)
 }
 
 
-void handle_ri(pdf_context_t* context)
+void handle_ri(pdf_render_t* context)
 {
     // set color rendering intent
     // intent
@@ -511,7 +541,7 @@ void handle_ri(pdf_context_t* context)
     pdf_deque_pop_front(context->deque, &node);
 }
 
-void handle_sh(pdf_context_t* context)
+void handle_sh(pdf_render_t* context)
 {
     // name
     char buf[1024] = { 0 };

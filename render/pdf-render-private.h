@@ -1,5 +1,5 @@
 #pragma once
-#include "pdf.h"
+#include "pdf-render.h"
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -74,8 +74,12 @@ typedef struct
     plutovg_font_face_t* fontface;
     bool loaded;
 } pdf_font_cache_t;
-typedef struct context
+struct render
 {
+    unsigned char* pixels;
+    int width;
+    int height;
+    int stride;
     plutovg_surface_t* surface;
     pdf_deque_t* deque;
     plutovg_canvas_t* canvas;
@@ -83,80 +87,81 @@ typedef struct context
     pdf_page_t* page;
     pdf_obj_t* current_obj;
     pdf_graphics_state_t* state;
+    PDF_RENDER_FONT_LOAD_CB fontloadCB;
     cvector_vector_type(pdf_font_cache_t*) fontcache;
-} pdf_context_t;
-typedef void (*OPERATION_HANDLER)(pdf_context_t* context);
+};
+typedef void (*OPERATION_HANDLER)(pdf_render_t* context);
 
-void handle_q(pdf_context_t* context);
-void handle_Q(pdf_context_t* context);
-void handle_cm(pdf_context_t* context);
-void handle_w(pdf_context_t* context);
-void handle_J(pdf_context_t* context);
-void handle_j(pdf_context_t* context);
-void handle_M(pdf_context_t* context);
-void handle_d(pdf_context_t* context);
-void handle_ri(pdf_context_t* context);
-void handle_i(pdf_context_t* context);
-void handle_gs(pdf_context_t* context);
-void handle_m(pdf_context_t* context);
-void handle_l(pdf_context_t* context);
-void handle_c(pdf_context_t* context);
-void handle_v(pdf_context_t* context);
-void handle_y(pdf_context_t* context);
-void handle_h(pdf_context_t* context);
-void handle_re(pdf_context_t* context);
-void handle_S(pdf_context_t* context);
-void handle_s(pdf_context_t* context);
-void handle_F_f(pdf_context_t* context);
-void handle_f_star(pdf_context_t* context);
-void handle_B(pdf_context_t* context);
-void handle_B_star(pdf_context_t* context);
-void handle_b(pdf_context_t* context);
-void handle_b_star(pdf_context_t* context);
-void handle_n(pdf_context_t* context);
-void handle_W(pdf_context_t* context);
-void handle_W_star(pdf_context_t* context);
-void handle_CS(pdf_context_t* context);
-void handle_SC(pdf_context_t* context);
-void handle_G(pdf_context_t* context);
-void handle_cs(pdf_context_t* context);
-void handle_sc(pdf_context_t* context);
-void handle_g(pdf_context_t* context);
-void handle_RG(pdf_context_t* context);
-void handle_rg(pdf_context_t* context);
-void handle_K(pdf_context_t* context);
-void handle_k(pdf_context_t* context);
-void handle_SCN(pdf_context_t* context);
-void handle_scn(pdf_context_t* context);
-void handle_sh(pdf_context_t* context);
-void handle_Do(pdf_context_t* context);
-void handle_BI(pdf_context_t* context);
-void handle_ID(pdf_context_t* context);
-void handle_EI(pdf_context_t* context);
-void handle_BT(pdf_context_t* context);
-void handle_ET(pdf_context_t* context);
-void handle_Tf(pdf_context_t* context);
-void handle_Tc(pdf_context_t* context);
-void handle_Tw(pdf_context_t* context);
-void handle_Tz(pdf_context_t* context);
-void handle_TL(pdf_context_t* context);
-void handle_Tr(pdf_context_t* context);
-void handle_Ts(pdf_context_t* context);
-void handle_Td(pdf_context_t* context);
-void handle_TD(pdf_context_t* context);
-void handle_Tm(pdf_context_t* context);
-void handle_T_star(pdf_context_t* context);
-void handle_Tj(pdf_context_t* context);
-void handle_apostrophe(pdf_context_t* context);
-void handle_quotation(pdf_context_t* context);
-void handle_TJ(pdf_context_t* context);
-void handle_d0(pdf_context_t* context);
-void handle_d1(pdf_context_t* context);
-void handle_BDC(pdf_context_t* context);
-void handle_BMC(pdf_context_t* context);
-void handle_DP(pdf_context_t* context);
-void handle_EMC(pdf_context_t* context);
-void handle_MP(pdf_context_t* context);
+void handle_q(pdf_render_t* context);
+void handle_Q(pdf_render_t* context);
+void handle_cm(pdf_render_t* context);
+void handle_w(pdf_render_t* context);
+void handle_J(pdf_render_t* context);
+void handle_j(pdf_render_t* context);
+void handle_M(pdf_render_t* context);
+void handle_d(pdf_render_t* context);
+void handle_ri(pdf_render_t* context);
+void handle_i(pdf_render_t* context);
+void handle_gs(pdf_render_t* context);
+void handle_m(pdf_render_t* context);
+void handle_l(pdf_render_t* context);
+void handle_c(pdf_render_t* context);
+void handle_v(pdf_render_t* context);
+void handle_y(pdf_render_t* context);
+void handle_h(pdf_render_t* context);
+void handle_re(pdf_render_t* context);
+void handle_S(pdf_render_t* context);
+void handle_s(pdf_render_t* context);
+void handle_F_f(pdf_render_t* context);
+void handle_f_star(pdf_render_t* context);
+void handle_B(pdf_render_t* context);
+void handle_B_star(pdf_render_t* context);
+void handle_b(pdf_render_t* context);
+void handle_b_star(pdf_render_t* context);
+void handle_n(pdf_render_t* context);
+void handle_W(pdf_render_t* context);
+void handle_W_star(pdf_render_t* context);
+void handle_CS(pdf_render_t* context);
+void handle_SC(pdf_render_t* context);
+void handle_G(pdf_render_t* context);
+void handle_cs(pdf_render_t* context);
+void handle_sc(pdf_render_t* context);
+void handle_g(pdf_render_t* context);
+void handle_RG(pdf_render_t* context);
+void handle_rg(pdf_render_t* context);
+void handle_K(pdf_render_t* context);
+void handle_k(pdf_render_t* context);
+void handle_SCN(pdf_render_t* context);
+void handle_scn(pdf_render_t* context);
+void handle_sh(pdf_render_t* context);
+void handle_Do(pdf_render_t* context);
+void handle_BI(pdf_render_t* context);
+void handle_ID(pdf_render_t* context);
+void handle_EI(pdf_render_t* context);
+void handle_BT(pdf_render_t* context);
+void handle_ET(pdf_render_t* context);
+void handle_Tf(pdf_render_t* context);
+void handle_Tc(pdf_render_t* context);
+void handle_Tw(pdf_render_t* context);
+void handle_Tz(pdf_render_t* context);
+void handle_TL(pdf_render_t* context);
+void handle_Tr(pdf_render_t* context);
+void handle_Ts(pdf_render_t* context);
+void handle_Td(pdf_render_t* context);
+void handle_TD(pdf_render_t* context);
+void handle_Tm(pdf_render_t* context);
+void handle_T_star(pdf_render_t* context);
+void handle_Tj(pdf_render_t* context);
+void handle_apostrophe(pdf_render_t* context);
+void handle_quotation(pdf_render_t* context);
+void handle_TJ(pdf_render_t* context);
+void handle_d0(pdf_render_t* context);
+void handle_d1(pdf_render_t* context);
+void handle_BDC(pdf_render_t* context);
+void handle_BMC(pdf_render_t* context);
+void handle_DP(pdf_render_t* context);
+void handle_EMC(pdf_render_t* context);
+void handle_MP(pdf_render_t* context);
 
 const static OPERATION_HANDLER handlers[] = {
     NULL, handle_quotation, handle_apostrophe, handle_B, 
@@ -173,10 +178,10 @@ const static OPERATION_HANDLER handlers[] = {
     handle_m, handle_n, handle_q, handle_re, handle_rg, handle_ri, handle_s, 
     handle_sc, handle_scn, handle_sh, handle_v, handle_w, handle_y
 };
-void _do_render_operation(pdf_context_t* context, pdf_parser_token_t* tk);
-void stroke(pdf_context_t* context);
-void _do_text_render(pdf_context_t* context, char* buf, int len);
-void _init_state(pdf_context_t* context);
+void _do_render_operation(pdf_render_t* context, pdf_parser_token_t* tk);
+void stroke(pdf_render_t* context);
+void _do_text_render(pdf_render_t* context, char* buf, int len);
+void _init_state(pdf_render_t* context);
 
 typedef void (*CFF_HANDLER)(pdf_cff_char_render_t* context, pdf_deque_t* deque);
 void handle_hstem(pdf_cff_char_render_t* context, pdf_deque_t* deque);

@@ -1,5 +1,5 @@
 #include "pdf.h"
-
+#include "pdf-render.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -15,6 +15,21 @@ double get_wall_time(void)
     struct timeval time;
     gettimeofday(&time, NULL);
     return (double)time.tv_sec + (double)time.tv_usec * 0.000001;
+}
+void load_font_callback(const char* basefontName, char** data, long* len)
+{
+    printf("try to load font %s\n", basefontName);
+    FILE * f = fopen("fonts/SimSun.ttf", "rb");
+    if (f)
+    {
+        fseek(f, 0, SEEK_END);
+        long filesize = ftell(f);
+        fseek(f, 0, SEEK_SET);
+        *data = (char*)malloc(filesize);
+        fread(*data, filesize, 1, f);
+        *len = filesize;
+        fclose(f);
+    }
 }
 int main(int argc, char* argv[])
 {
@@ -70,7 +85,10 @@ int main(int argc, char* argv[])
                 continue;
             char filename[256] = { 0 };
             sprintf(filename, "page%d.png", i);
-            render_to_png_by_plutovg(page, filename);
+            pdf_render_t* r = pdf_render_init(page);
+            pdf_render_set_load_font_callback(r, load_font_callback);
+            pdf_render_do(r);
+            pdf_render_save_to_png(r, filename);
 
             pdf_page_free(page);
         }
@@ -107,7 +125,9 @@ int main(int argc, char* argv[])
                     continue;
                 char filename[256] = { 0 };
                 sprintf(filename, "page%d.png", i);
-                render_to_png_by_plutovg(page, filename);
+                pdf_render_t* r = pdf_render_init(page);
+                pdf_render_do(r);
+                pdf_render_save_to_png(r, filename);
 
                 pdf_page_free(page);
             }

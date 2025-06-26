@@ -1,4 +1,5 @@
-#include "render.h"
+#include "pdf-render.h"
+#include "pdf-render-private.h"
 #include "pdf-private.h"
 #include "plutovg-private.h"
 uint32_t _get_unicode_from_cmap(pdf_cmap_t* cmap, uint32_t code)
@@ -229,7 +230,7 @@ typedef struct unicode_text
     };
     plutovg_text_encoding_t encoding;
 } unicode_text_t;
-void _do_text_render(pdf_context_t* context, char* buf, int len)
+void _do_text_render(pdf_render_t* context, char* buf, int len)
 {
     plutovg_canvas_save(context->canvas);
     int unicode_cnt = 0;
