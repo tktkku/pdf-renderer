@@ -144,6 +144,7 @@ pdf_font_t* _load_type0_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
             cmap->worldwide = false;
             font->to_unicode_map = cmap;
             pdf_parser_free(parser);
+            pdf_input_close(input);
             free(origin);
         } 
     }
@@ -358,6 +359,7 @@ pdf_font_t* _load_truetype_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
             pdf_cmap_t* cmap = pdf_parser_build_cmap(parser);
             cmap->worldwide = false;
             font->to_unicode_map = cmap;
+            pdf_input_close(input);
             free(origin);
         }
     }
@@ -551,6 +553,7 @@ pdf_font_t* _load_type3_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
             pdf_cmap_t* cmap = pdf_parser_build_cmap(parser);
             cmap->worldwide = false;
             font->to_unicode_map = cmap;
+            pdf_input_close(input);
             free(origin);
         }
     }
@@ -773,6 +776,7 @@ pdf_font_t* _load_type1_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
         pdf_parser_token_free(parser, tk);
     }
     pdf_parser_free(parser);
+    pdf_input_close(input);
     free(buffer);
     return NULL;
 }

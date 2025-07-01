@@ -9,28 +9,14 @@
 #include <time.h>
 #include <sys/time.h>
 #include <locale.h>
-
+#include "plutovg.h"
 double get_wall_time(void)
 {
     struct timeval time;
     gettimeofday(&time, NULL);
     return (double)time.tv_sec + (double)time.tv_usec * 0.000001;
 }
-void load_font_callback(const char* basefontName, char** data, long* len)
-{
-    printf("try to load font %s\n", basefontName);
-    FILE * f = fopen("fonts/SimSun.ttf", "rb");
-    if (f)
-    {
-        fseek(f, 0, SEEK_END);
-        long filesize = ftell(f);
-        fseek(f, 0, SEEK_SET);
-        *data = (char*)malloc(filesize);
-        fread(*data, filesize, 1, f);
-        *len = filesize;
-        fclose(f);
-    }
-}
+
 int main(int argc, char* argv[])
 {
     const char* filename = NULL;
@@ -71,11 +57,20 @@ int main(int argc, char* argv[])
     long filesize = ftell(f);
     fseek(f, 0, SEEK_SET);
     char* filebuffer = malloc(filesize);
-    fread(filebuffer, 1, filebuffer, f);
+    fread(filebuffer, 1, filesize, f);
     fclose(f);
     pdf_file_t* pdf = pdf_file_read_buffer(filebuffer, filesize);
     int num_pages = pdf_file_get_pages(pdf);
 
+    f = fopen("fonts/SimSun.ttf", "rb");
+    fseek(f, 0, SEEK_END);
+    filesize = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    char* fontbuffer = malloc(filesize);
+    fread(fontbuffer, 1, filesize, f);
+    fclose(f);
+
+    pdf_file_load_font(pdf, "SimSun", fontbuffer, filesize);
     if (pages == NULL)
     {
         for (int i = 1; i <= num_pages; i++)
@@ -85,11 +80,20 @@ int main(int argc, char* argv[])
                 continue;
             char filename[256] = { 0 };
             sprintf(filename, "page%d.png", i);
-            pdf_render_t* r = pdf_render_init(page);
-            pdf_render_set_load_font_callback(r, load_font_callback);
+            int height = pdf_page_get_media_height(page) * PIXELS_PER_POINT;
+            int width = pdf_page_get_media_width(page) * PIXELS_PER_POINT;
+            int stride = width * 4;
+            pdf_render_t* r = pdf_render_init_with_size(page, width, height, stride);
             pdf_render_do(r);
-            pdf_render_save_to_png(r, filename);
-
+            unsigned char* pixels = (unsigned char*)malloc(stride * height);
+            memset(pixels, 0xFF, stride * height);
+            pdf_render_copy_to_buffer(r, pixels, stride * height);
+            plutovg_surface_t* surface =
+            plutovg_surface_create_for_data(pixels, width, height, stride);
+            plutovg_surface_write_to_png(surface, filename);
+            plutovg_surface_destroy(surface);
+            free(pixels);
+            pdf_render_free(r);
             pdf_page_free(page);
         }
     }
@@ -138,6 +142,7 @@ int main(int argc, char* argv[])
 
     pdf_file_free(pdf);
     free(filebuffer);
+    free(fontbuffer);
     wall_end = get_wall_time();
     printf("Elapsed %.3lf seconds.\n", wall_end - wall_start);
 

@@ -103,6 +103,7 @@ pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, int ref);
 int pdf_file_get_pages(pdf_file_t* pdf);
 pdf_page_t* pdf_file_get_page(pdf_file_t* pdf, int pageNo);
 pdf_cmap_t* pdf_file_get_cmap(pdf_file_t* pdf, char* name);
+void pdf_file_load_font(pdf_file_t* page, const char* name, const char* data, long len);
 
 pdf_dict_t* pdf_dict_init(void);
 void pdf_dict_free(pdf_dict_t* dict);

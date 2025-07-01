@@ -182,6 +182,12 @@ typedef struct pdf_input
         } buffer;
     };
 } pdf_input_t;
+typedef struct external_font {
+    char* name;
+    int name_len;
+    char* data;
+    long data_len;
+} pdf_external_font_t;
 struct pdf_file
 {
     pdf_input_t* input;
@@ -201,6 +207,7 @@ struct pdf_file
     pdf_cmap_t* cmaps;
     int num_cmaps;
     //pdf_parser_token_t* freed_tokens;
+    cvector_vector_type(pdf_external_font_t*) external_fonts;
 };
 
 // struct pdf_resources

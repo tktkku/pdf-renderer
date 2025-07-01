@@ -861,18 +861,35 @@ pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, int ref)
                     }
                     pdf_parser_token_free(parser, tk1);
                     pdf_parser_free(val_parser);
+                    pdf_input_close(input2);
                     _fill_resources(obj);
                     // _add_to_obj_table(pdf, obj);
                     cvector_push_back(pdf->read_objs, obj);
                 }
                 free(origin);  
                 pdf_parser_free(parser);
-
+                pdf_input_close(input);
                 return _get_obj_from_table(pdf, ref);
             }
         }
     }
     return NULL;
+}
+void pdf_file_load_font(pdf_file_t* file, const char* name, const char* data, long len)
+{
+    if (file == NULL || name == NULL || data == NULL || len <= 0)
+        return;
+    pdf_external_font_t* font = (pdf_external_font_t*)malloc(sizeof(pdf_external_font_t));
+    font->name_len = strlen(name);
+    font->name = (char*)malloc(font->name_len + 1);
+    memcpy(font->name, name, font->name_len);
+    font->name[font->name_len] = '\0';
+    
+    font->data_len = len;
+    font->data = (char*)malloc(font->data_len);
+    memcpy(font->data, data, font->data_len);
+    
+    cvector_push_back(file->external_fonts, font);
 }
 pdf_cmap_t* pdf_file_get_cmap(pdf_file_t* pdf, char* name)
 {
@@ -915,6 +932,7 @@ pdf_cmap_t* pdf_file_get_cmap(pdf_file_t* pdf, char* name)
     pdf_parser_t* parser = pdf_parser_init(pdf, INPUT_READER, input);
     pdf_cmap_t* cmap = pdf_parser_build_cmap(parser);
     pdf_parser_free(parser);
+    pdf_input_close(input);
     free(filedata);
     cmap->worldwide = true;
     cmap->next = NULL;
@@ -955,6 +973,26 @@ void pdf_file_free(pdf_file_t* file)
         pdf_obj_free(file->read_objs[i]);
     }
     cvector_free(file->read_objs);
+    nums = cvector_size(file->external_fonts);
+    for (int i = 0; i < nums; i++)
+    {
+        pdf_external_font_t* f = file->external_fonts[i];
+        if (f == NULL) continue;
+        if (f->data)
+        {
+            free(f->data);
+            f->data = NULL;
+        }
+        if (f->name)
+        {
+            free(f->name);
+            f->name = NULL;
+        }
+        free(f);
+        f = NULL;
+    }
+    cvector_free(file->external_fonts);
+    file->external_fonts = NULL;
     if (file->cmaps)
     {
         pdf_cmap_t* p = file->cmaps;

@@ -46,21 +46,20 @@ void handle_Tf(pdf_render_t* context)
     {
         if (font->font_data == NULL)
         {
-            if (context->fontloadCB != NULL)
+            context->state->textState.fontface = NULL;
+            for (int i = 0; cvector_size(context->page->pdf->external_fonts); i++)
             {
-                char* data = NULL;
-                long len = 0;
-                context->fontloadCB(font->basefont + 1, &data, &len);
-                if (data != NULL)
+                pdf_external_font_t* f = context->page->pdf->external_fonts[i];
+                if (strcmp(f->name, font->basefont + 1) == 0)
                 {
-                    context->state->textState.fontface = context->state->textState.fontface = plutovg_font_face_load_from_data(
-                    data, len, 0, NULL, NULL);
+                    font->font_data_length = f->data_len;
+                    font->font_data = f->data;
+                    
+                    context->state->textState.fontface = plutovg_font_face_load_from_data(
+                        font->font_data, font->font_data_length, 0, NULL, NULL);
                     context->state->textState.font_face_loaded = true;
+                    break;
                 }
-            }
-            else
-            {
-                context->state->textState.fontface = NULL;
             }
             context->state->textState.font_face_loaded = true;
         }
@@ -75,21 +74,20 @@ void handle_Tf(pdf_render_t* context)
     {
         if (font->font_data == NULL)
         {
-            if (context->fontloadCB != NULL)
+            context->state->textState.fontface = NULL;
+            for (int i = 0; cvector_size(context->page->pdf->external_fonts); i++)
             {
-                char* data = NULL;
-                long len = 0;
-                context->fontloadCB(font->basefont + 1, &data, &len);
-                if (data != NULL)
+                pdf_external_font_t* f = context->page->pdf->external_fonts[i];
+                if (strcmp(f->name, font->basefont + 1) == 0)
                 {
+                    font->font_data_length = f->data_len;
+                    font->font_data = f->data;
+                    
                     context->state->textState.fontface = plutovg_font_face_load_from_data(
-                    data, len, 0, NULL, NULL);
+                        font->font_data, font->font_data_length, 0, NULL, NULL);
                     context->state->textState.font_face_loaded = true;
+                    break;
                 }
-            }
-            else
-            {
-                context->state->textState.fontface = NULL;
             }
             context->state->textState.font_face_loaded = true;
         }

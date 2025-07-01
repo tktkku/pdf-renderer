@@ -87,7 +87,6 @@ struct render
     pdf_page_t* page;
     pdf_obj_t* current_obj;
     pdf_graphics_state_t* state;
-    PDF_RENDER_FONT_LOAD_CB fontloadCB;
     cvector_vector_type(pdf_font_cache_t*) fontcache;
 };
 typedef void (*OPERATION_HANDLER)(pdf_render_t* context);

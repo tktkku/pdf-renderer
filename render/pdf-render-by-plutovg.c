@@ -35,7 +35,7 @@ void _init_state(pdf_render_t* context)
     context->state->textState.font = NULL;
     context->state->textState.fontface = NULL;
 }
-pdf_render_t* pdf_render_init(pdf_page_t* page)
+pdf_render_t* pdf_render_init_with_size(pdf_page_t* page, int width, int height, int stride)
 {
     if (page == NULL) return NULL;
     pdf_render_t* r = (pdf_render_t*)malloc(sizeof(pdf_render_t));
@@ -44,9 +44,6 @@ pdf_render_t* pdf_render_init(pdf_page_t* page)
     r->pdf = page->pdf;
     r->current_obj = page->obj;
 
-    int width = pdf_page_get_media_width(r->page) * PIXELS_PER_POINT;
-    int height = pdf_page_get_media_height(r->page) * PIXELS_PER_POINT;
-    int stride = width * 4;
     unsigned char* pixels = (unsigned char*)malloc(stride * height);
     memset(pixels, 0xFF, stride * height);
     r->pixels = pixels;
@@ -80,11 +77,16 @@ pdf_render_t* pdf_render_init(pdf_page_t* page)
     r->surface = surface;
     return r;
 }
-void pdf_render_set_load_font_callback(pdf_render_t* render, PDF_RENDER_FONT_LOAD_CB cb)
+pdf_render_t* pdf_render_init(pdf_page_t* page)
 {
-    if (render == NULL || cb == NULL) return;
-    render->fontloadCB = cb;
+    if (page == NULL) return NULL;
+    
+    int width = pdf_page_get_media_width(page) * PIXELS_PER_POINT;
+    int height = pdf_page_get_media_height(page) * PIXELS_PER_POINT;
+    int stride = width * 4;
+    return pdf_render_init_with_size(page, width, height, stride);
 }
+
 void pdf_render_free(pdf_render_t* context)
 {
     if (context == NULL) return;
@@ -119,12 +121,13 @@ void pdf_render_save_to_png(pdf_render_t* context, char* filename)
     plutovg_surface_t* surface =
         plutovg_surface_create_for_data(context->pixels, context->width, context->height, context->stride);
     plutovg_surface_write_to_png(surface, filename);
+    plutovg_surface_destroy(surface);
 }
 int pdf_render_copy_to_buffer(pdf_render_t* context, void* data, int len)
 {
     if (context == NULL) return -1;
     int need = context->stride * context->height;
-    if (data == NULL || len <= need) return need;
+    if (data == NULL || len < need) return need;
     memcpy(data, context->pixels, need);
     return 0;
 }
@@ -228,10 +231,10 @@ void pdf_render_do(pdf_render_t* context)
 
 void _do_render_operation(pdf_render_t* context, pdf_parser_token_t* tk)
 {
-    printf("%s", _token_to_string(tk->type));
-    if (tk->token != NULL)
-        printf("%s", tk->token);
-    printf("\n");
+    // printf("%s", _token_to_string(tk->type));
+    // if (tk->token != NULL)
+    //     printf("%s", tk->token);
+    // printf("\n");
 
     if (tk->type < TOKEN_OPERATOR && tk->token != NULL)
     {
