@@ -3,18 +3,24 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef _WIN32
+#define strtok_r strtok_s
+#else
 #include <unistd.h>
+#include <sys/time.h>
 #include <getopt.h>
+#endif
+
 #include <stdint.h>
 #include <time.h>
-#include <sys/time.h>
+#include <chrono>
 #include <locale.h>
 #include "plutovg.h"
-double get_wall_time(void)
+static uint64_t get_wall_time(void)
 {
-    struct timeval time;
-    gettimeofday(&time, NULL);
-    return (double)time.tv_sec + (double)time.tv_usec * 0.000001;
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()
+    ).count();
 }
 
 int main(int argc, char* argv[])
@@ -47,7 +53,7 @@ int main(int argc, char* argv[])
     //setbuf(stdout, NULL);
     setlocale(LC_CTYPE, "zh_CN.UTF-8");
 
-    double wall_start, wall_end;
+    uint64_t wall_start, wall_end;
     wall_start = get_wall_time();
     // pdf_file_t* pdf = pdf_file_read_file(filename);
     FILE* f = fopen(filename, "rb");
@@ -56,7 +62,7 @@ int main(int argc, char* argv[])
     fseek(f, 0, SEEK_END);
     long filesize = ftell(f);
     fseek(f, 0, SEEK_SET);
-    char* filebuffer = malloc(filesize);
+    char* filebuffer = (char*)malloc(filesize);
     fread(filebuffer, 1, filesize, f);
     fclose(f);
     pdf_file_t* pdf = pdf_file_read_buffer(filebuffer, filesize);
@@ -66,7 +72,13 @@ int main(int argc, char* argv[])
     fseek(f, 0, SEEK_END);
     filesize = ftell(f);
     fseek(f, 0, SEEK_SET);
-    char* fontbuffer = malloc(filesize);
+    char* fontbuffer = (char*)malloc(filesize);
+    if (fontbuffer == nullptr)
+    {
+        pdf_file_free(pdf);
+        fclose(f);
+        return -1;
+    }
     fread(fontbuffer, 1, filesize, f);
     fclose(f);
 
@@ -80,13 +92,18 @@ int main(int argc, char* argv[])
                 continue;
             char filename[256] = { 0 };
             sprintf(filename, "page%d.png", i);
-            int height = pdf_page_get_media_height(page) * PIXELS_PER_POINT;
-            int width = pdf_page_get_media_width(page) * PIXELS_PER_POINT;
+            int height = (int)(pdf_page_get_media_height(page) * PIXELS_PER_POINT + 0.5);
+            int width = (int)(pdf_page_get_media_width(page) * PIXELS_PER_POINT + 0.5);
             int stride = width * 4;
             pdf_render_t* r = pdf_render_init_with_size(page, width, height, stride);
             pdf_render_do(r);
-            unsigned char* pixels = (unsigned char*)malloc(stride * height);
-            memset(pixels, 0xFF, stride * height);
+            unsigned char* pixels = (unsigned char*)malloc(static_cast<size_t>(stride) * height);
+            if (pixels == nullptr)
+            {
+                pdf_page_free(page);
+                break;
+            }
+            memset(pixels, 0xFF, static_cast<size_t>(stride) * height);
             pdf_render_copy_to_buffer(r, pixels, stride * height);
             plutovg_surface_t* surface =
             plutovg_surface_create_for_data(pixels, width, height, stride);
@@ -101,6 +118,7 @@ int main(int argc, char* argv[])
     {
         char* token;
         char* rest = pages;
+        
         while ((token = strtok_r(rest, ",", &rest)) != NULL)
         {
             char* dash = strchr(token, '-');
@@ -144,7 +162,7 @@ int main(int argc, char* argv[])
     free(filebuffer);
     free(fontbuffer);
     wall_end = get_wall_time();
-    printf("Elapsed %.3lf seconds.\n", wall_end - wall_start);
+    printf("Elapsed %lld seconds.\n", wall_end - wall_start);
 
     return 0;
 }
