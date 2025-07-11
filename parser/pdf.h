@@ -8,8 +8,6 @@ extern "C" {
     //#define CVECTOR_LINEAR_GROWTH
 #include "../c-vector/cvector.h"
     typedef struct pdf_parser_token pdf_parser_token_t;
-    typedef enum pdf_parser_token_type pdf_parser_token_type_t;
-    typedef enum pdf_value_type pdf_value_type_t;
 
     typedef struct pdf_node pdf_node_t;
     typedef struct pdf_deque pdf_deque_t;
@@ -40,13 +38,12 @@ extern "C" {
     typedef struct pdf_stream pdf_stream_t;
 
     typedef struct pdf_image pdf_image_t;
-    typedef enum xobject_type xobject_type_t;
+    
     typedef struct pdf_form pdf_form_t;
     typedef struct pdf_xobject pdf_xobject_t;
 
     struct pdf_parser;
     typedef struct pdf_parser pdf_parser_t;
-    typedef enum pdf_parser_reader_type pdf_parser_reader_type_t;
 
     struct pdf_cmap;
     typedef struct pdf_cmap pdf_cmap_t;
@@ -58,22 +55,6 @@ extern "C" {
      * user_data: custom param
      * return: actual size that filled in buf
      */
-    typedef void (*pdf_parser_read_func)(pdf_parser_t* parser, void* source);
-    /**
-     * @param pdf
-     * @param type BUFFER_READER, FILE_READER, STREAM_READER
-     * @param source pdf_buffer_t*, FILE*, pdf_stream_t*
-     */
-    pdf_parser_t* pdf_parser_init(pdf_file_t* pdf, pdf_parser_reader_type_t type, void* source);
-    void pdf_parser_free(pdf_parser_t* parser);
-    pdf_parser_token_t* pdf_parser_token_init(pdf_parser_t* parser, const unsigned char* start, pdf_parser_token_type_t type, int len);
-    const char* pdf_parser_token_get_token(pdf_parser_token_t* token);
-    void pdf_parser_token_free(pdf_parser_t* parser, pdf_parser_token_t* token);
-    pdf_parser_token_t* pdf_parser_next_token(pdf_parser_t* parser);
-    pdf_obj_t* pdf_parser_build_obj(pdf_parser_t* parser);
-    pdf_dict_t* pdf_parser_build_dict(pdf_parser_t* parser);
-    pdf_array_t* pdf_parser_build_array(pdf_parser_t* parser);
-    pdf_cmap_t* pdf_parser_build_cmap(pdf_parser_t* parser);
 
     pdf_page_t* pdf_page_init(void);
     void pdf_page_free(pdf_page_t* page);
@@ -107,19 +88,6 @@ extern "C" {
     pdf_page_t* pdf_file_get_page(pdf_file_t* pdf, int pageNo);
     pdf_cmap_t* pdf_file_get_cmap(pdf_file_t* pdf, char* name);
     void pdf_file_load_font(pdf_file_t* page, const char* name, const char* data, long len);
-
-    pdf_dict_t* pdf_dict_init(void);
-    void pdf_dict_free(pdf_dict_t* dict);
-    double pdf_dict_get_number(pdf_dict_t* dict, const char* name);
-    int pdf_dict_get_ref(pdf_dict_t* dict, const char* name);
-    pdf_array_t* pdf_dict_get_array(pdf_dict_t* dict, const char* name);
-    pdf_dict_t* pdf_dict_get_dict(pdf_dict_t* dict, const char* name);
-    char* pdf_dict_get_name(pdf_dict_t* dict, const char* name);
-    int pdf_dict_get_bool(pdf_dict_t* dict, const char* name);
-    bool pdf_dict_add_array(pdf_dict_t* dict, const char* name, pdf_array_t* array);
-    bool pdf_dict_add(pdf_dict_t* dict, const char* name, pdf_value_type_t type, void* data);
-    char* pdf_dict_get_string(pdf_dict_t* dict, const char* name);
-    bool pdf_dict_add_value(pdf_dict_t* dict, const char* name, pdf_value_t* value);
 
     pdf_font_t* pdf_font_init(void);
     void pdf_font_free(pdf_font_t* font);

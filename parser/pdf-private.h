@@ -8,11 +8,11 @@
 #define ARRAY_COUNT(a) (sizeof(a) / sizeof(a[0]))
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
-enum pdf_parser_token_type
+typedef enum pdf_parser_token_type
 {
 #define TOKEN_DEF(v, t) t,
 #include "pdf-token.def"
-};
+} pdf_parser_token_type_t;
 
 struct pdf_parser_token
 {
@@ -23,7 +23,7 @@ struct pdf_parser_token
     struct pdf_parser_token* next;
 };
 
-enum pdf_value_type
+typedef enum pdf_value_type
 {
     NUL,
     BOOLEAN,
@@ -33,7 +33,7 @@ enum pdf_value_type
     ARRAY,
     DICT,
     STRING
-};
+} pdf_value_type_t;
 
 struct pdf_value
 {
@@ -301,12 +301,11 @@ struct pdf_image
     int data_len;
     char color_space[128];
 };
-
-enum xobject_type
+typedef enum xobject_type
 {
     XOBJ_IMAGE = 0,
     XOBJ_FORM
-};
+} xobject_type_t;
 
 struct pdf_form
 {
@@ -324,11 +323,12 @@ struct pdf_xobject
     };
     pdf_obj_t* obj;
 };
-enum pdf_parser_reader_type {
+
+typedef enum pdf_parser_reader_type {
     INPUT_READER,
     STREAM_READER
-};
-
+}pdf_parser_reader_type_t;
+typedef void (*pdf_parser_read_func)(pdf_parser_t* parser, void* source);
 struct pdf_parser
 {
     struct {
@@ -419,3 +419,33 @@ size_t pdf_input_read(pdf_input_t* input, void* ptr, size_t size);
 int pdf_input_seek(pdf_input_t* input, long offset, int whence);
 long pdf_input_tell(pdf_input_t* input);
 void pdf_input_close(pdf_input_t* input);
+
+
+/**
+ * @param pdf
+ * @param type BUFFER_READER, FILE_READER, STREAM_READER
+ * @param source pdf_buffer_t*, FILE*, pdf_stream_t*
+ */
+pdf_parser_t* pdf_parser_init(pdf_file_t* pdf, pdf_parser_reader_type_t type, void* source);
+void pdf_parser_free(pdf_parser_t* parser);
+pdf_parser_token_t* pdf_parser_token_init(pdf_parser_t* parser, const unsigned char* start, pdf_parser_token_type_t type, int len);
+const char* pdf_parser_token_get_token(pdf_parser_token_t* token);
+void pdf_parser_token_free(pdf_parser_t* parser, pdf_parser_token_t* token);
+pdf_parser_token_t* pdf_parser_next_token(pdf_parser_t* parser);
+pdf_obj_t* pdf_parser_build_obj(pdf_parser_t* parser);
+pdf_dict_t* pdf_parser_build_dict(pdf_parser_t* parser);
+pdf_array_t* pdf_parser_build_array(pdf_parser_t* parser);
+pdf_cmap_t* pdf_parser_build_cmap(pdf_parser_t* parser);
+
+    pdf_dict_t* pdf_dict_init(void);
+    void pdf_dict_free(pdf_dict_t* dict);
+    double pdf_dict_get_number(pdf_dict_t* dict, const char* name);
+    int pdf_dict_get_ref(pdf_dict_t* dict, const char* name);
+    pdf_array_t* pdf_dict_get_array(pdf_dict_t* dict, const char* name);
+    pdf_dict_t* pdf_dict_get_dict(pdf_dict_t* dict, const char* name);
+    char* pdf_dict_get_name(pdf_dict_t* dict, const char* name);
+    int pdf_dict_get_bool(pdf_dict_t* dict, const char* name);
+    bool pdf_dict_add_array(pdf_dict_t* dict, const char* name, pdf_array_t* array);
+    bool pdf_dict_add(pdf_dict_t* dict, const char* name, pdf_value_type_t type, void* data);
+    char* pdf_dict_get_string(pdf_dict_t* dict, const char* name);
+    bool pdf_dict_add_value(pdf_dict_t* dict, const char* name, pdf_value_t* value);

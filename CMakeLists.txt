@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(pdf-renderer VERSION 0.0.1 LANGUAGES CXX)
+project(pdf-renderer VERSION 0.0.1 LANGUAGES C CXX)
 # 设置统一产物输出路径
 set(GLOBAL_OUTPUT_DIR ${CMAKE_BINARY_DIR}/output)
 
