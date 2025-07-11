@@ -35,7 +35,7 @@ void _init_state(pdf_render_t* context)
     context->state->textState.font = NULL;
     context->state->textState.fontface = NULL;
 }
-pdf_render_t* pdf_render_init_with_size(pdf_page_t* page, int width, int height, int stride)
+pdf_render_t* pdf_render_init_with_size(pdf_page_t* page, int width, int height, int stride, int dpi)
 {
     if (page == NULL) return NULL;
     pdf_render_t* r = (pdf_render_t*)malloc(sizeof(pdf_render_t));
@@ -68,7 +68,27 @@ pdf_render_t* pdf_render_init_with_size(pdf_page_t* page, int width, int height,
 
     // Flip the Y-axis
     plutovg_canvas_translate(canvas, 0, height);
-    plutovg_canvas_scale(canvas, PIXELS_PER_POINT, -PIXELS_PER_POINT);
+    plutovg_canvas_scale(canvas, (dpi / 72.0), -(dpi / 72.0));
+    
+    // 步骤2: 计算输出尺寸的缩放比例和偏移（保持宽高比）
+    double design_width = pdf_page_get_media_width(page);  // 设计宽度（点单位）
+    double design_height = pdf_page_get_media_height(page); // 设计高度（点单位）
+    // 计算画布在点单位下的实际尺寸
+    double canvas_width_pt = width * 72.0 / dpi;
+    double canvas_height_pt = height * 72.0 / dpi;
+
+    // 计算保持宽高比的缩放比例
+    double scale_x = canvas_width_pt / design_width;
+    double scale_y = canvas_height_pt / design_height;
+    double scale = fmin(scale_x, scale_y); // 取较小值确保内容完整显示
+
+    // 计算居中偏移量
+    double offset_x = (canvas_width_pt - design_width * scale) / 2.0;
+    double offset_y = (canvas_height_pt - design_height * scale) / 2.0;
+
+    // 步骤3: 应用居中偏移和缩放
+    plutovg_canvas_translate(canvas, offset_x, offset_y);
+    plutovg_canvas_scale(canvas, scale, scale);
     r->canvas = canvas;
     r->deque = deque;
     _init_state(r);
@@ -77,14 +97,14 @@ pdf_render_t* pdf_render_init_with_size(pdf_page_t* page, int width, int height,
     r->surface = surface;
     return r;
 }
-pdf_render_t* pdf_render_init(pdf_page_t* page)
+pdf_render_t* pdf_render_init(pdf_page_t* page, int dpi)
 {
     if (page == NULL) return NULL;
-    
-    int width = pdf_page_get_media_width(page) * PIXELS_PER_POINT;
-    int height = pdf_page_get_media_height(page) * PIXELS_PER_POINT;
+    double dpi_scale = dpi / 72.0;
+    int width = pdf_page_get_media_width(page) * dpi_scale;
+    int height = pdf_page_get_media_height(page) * dpi_scale;
     int stride = width * 4;
-    return pdf_render_init_with_size(page, width, height, stride);
+    return pdf_render_init_with_size(page, width, height, stride, dpi);
 }
 
 void pdf_render_free(pdf_render_t* context)
