@@ -95,7 +95,7 @@ int main(int argc, char* argv[])
             int height = (int)(pdf_page_get_media_height(page) * PIXELS_PER_POINT + 0.5);
             int width = (int)(pdf_page_get_media_width(page) * PIXELS_PER_POINT + 0.5);
             int stride = width * 4;
-            pdf_render_t* r = pdf_render_init_with_size(page, width, height, stride);
+            pdf_render_t* r = pdf_render_init_with_size(page, width, height, stride, 203);
             pdf_render_do(r);
             unsigned char* pixels = (unsigned char*)malloc(static_cast<size_t>(stride) * height);
             if (pixels == nullptr)
@@ -147,7 +147,7 @@ int main(int argc, char* argv[])
                     continue;
                 char filename[256] = { 0 };
                 sprintf(filename, "page%d.png", i);
-                pdf_render_t* r = pdf_render_init(page);
+                pdf_render_t* r = pdf_render_init(page, 203);
                 pdf_render_do(r);
                 pdf_render_save_to_png(r, filename);
 

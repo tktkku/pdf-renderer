@@ -11,6 +11,9 @@ void pdf_render_do(pdf_render_t* render);
 void pdf_render_free(pdf_render_t* render);
 int pdf_render_copy_to_buffer(pdf_render_t* context, void* data, int len);
 void pdf_render_save_to_png(pdf_render_t* context, char* filename);
+pdf_render_t* pdf_render_init_for_paper(pdf_page_t* page, 
+    int paperWidth, int paperHeight, int paperStride, 
+    int rotation, int dpi);
 #ifdef __cplusplus
 }
 #endif

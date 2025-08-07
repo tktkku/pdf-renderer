@@ -68,27 +68,7 @@ pdf_render_t* pdf_render_init_with_size(pdf_page_t* page, int width, int height,
 
     // Flip the Y-axis
     plutovg_canvas_translate(canvas, 0, height);
-    plutovg_canvas_scale(canvas, (dpi / 72.0), -(dpi / 72.0));
-    
-    // 步骤2: 计算输出尺寸的缩放比例和偏移（保持宽高比）
-    double design_width = pdf_page_get_media_width(page);  // 设计宽度（点单位）
-    double design_height = pdf_page_get_media_height(page); // 设计高度（点单位）
-    // 计算画布在点单位下的实际尺寸
-    double canvas_width_pt = width * 72.0 / dpi;
-    double canvas_height_pt = height * 72.0 / dpi;
-
-    // 计算保持宽高比的缩放比例
-    double scale_x = canvas_width_pt / design_width;
-    double scale_y = canvas_height_pt / design_height;
-    double scale = fmin(scale_x, scale_y); // 取较小值确保内容完整显示
-
-    // 计算居中偏移量
-    double offset_x = (canvas_width_pt - design_width * scale) / 2.0;
-    double offset_y = (canvas_height_pt - design_height * scale) / 2.0;
-
-    // 步骤3: 应用居中偏移和缩放
-    plutovg_canvas_translate(canvas, offset_x, offset_y);
-    plutovg_canvas_scale(canvas, scale, scale);
+    plutovg_canvas_scale(canvas, dpi / 72.0, -(dpi / 72.0));
     r->canvas = canvas;
     r->deque = deque;
     _init_state(r);
@@ -106,7 +86,90 @@ pdf_render_t* pdf_render_init(pdf_page_t* page, int dpi)
     int stride = width * 4;
     return pdf_render_init_with_size(page, width, height, stride, dpi);
 }
+pdf_render_t* pdf_render_init_for_paper(pdf_page_t* page, 
+    int paperWidth, int paperHeight, int paperStride, 
+    int rotation, int dpi)
+{
+    if (page == NULL) return NULL;
 
+    int rotationDegree = 0;
+    if (rotation == 0) {
+        bool isCanvasLandscape = paperWidth > paperHeight;
+        bool isPageLandscape = pdf_page_get_media_width(page) > pdf_page_get_media_height(page);
+        rotationDegree = (isCanvasLandscape != isPageLandscape) ? 90 : 0;
+    } else {
+        rotationDegree = 90 * (rotation - 1);
+    }
+
+    int renderWidth = paperWidth;
+    int renderHeight = paperHeight;
+    int renderStride = paperStride;
+
+    pdf_render_t* r = (pdf_render_t*)calloc(1, sizeof(pdf_render_t));
+    r->page = page;
+    r->pdf = page->pdf;
+    r->current_obj = page->obj;
+
+    r->pixels = (unsigned char*)calloc(renderStride * renderHeight, 1);
+    memset(r->pixels, 0xFF, renderStride * renderHeight);
+
+    r->width = renderWidth;
+    r->height = renderHeight;
+    r->stride = renderStride;
+
+    pdf_deque_t* deque = pdf_deque_init();
+    r->deque = deque;
+
+    plutovg_surface_t* surface = plutovg_surface_create_for_data(r->pixels, renderWidth, renderHeight, renderStride);
+    plutovg_canvas_t* canvas = plutovg_canvas_create(surface);
+
+    // clear background
+    plutovg_canvas_save(canvas);
+    plutovg_canvas_set_rgb(canvas, 1, 1, 1);
+    plutovg_canvas_paint(canvas);
+    plutovg_canvas_restore(canvas);
+
+    // get pdf page size (uint: pt)
+    double pageWidth = pdf_page_get_media_width(page);
+    double pageHeight = pdf_page_get_media_height(page);
+
+    // convert canvas' px size to pt size
+    double canvasWidthPt = renderWidth * 72.0 / dpi;
+    double canvasHeightPt = renderHeight * 72.0 / dpi;
+
+    // calc scale factor
+    double scaleX = canvasWidthPt / (rotationDegree % 180 == 90 ? pageHeight : pageWidth);
+    double scaleY = canvasHeightPt / (rotationDegree % 180 == 90 ? pageWidth : pageHeight);
+    double scale = fmin(scaleX, scaleY); // fit to page
+
+    // after scale, the actual content size
+    double scaledWidth = pageWidth * scale;
+    double scaledHeight = pageHeight * scale;
+
+    // calc offset (in pt)
+    double offsetX = (canvasWidthPt - scaledWidth) / 2.0;
+    double offsetY = (canvasHeightPt - scaledHeight) / 2.0;
+
+    // px -> pt -> rotate -> offset -> scale
+    plutovg_canvas_translate(canvas, 0, renderHeight); // flip y in px
+    plutovg_canvas_scale(canvas, dpi / 72.0, -(dpi / 72.0)); // px to pt
+
+    // move to center then rotate
+    plutovg_canvas_translate(canvas, canvasWidthPt / 2.0, canvasHeightPt / 2.0);
+    plutovg_canvas_rotate(canvas, rotationDegree * M_PI / 180.0);
+    plutovg_canvas_translate(canvas, -canvasWidthPt / 2.0, -canvasHeightPt / 2.0);
+
+    // move and scale
+    plutovg_canvas_translate(canvas, offsetX, offsetY);
+    plutovg_canvas_scale(canvas, scale, scale);
+
+    r->canvas = canvas;
+    r->surface = surface;
+    _init_state(r);
+    r->fontcache = NULL;
+
+    return r;
+}
 void pdf_render_free(pdf_render_t* context)
 {
     if (context == NULL) return;

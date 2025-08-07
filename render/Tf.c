@@ -47,7 +47,7 @@ void handle_Tf(pdf_render_t* context)
         if (font->font_data == NULL)
         {
             context->state->textState.fontface = NULL;
-            for (int i = 0; cvector_size(context->page->pdf->external_fonts); i++)
+            for (int i = 0; i < cvector_size(context->page->pdf->external_fonts); i++)
             {
                 pdf_external_font_t* f = context->page->pdf->external_fonts[i];
                 if (strcmp(f->name, font->basefont + 1) == 0)
@@ -75,7 +75,7 @@ void handle_Tf(pdf_render_t* context)
         if (font->font_data == NULL)
         {
             context->state->textState.fontface = NULL;
-            for (int i = 0; cvector_size(context->page->pdf->external_fonts); i++)
+            for (int i = 0; i < cvector_size(context->page->pdf->external_fonts); i++)
             {
                 pdf_external_font_t* f = context->page->pdf->external_fonts[i];
                 if (strcmp(f->name, font->basefont + 1) == 0)
