@@ -214,6 +214,21 @@ int pdf_render_copy_to_buffer(pdf_render_t* context, void* data, int len)
     memcpy(data, context->pixels, need);
     return 0;
 }
+void _pdf_process_stream(pdf_render_t* context, pdf_stream_t* stream)
+{
+    pdf_stream_open(stream);
+    pdf_parser_token_t* tk;
+    //int count = 0;
+    while ((tk = pdf_stream_get_next_token(stream)) != NULL)
+    {
+        if (tk->type == TOKEN_STREAM_END)
+            break;
+        _do_render_operation(context, tk);
+        pdf_parser_token_free(stream->parser, tk);
+    }
+
+    pdf_stream_close(stream);
+}
 void pdf_render_do(pdf_render_t* context)
 {
     int numStreams = pdf_page_get_streams(context->page);
@@ -221,19 +236,34 @@ void pdf_render_do(pdf_render_t* context)
     {
         pdf_stream_t* stream = pdf_page_get_stream(context->page, j);
         if (stream == NULL)
-            continue;
-        pdf_stream_open(stream);
-        pdf_parser_token_t* tk;
-        //int count = 0;
-        while ((tk = pdf_stream_get_next_token(stream)) != NULL)
         {
-            if (tk->type == TOKEN_STREAM_END)
-                break;
-            _do_render_operation(context, tk);
-            pdf_parser_token_free(stream->parser, tk);
+            if (context->page->contents[j]->value->type == ARRAY)
+            {
+                pdf_array_t* arr = context->page->contents[j]->value->val.array;
+                for (int i = 0; i < arr->num_elements; i++)
+                {
+                    if (arr->values[i]->type == INDIRECT)
+                    {
+                        pdf_obj_t* obj = pdf_file_get_obj(context->pdf, arr->values[i]->val.indirect);
+                        if (obj != NULL && obj->stream != NULL)
+                        {
+                            _pdf_process_stream(context, obj->stream);
+                        }
+                    }
+                }
+            }
+            else if (context->page->contents[j]->value->type == INDIRECT)
+            {
+                pdf_obj_t* obj = pdf_file_get_obj(context->pdf, context->page->contents[j]->value->val.indirect);
+                if (obj != NULL && obj->stream != NULL)
+                {
+                    _pdf_process_stream(context, obj->stream);
+                }
+            }
+            continue;
         }
-
-        pdf_stream_close(stream);
+            
+        _pdf_process_stream(context, stream);
     }
     // Annots
     if (context->page->annots != NULL)
