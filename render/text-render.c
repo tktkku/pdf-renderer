@@ -682,7 +682,7 @@ void _do_text_render(pdf_render_t* context, char* buf, int len)
                                 {
                                     if (tk->type == TOKEN_STREAM_END)
                                         break;
-                                    _do_render_operation(context, tk);
+                                    _do_render_operation(obj->stream, context, tk);
                                     pdf_parser_token_free(obj->stream->parser, tk);
                                 }
                                 pdf_stream_close(obj->stream);

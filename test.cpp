@@ -162,7 +162,7 @@ int main(int argc, char* argv[])
     free(filebuffer);
     free(fontbuffer);
     wall_end = get_wall_time();
-    printf("Elapsed %lld seconds.\n", wall_end - wall_start);
+    printf("Elapsed %ld ms.\n", wall_end - wall_start);
 
     return 0;
 }

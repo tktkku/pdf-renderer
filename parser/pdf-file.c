@@ -113,6 +113,26 @@ bool _read_xref_and_trailer(pdf_file_t* pdf)
     pdf_input_seek(pdf->input, xref_offset, SEEK_SET);
     ret = _read_line(pdf, buffer, sizeof(buffer));
 
+    if (strcmp(buffer, "xref") != 0)
+    {
+        // get wrong xref offset, find from the file start
+        pdf_input_seek(pdf->input, 0, SEEK_SET);
+        while (true)
+        {
+            ret = _read_line(pdf, buffer, sizeof(buffer));
+            if (strcmp(buffer, "xref") == 0)
+            {
+                xref_offset = pdf_input_tell(pdf->input) - ret;
+                break;
+            }
+            if (ret == 0)
+            {
+                printf("invalid pdf: could not find xref table\n");
+                return false;
+            }
+        }
+    }
+
     if (strcmp(buffer, "xref") == 0)
     {
         while (true)

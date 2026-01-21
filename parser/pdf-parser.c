@@ -626,11 +626,19 @@ pdf_parser_token_t* _pdf_parser_next_one_token(pdf_parser_t* parser, const unsig
         {
             //tk = pdf_parser_token_init(parser, start, to_compare[mid].type, len);
             tk = (pdf_parser_token_t*)malloc(sizeof(pdf_parser_token_t));
-            tk->next = NULL;
-            tk->token = NULL;
-            tk->token_len = len;
-            tk->steps = len;
             tk->type = to_compare[mid];
+            tk->next = NULL;
+            tk->token_len = len;
+            if (tk->type == TOKEN_NULL || tk->type == TOKEN_BOOLEAN_TRUE || tk->type == TOKEN_BOOLEAN_FALSE)
+            {
+                tk->token = (char*)malloc(len + 1);
+                memcpy(tk->token, start, len);
+                tk->token[len] = '\0';
+            }
+            else
+                tk->token = NULL;
+            
+            tk->steps = len;
             start += len;
             return tk;
         }

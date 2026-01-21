@@ -134,9 +134,9 @@ void handle_SCN(pdf_render_t* context);
 void handle_scn(pdf_render_t* context);
 void handle_sh(pdf_render_t* context);
 void handle_Do(pdf_render_t* context);
-void handle_BI(pdf_render_t* context);
-void handle_ID(pdf_render_t* context);
-void handle_EI(pdf_render_t* context);
+//void handle_BI(pdf_render_t* context);
+//void handle_ID(pdf_render_t* context);
+//void handle_EI(pdf_render_t* context);
 void handle_BT(pdf_render_t* context);
 void handle_ET(pdf_render_t* context);
 void handle_Tf(pdf_render_t* context);
@@ -164,9 +164,9 @@ void handle_MP(pdf_render_t* context);
 
 const static OPERATION_HANDLER handlers[] = {
     NULL, handle_quotation, handle_apostrophe, handle_B, 
-    handle_B_star, handle_BDC, handle_BMC, handle_BI, 
-    handle_BT, handle_CS, handle_DP, handle_Do, handle_EI,
-    handle_EMC, handle_ET, handle_F_f, handle_G, handle_ID, 
+    handle_B_star, handle_BDC, handle_BMC, NULL, 
+    handle_BT, handle_CS, handle_DP, handle_Do, NULL,
+    handle_EMC, handle_ET, handle_F_f, handle_G, NULL, 
     handle_J, handle_K, handle_M, handle_MP, handle_Q, handle_RG, 
     handle_S, handle_SC, handle_SCN, handle_T_star, handle_TD, 
     handle_TJ, handle_TL,handle_Tc, handle_Td, handle_Tf, handle_Tj, 
@@ -177,7 +177,7 @@ const static OPERATION_HANDLER handlers[] = {
     handle_m, handle_n, handle_q, handle_re, handle_rg, handle_ri, handle_s, 
     handle_sc, handle_scn, handle_sh, handle_v, handle_w, handle_y
 };
-void _do_render_operation(pdf_render_t* context, pdf_parser_token_t* tk);
+void _do_render_operation(pdf_stream_t* stream, pdf_render_t* context, pdf_parser_token_t* tk);
 void stroke(pdf_render_t* context);
 void _do_text_render(pdf_render_t* context, char* buf, int len);
 void _init_state(pdf_render_t* context);

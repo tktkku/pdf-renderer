@@ -223,7 +223,7 @@ void _pdf_process_stream(pdf_render_t* context, pdf_stream_t* stream)
     {
         if (tk->type == TOKEN_STREAM_END)
             break;
-        _do_render_operation(context, tk);
+        _do_render_operation(stream, context, tk);
         pdf_parser_token_free(stream->parser, tk);
     }
 
@@ -325,7 +325,7 @@ void pdf_render_do(pdf_render_t* context)
                             {
                                 if (tk->type == TOKEN_STREAM_END)
                                     break;
-                                _do_render_operation(context, tk);
+                                _do_render_operation(obj->stream, context, tk);
                                 pdf_parser_token_free(obj->stream->parser, tk);
                             }
                             pdf_stream_close(obj->stream);
@@ -342,12 +342,15 @@ void pdf_render_do(pdf_render_t* context)
     }
 }
 
-void _do_render_operation(pdf_render_t* context, pdf_parser_token_t* tk)
+void _do_render_operation(pdf_stream_t* stream, pdf_render_t* context, pdf_parser_token_t* tk)
 {
-    // printf("%s", _token_to_string(tk->type));
-    // if (tk->token != NULL)
-    //     printf("%s", tk->token);
-    // printf("\n");
+    printf("%s", _token_to_string(tk->type));
+    if (tk->token != NULL)
+    {
+        printf("%s", tk->token);
+    }
+        
+    printf("\n");
 
     if (tk->type < TOKEN_OPERATOR && tk->token != NULL)
     {
@@ -374,10 +377,28 @@ void _do_render_operation(pdf_render_t* context, pdf_parser_token_t* tk)
                 plutovg_canvas_set_fill_rule(context->canvas,
                     PLUTOVG_FILL_RULE_EVEN_ODD);
                 break;
+            case TOKEN_OPERATOR_BI:
+            {
+                pdf_parser_token_t* t = NULL;
+                int width = 0, height = 0;
+                int channles = 3;
+                while ((t = pdf_stream_get_next_token(stream)) != NULL)
+                {
+                    if (tk->type == TOKEN_OPERATOR_ID)
+                        break;
+ 
+                    pdf_parser_token_free(stream->parser, t);
+                }
+                // TODO: seek stream
+                break;
+            }
             default:
                 break;
         }
-        handlers[tk->type - TOKEN_OPERATOR](context);
+        if (handlers[tk->type - TOKEN_OPERATOR])
+        {
+            handlers[tk->type - TOKEN_OPERATOR](context);
+        }
         // if (tk->type == TOKEN_OPERATOR_TJ || tk->type == TOKEN_OPERATOR_Tj)
         // {
         //     plutovg_surface_write_to_png(context->surface, "test.png");
@@ -410,10 +431,10 @@ void handle_BDC(pdf_render_t* context)
     pdf_deque_pop_front(context->deque, &node); // tag
     
 }
-void handle_BI(pdf_render_t* context)
-{
-    // begin an inline image object
-}
+// void handle_BI(pdf_render_t* context)
+// {
+//     // begin an inline image object
+// }
 
 void handle_BMC(pdf_render_t* context)
 {
@@ -531,10 +552,10 @@ void handle_DP(pdf_render_t* context)
     pdf_deque_pop_front(context->deque, &node);
     pdf_deque_pop_front(context->deque, &node);
 }
-void handle_EI(pdf_render_t* context)
-{
-    // end an inline image object
-}
+// void handle_EI(pdf_render_t* context)
+// {
+//     // end an inline image object
+// }
 
 void handle_EMC(pdf_render_t* context) {}
 
@@ -564,10 +585,10 @@ void handle_i(pdf_render_t* context)
     // context->graphics_state.flatness = i;
 }
 
-void handle_ID(pdf_render_t* context)
-{
-    // begin the image data for an inline image object
-}
+// void handle_ID(pdf_render_t* context)
+// {
+//     // begin the image data for an inline image object
+// }
 
 void handle_j(pdf_render_t* context)
 {
