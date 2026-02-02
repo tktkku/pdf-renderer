@@ -120,7 +120,9 @@ void pdf_stream_open(pdf_stream_t* stream)
 {
     if (stream == NULL || stream->pdf == NULL)
         return;
-    stream->parser = pdf_parser_init(stream->pdf, STREAM_READER, stream);
+    input_t* input = NULL;
+    input_stream(&input, stream);
+    stream->parser = pdf_parser_init(stream->pdf, input);
     stream->processed = 0;
     stream->readin_len = 0;
     stream->decomp.flate.avail_in = 0;
@@ -134,7 +136,7 @@ void pdf_stream_open(pdf_stream_t* stream)
     stream->decomp.buf_size = 4096;
     stream->decomp.cur_pos = 0;
     stream->decomp.len = 0;
-    pdf_input_seek(stream->pdf->input, stream->stream_offset, SEEK_SET);
+    input_seek(stream->pdf->input, stream->stream_offset, SEEK_SET);
 }
 /**
  * -1: error
@@ -157,9 +159,9 @@ int pdf_stream_get_data(pdf_stream_t* stream, unsigned char* buf, int size)
                     memset(stream->decomp.buf, 0, stream->decomp.buf_size);
                     int read_size = stream->stream_len - stream->processed;
                     read_size = MIN(stream->decomp.buf_size, read_size);
-                    pdf_input_seek(stream->pdf->input, stream->stream_offset + stream->readin_len, SEEK_SET);
+                    input_seek(stream->pdf->input, stream->stream_offset + stream->readin_len, SEEK_SET);
                     stream->decomp.len = stream->decomp.flate.avail_in
-                        = pdf_input_read(stream->pdf->input, stream->decomp.buf, read_size);
+                        = input_read(stream->pdf->input, stream->decomp.buf, read_size);
                     if (stream->decomp.flate.avail_in == 0)
                     {
                         return 0;
@@ -186,7 +188,7 @@ int pdf_stream_get_data(pdf_stream_t* stream, unsigned char* buf, int size)
     }
     else
     {
-        ret = pdf_input_read(stream->pdf->input, buf, size);
+        ret = input_read(stream->pdf->input, buf, size);
         if (ret < 0)
         {
             return -1;

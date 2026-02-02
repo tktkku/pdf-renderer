@@ -164,13 +164,14 @@ struct pdf_cmap
     struct pdf_cmap* next;
 };
 typedef enum {
-    PDF_INPUT_TYPE_FILE,
-    PDF_INPUT_TYPE_BUFFER
-} pdf_input_type_t;
+    INPUT_TYPE_FILE,
+    INPUT_TYPE_BUFFER,
+    INPUT_TYPE_STREAM
+} input_type_t;
 
-typedef struct pdf_input
+typedef struct input
 {
-    pdf_input_type_t type;
+    input_type_t type;
     union 
     {
         FILE* file;
@@ -180,8 +181,9 @@ typedef struct pdf_input
             size_t size;
             size_t pos;
         } buffer;
+        pdf_stream_t* stream;
     };
-} pdf_input_t;
+} input_t;
 typedef struct external_font {
     char* name;
     int name_len;
@@ -190,7 +192,7 @@ typedef struct external_font {
 } pdf_external_font_t;
 struct pdf_file
 {
-    pdf_input_t* input;
+    input_t* input;
     long data_len;
     long current_index;
     //int num_read_objs;
@@ -331,12 +333,8 @@ typedef enum pdf_parser_reader_type {
 typedef void (*pdf_parser_read_func)(pdf_parser_t* parser, void* source);
 struct pdf_parser
 {
-    struct {
-        enum pdf_parser_reader_type type;
-        void* source;
-        pdf_parser_read_func read;
-    } reader;
     pdf_file_t* pdf;
+    input_t* input;
     unsigned char* buffer;
     int buffer_size;
     unsigned char* end_pos;
@@ -392,8 +390,7 @@ bool _is_space(char c);
 bool _is_hex(char c);
 bool _is_digit(char c);
 bool _is_delimiter(char c);
-void _pdf_parser_read_input(pdf_parser_t* parser, void* source);
-void _pdf_parser_read_stream(pdf_parser_t* parser, void* source);
+void _pdf_parser_read_input(pdf_parser_t* parser);
 uint32_t _hex_str_to_32bit(char* hexStr, int len);
 uint16_t _hex_str_to_16bit(char hexStr[4]);
 uint8_t _hex_str_to_8bit(char hexStr[2]);
@@ -413,12 +410,13 @@ struct pdf_deque
     size_t size;
 };
 
-int pdf_input_file(pdf_input_t** input, const char* filename);
-int pdf_input_buffer(pdf_input_t** input, const char* data, size_t size);
-size_t pdf_input_read(pdf_input_t* input, void* ptr, size_t size);
-int pdf_input_seek(pdf_input_t* input, long offset, int whence);
-long pdf_input_tell(pdf_input_t* input);
-void pdf_input_close(pdf_input_t* input);
+int input_file(input_t** input, const char* filename);
+int input_buffer(input_t** input, const char* data, size_t size);
+size_t input_read(input_t* input, void* ptr, size_t size);
+int input_seek(input_t* input, long offset, int whence);
+long input_tell(input_t* input);
+void input_close(input_t* input);
+int input_stream(input_t** input, pdf_stream_t* stream);
 
 
 /**
@@ -426,8 +424,9 @@ void pdf_input_close(pdf_input_t* input);
  * @param type BUFFER_READER, FILE_READER, STREAM_READER
  * @param source pdf_buffer_t*, FILE*, pdf_stream_t*
  */
-pdf_parser_t* pdf_parser_init(pdf_file_t* pdf, pdf_parser_reader_type_t type, void* source);
+pdf_parser_t* pdf_parser_init(pdf_file_t* pdf, input_t* input);
 void pdf_parser_free(pdf_parser_t* parser);
+size_t pdf_parser_read_data(pdf_parser_t* parser, void* ptr, size_t size);
 pdf_parser_token_t* pdf_parser_token_init(pdf_parser_t* parser, const unsigned char* start, pdf_parser_token_type_t type, int len);
 const char* pdf_parser_token_get_token(pdf_parser_token_t* token);
 void pdf_parser_token_free(pdf_parser_t* parser, pdf_parser_token_t* token);

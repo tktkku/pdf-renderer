@@ -29,8 +29,6 @@ add_subdirectory(plutovg)
 add_subdirectory(zlib)
 add_subdirectory(parser)
 add_subdirectory(render)
-add_subdirectory(ippd)
-add_subdirectory(libusb-cmake)
 
 add_executable(test test.cpp)
 target_link_libraries(test render)

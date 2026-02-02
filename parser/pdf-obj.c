@@ -135,16 +135,16 @@ pdf_font_t* _load_type0_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
         pdf_stream_get_all(obj1->stream, &data, &len);
         if (data != NULL)
         {
-            pdf_input_t* input = NULL;
-            pdf_input_buffer(&input, data, len);
+            input_t* input = NULL;
+            input_buffer(&input, data, len);
             unsigned char* origin = data;
-            pdf_parser_t* parser = pdf_parser_init(obj->pdf, INPUT_READER, input);
+            pdf_parser_t* parser = pdf_parser_init(obj->pdf, input);
 
             pdf_cmap_t* cmap = pdf_parser_build_cmap(parser);
             cmap->worldwide = false;
             font->to_unicode_map = cmap;
             pdf_parser_free(parser);
-            pdf_input_close(input);
+            input_close(input);
             free(origin);
         } 
     }
@@ -351,15 +351,15 @@ pdf_font_t* _load_truetype_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
         pdf_stream_get_all(obj1->stream, &data, &len);
         if (data == NULL)
         {
-            pdf_input_t* input = NULL;
-            pdf_input_buffer(&input, data, len);
+            input_t* input = NULL;
+            input_buffer(&input, data, len);
             unsigned char* origin = data;
-            pdf_parser_t* parser = pdf_parser_init(obj->pdf, INPUT_READER, input);
+            pdf_parser_t* parser = pdf_parser_init(obj->pdf, input);
 
             pdf_cmap_t* cmap = pdf_parser_build_cmap(parser);
             cmap->worldwide = false;
             font->to_unicode_map = cmap;
-            pdf_input_close(input);
+            input_close(input);
             free(origin);
         }
     }
@@ -545,15 +545,15 @@ pdf_font_t* _load_type3_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
         pdf_stream_get_all(obj1->stream, &data, &len);
         if (data != NULL)
         {
-            pdf_input_t* input = NULL;
-            pdf_input_buffer(&input, data, len);
+            input_t* input = NULL;
+            input_buffer(&input, data, len);
             unsigned char* origin = data;
-            pdf_parser_t* parser = pdf_parser_init(obj->pdf, INPUT_READER, input);
+            pdf_parser_t* parser = pdf_parser_init(obj->pdf, input);
     
             pdf_cmap_t* cmap = pdf_parser_build_cmap(parser);
             cmap->worldwide = false;
             font->to_unicode_map = cmap;
-            pdf_input_close(input);
+            input_close(input);
             free(origin);
         }
     }
@@ -766,9 +766,9 @@ pdf_font_t* _load_type1_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
     fclose(f);
 
     unsigned char* p = buffer + 6;
-    pdf_input_t* input = NULL;
-    pdf_input_buffer(&input, p, filesize - 6);
-    pdf_parser_t* parser = pdf_parser_init(obj->pdf, INPUT_READER, input);
+    input_t* input = NULL;
+    input_buffer(&input, p, filesize - 6);
+    pdf_parser_t* parser = pdf_parser_init(obj->pdf, input);
     pdf_parser_token_t* tk = NULL;
     while ((tk = pdf_parser_next_token(parser)) != NULL)
     {
@@ -776,7 +776,7 @@ pdf_font_t* _load_type1_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
         pdf_parser_token_free(parser, tk);
     }
     pdf_parser_free(parser);
-    pdf_input_close(input);
+    input_close(input);
     free(buffer);
     return NULL;
 }
@@ -1075,7 +1075,8 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj, const char* name)
                         }
                     }
                 }
-                free(lookup);
+                if (color_space_aar->values[3]->type == INDIRECT)
+                    free(lookup);
                 free(img->data);
                 img->data = tmp;
                 img->data_len = tmp_len;
@@ -1100,8 +1101,8 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj, const char* name)
             {
                 strcpy(img->color_space, color_space);
             }
-            pdf_input_seek(xobject->pdf->input, xobject->stream->stream_offset, SEEK_SET);
-            int ret = pdf_input_read(xobject->pdf->input, img->data, length);
+            input_seek(xobject->pdf->input, xobject->stream->stream_offset, SEEK_SET);
+            int ret = input_read(xobject->pdf->input, img->data, length);
             if (ret != length)
             {
                 free(img);

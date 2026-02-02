@@ -1,37 +1,47 @@
 #include "pdf.h"
 #include "pdf-private.h"
 
-int pdf_input_file(pdf_input_t** input, const char* filename)
+int input_file(input_t** input, const char* filename)
 {
     if (input == NULL || filename == NULL) return -1;
     FILE* fp = fopen(filename, "rb");
     if (!fp) return -1;
-    *input = (pdf_input_t*)malloc(sizeof(pdf_input_t));
-    (*input)->type = PDF_INPUT_TYPE_FILE;
+    *input = (input_t*)malloc(sizeof(input_t));
+    (*input)->type = INPUT_TYPE_FILE;
     (*input)->file = fp;
     return 0;
 }
 
-int pdf_input_buffer(pdf_input_t** input, const char* data, size_t size)
+int input_buffer(input_t** input, const char* data, size_t size)
 {
     if (input == NULL || data == NULL || size <= 0) 
         return -1;
-    *input = (pdf_input_t*)malloc(sizeof(pdf_input_t));
-    (*input)->type = PDF_INPUT_TYPE_BUFFER;
+    *input = (input_t*)malloc(sizeof(input_t));
+    (*input)->type = INPUT_TYPE_BUFFER;
     (*input)->buffer.data = data;
     (*input)->buffer.size = size;
     (*input)->buffer.pos = 0;
     return 0;
 }
 
-size_t pdf_input_read(pdf_input_t* input, void* ptr, size_t size)
+int input_stream(input_t** input, pdf_stream_t* stream)
 {
+    if (input == NULL || stream == NULL) 
+        return -1;
+    *input = (input_t*)malloc(sizeof(input_t));
+    (*input)->type = INPUT_TYPE_STREAM;
+    (*input)->stream = stream;
+}
+
+size_t input_read(input_t* input, void* ptr, size_t size)
+{
+    if (ptr == NULL || size <= 0) return 0;
     switch (input->type)
     {
-        case PDF_INPUT_TYPE_FILE:
+        case INPUT_TYPE_FILE:
             return fread(ptr, 1, size, input->file);
             break;
-        case PDF_INPUT_TYPE_BUFFER:
+        case INPUT_TYPE_BUFFER:
         {
             size_t remaining = input->buffer.size - input->buffer.pos;
             size_t read_size = (size < remaining) ? size : remaining;
@@ -42,19 +52,30 @@ size_t pdf_input_read(pdf_input_t* input, void* ptr, size_t size)
             }
             return read_size;
         }
+        case INPUT_TYPE_STREAM:
+        {
+            int ret = 0;
+            input->stream->parser->current_pos;
+            if ((input->stream->decomp.cur_pos >= input->stream->decomp.len && input->stream->readin_len < input->stream->stream_len)
+                || input->stream->processed < input->stream->stream_len)
+            {
+                ret = pdf_stream_get_data(input->stream, ptr, size);
+            }
+            return ret;
+        }
         default:
             return 0;
     }
 }
 
-int pdf_input_seek(pdf_input_t* input, long offset, int whence)
+int input_seek(input_t* input, long offset, int whence)
 {
     switch (input->type)
     {
-        case PDF_INPUT_TYPE_FILE:
+        case INPUT_TYPE_FILE:
             return fseek(input->file, offset, whence);
             break;
-        case PDF_INPUT_TYPE_BUFFER:
+        case INPUT_TYPE_BUFFER:
         {
             size_t new_pos;
             switch (whence)
@@ -80,14 +101,14 @@ int pdf_input_seek(pdf_input_t* input, long offset, int whence)
     }
 }
 
-long pdf_input_tell(pdf_input_t* input)
+long input_tell(input_t* input)
 {
     switch (input->type)
     {
-        case PDF_INPUT_TYPE_FILE:
+        case INPUT_TYPE_FILE:
             return ftell(input->file);
             break;
-        case PDF_INPUT_TYPE_BUFFER:
+        case INPUT_TYPE_BUFFER:
             return input->buffer.pos;
             break;
         default:
@@ -96,9 +117,9 @@ long pdf_input_tell(pdf_input_t* input)
     }
 }
 
-void pdf_input_close(pdf_input_t* input)
+void input_close(input_t* input)
 {
-    if (input->type == PDF_INPUT_TYPE_FILE)
+    if (input->type == INPUT_TYPE_FILE)
     {
         fclose(input->file);
     }

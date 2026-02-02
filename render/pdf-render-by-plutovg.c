@@ -379,17 +379,202 @@ void _do_render_operation(pdf_stream_t* stream, pdf_render_t* context, pdf_parse
                 break;
             case TOKEN_OPERATOR_BI:
             {
+                plutovg_canvas_save(context->canvas);
                 pdf_parser_token_t* t = NULL;
                 int width = 0, height = 0;
-                int channles = 3;
+                int channels = 3;
+                int bitsPerColor = 8;
+                char filter[64] = {0};
                 while ((t = pdf_stream_get_next_token(stream)) != NULL)
                 {
-                    if (tk->type == TOKEN_OPERATOR_ID)
+                    if (t->type == TOKEN_OPERATOR_ID)
+                    {
+                        pdf_parser_token_free(stream->parser, t);
                         break;
+                    }
+                    else if (t->type == TOKEN_NAME)
+                    {
+                        pdf_parser_token_t* t1 = pdf_stream_get_next_token(stream);
+                        if (t1 != NULL)
+                        {
+                            if (!strcmp(t->token, "/W"))
+                            {
+                                width = atoi(t1->token);
+                            }
+                            else if (!strcmp(t->token, "/H"))
+                            {
+                                height = atoi(t1->token);
+                            }
+                            else if (!strcmp(t->token, "/BPC"))
+                            {
+                                bitsPerColor = atoi(t1->token);
+                            }
+                            else if (!strcmp(t->token, "/CS"))
+                            {
+                                if (!strcmp(t1->token, "/RGB"))
+                                {
+                                    channels = 3;
+                                }
+                                else if (!strcmp(t1->token, "/Gray"))
+                                {
+                                    channels = 1;
+                                }
+                            }
+                            else if (!strcmp(t->token, "/F"))
+                            {
+                                if (t1->type == TOKEN_NAME)
+                                {
+                                    strcpy(filter, t1->token);
+                                }
+                                else if (t1->type == TOKEN_ARRAY_BEG)
+                                {
+                                    pdf_parser_token_t* t2 = pdf_stream_get_next_token(stream);
+                                    if (t2 != NULL && t2->type == TOKEN_NAME)
+                                    {
+                                        strcpy(filter, t2->token);
+                                    }
+                                    pdf_parser_token_free(stream->parser, t2);
+                                    pdf_parser_token_t* t3 = pdf_stream_get_next_token(stream);
+                                    if (t3->type == TOKEN_ARRAY_END)
+                                    {
+
+                                    }
+                                    pdf_parser_token_free(stream->parser, t3);
+
+                                }
+                            }
+                            pdf_parser_token_free(stream->parser, t1);
+                        }
+                    }
  
                     pdf_parser_token_free(stream->parser, t);
                 }
-                // TODO: seek stream
+                int size = width * channels * height;
+                char* buffer = (char*)malloc(size);
+                size_t ret = 0;
+                if (!strcmp(filter, "/DCT"))
+                {
+                    char c;
+                    while (pdf_parser_read_data(stream->parser, &c, 1) == 1)
+                    {
+                        memcpy(buffer + ret, &c, 1);
+                        ret += 1;
+                        if (ret >= 2 && !memcmp(buffer + ret - 2, "\xFF\xD9", 2))
+                        {
+                            pdf_parser_token_t* t1 = pdf_stream_get_next_token(stream);
+                            if (t1 != NULL && t1->type == TOKEN_OPERATOR_EI)
+                            {
+                                pdf_parser_token_free(stream->parser, t1);
+                                break;
+                            }
+                        }
+                    }
+                    size = ret;
+                }
+                else
+                {
+                    ret = pdf_parser_read_data(stream->parser, buffer, size);
+                }
+                
+                plutovg_surface_t* s = NULL;
+                if (memcmp(buffer, "\xFF\xD8", 2) == 0) // jpeg
+                {
+                    s = plutovg_surface_load_from_image_data(buffer,
+                        size);
+                    // unsigned char* pixels = stbi_load_from_memory(xobj->image->data,
+                    // xobj->image->data_len, &width, &height, &channels, channels);
+                    // //convert_to_gray(pixels, width, height, width * channels, channels);
+                    // //average_gray(pixels, width, height, width * channels, channels);
+                    // //dither_by_threshold(pixels, width, height, width * channels,
+                    // channels, 220); free(xobj->image->data); xobj->image->data = pixels;
+                    // xobj->image->data_len = width * channels * height;
+                    // dither_by_threshold(pixels, width, height, width * channels, 220);
+                    // stbi_image_free(pixels);
+                }
+                else if (memcmp(buffer, "\x89\x50\x4E\x47\x0D\x0A\x1A\x0A",
+                    8) == 0) // png
+                {
+                    s = plutovg_surface_load_from_image_data(buffer,
+                        size);
+                }
+                else if (memcmp(buffer, "P6", 2) == 0) // ppm
+                {
+                    s = plutovg_surface_load_from_image_data(buffer,
+                        size);
+                }
+                else
+                {
+                    // tje_encode_to_file("tje.jpg", width, height, channels,
+                    // xobj->image->data);
+                    //  add header
+                    char header[128] = { 0 };
+                    if (channels == 3)
+                    {
+                        sprintf(header, "P6 %d %d 255\n", width, height);
+                    }
+                    else if (channels == 1)
+                    {
+                        sprintf(header, "P5 %d %d 255\n", width, height);
+                    }
+
+                    int header_len = strlen(header);
+                    int actual_line_bytes = size / height;
+                    int actual_data_len = size;
+                    int real_line_bytes = channels * width;
+                    int real_data_len = real_line_bytes * height;
+                    if (channels == 3 && real_data_len != actual_data_len)
+                    {
+                        unsigned char* tmp =
+                            (unsigned char*)malloc(real_data_len + header_len);
+                        int off = 0;
+                        memcpy(tmp, header, header_len);
+                        off += header_len;
+                        for (int i = 0; i < height; i++)
+                        {
+                            memcpy(tmp + off, buffer + i * actual_line_bytes,
+                                real_line_bytes);
+                            off += real_line_bytes;
+                        }
+                        free(buffer);
+                        buffer = tmp;
+                        size = off;
+                    }
+                    else
+                    {
+                        unsigned char* tmp =
+                            (unsigned char*)malloc(buffer + header_len);
+                        int off = 0;
+                        memcpy(tmp, header, header_len);
+                        off += header_len;
+                        memcpy(tmp + off, buffer, size);
+                        off += size;
+                        free(buffer);
+                        buffer = tmp;
+                        size = off;
+                    }
+
+                    s = plutovg_surface_load_from_image_data(buffer,
+                        size);
+                }
+                if (s == NULL)
+                {
+                    printf("process BI-ID failed\n");
+                    return;
+                }
+                float scale_x = 1.f / width;
+                float scale_y = 1.f / height;
+                // Transformation matrix to scale and flip the image vertically
+                plutovg_matrix_t m = { scale_x,  0,
+                                        0, -scale_y,
+                                        0, height * scale_y };
+
+                plutovg_canvas_set_texture(context->canvas, s, PLUTOVG_TEXTURE_TYPE_PLAIN,
+                    1.0f, &m);
+                plutovg_canvas_paint(context->canvas);
+                plutovg_surface_destroy(s);
+                free(buffer);
+
+                plutovg_canvas_restore(context->canvas);
                 break;
             }
             default:

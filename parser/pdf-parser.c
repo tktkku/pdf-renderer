@@ -378,9 +378,9 @@ const char* pdf_parser_token_get_token(pdf_parser_token_t* token)
 
     return token->token;
 }
-pdf_parser_t* pdf_parser_init(pdf_file_t* pdf, pdf_parser_reader_type_t type, void* source)
+pdf_parser_t* pdf_parser_init(pdf_file_t* pdf, input_t* input)
 {
-    if (pdf == NULL) return NULL;
+    // if (pdf == NULL) return NULL;
     pdf_parser_t* parser = (pdf_parser_t*)calloc(1, sizeof(pdf_parser_t));
     parser->pdf = pdf;
     parser->buffer = (unsigned char*)malloc(4096);
@@ -391,23 +391,10 @@ pdf_parser_t* pdf_parser_init(pdf_file_t* pdf, pdf_parser_reader_type_t type, vo
     parser->remain.rem = NULL;
     parser->remain.len = 0;
     parser->num_cached_tokens = 0;
-    parser->reader.type = type;
-    parser->reader.source = source;
+    parser->input = input;
     parser->pause_read = false;
     parser->eof = false;
-    switch (type)
-    {
-        case INPUT_READER:
-            parser->reader.read = _pdf_parser_read_input;
-            break;
-        case STREAM_READER:
-            parser->reader.read = _pdf_parser_read_stream;
-            break;
-        default:
-            printf("unknown reader type\n");
-            return NULL;
-            break;
-    }
+
     return parser;
 }
 void pdf_parser_free(pdf_parser_t* parser)
@@ -420,7 +407,7 @@ void pdf_parser_free(pdf_parser_t* parser)
     int remain = parser->end_pos - parser->current_pos;
     if (remain > 0)
     {
-        pdf_input_seek(parser->pdf->input, -remain, SEEK_CUR);
+        input_seek(parser->pdf->input, -remain, SEEK_CUR);
     }
     if (parser->remain.len > 0)
     {
@@ -436,6 +423,43 @@ void pdf_parser_free(pdf_parser_t* parser)
     }
     free(parser);
     parser = NULL;
+}
+
+
+size_t pdf_parser_read_data(pdf_parser_t* parser, void* ptr, size_t size)
+{
+    if (parser == NULL || ptr == NULL || size == 0)
+        return 0;
+
+    unsigned char* out_ptr = (unsigned char*)ptr;
+    size_t bytes_read = 0;
+    size_t bytes_remaining = size;
+
+    while (bytes_remaining > 0)
+    {
+        if (parser->current_pos != NULL && parser->splite_pos != NULL)
+        {
+            size_t available = parser->splite_pos - parser->current_pos + 1;
+            if (available > 0)
+            {
+                size_t copy_size = (bytes_remaining < available) ? bytes_remaining : available;
+                memcpy(out_ptr + bytes_read, parser->current_pos, copy_size);
+                parser->current_pos += copy_size;
+                bytes_read += copy_size;
+                bytes_remaining -= copy_size;
+                continue;
+            }
+        }
+
+        if (parser->eof)
+        {
+            break;
+        }
+
+        _pdf_parser_read_input(parser);
+    }
+
+    return bytes_read;
 }
 void _decode_hex_string(char* str, int len, int* out_len)
 {
@@ -861,62 +885,37 @@ void _pdf_parser_split(pdf_parser_t* parser, int end_i)
         end_i--;
     }
 }
-void _pdf_parser_read_input(pdf_parser_t* parser, void* source)
+void _pdf_parser_read_input(pdf_parser_t* parser)
 {
     if (parser == NULL)
     {
         return;
     }
-    pdf_input_t* input = (pdf_input_t*)source;
+    input_t* input = parser->input;
     int off = _pdf_parser_copy_rem(parser);
     int ret = 0;
-    ret = pdf_input_read(input, parser->buffer + off, parser->buffer_size - off);
-    if (ret < 0)
+    if (parser->buffer_size < off)
     {
+        printf("off error in parser\n");
         return;
     }
-    if (ret == 0)
+    else if (parser->buffer_size > off)
     {
-        parser->end_pos = parser->buffer + off - 1;
-        parser->splite_pos = parser->buffer + off;
-        parser->eof = true;
-    }
-    else
-    {
-        int end_i = off + ret - 1;
-        _pdf_parser_split(parser, end_i);
-    }
-    parser->pause_read = false;
-}
-
-void _pdf_parser_read_stream(pdf_parser_t* parser, void* source)
-{
-    pdf_stream_t* stream = (pdf_stream_t*)source;
-    if (parser == NULL)
-    {
-        return;
-    }
-    int off = _pdf_parser_copy_rem(parser);
-    int ret = 0;
-    if (parser != NULL && stream != NULL)
-    {
-        if ((stream->decomp.cur_pos >= stream->decomp.len && stream->readin_len < stream->stream_len)
-            || stream->processed < stream->stream_len)
+        ret = input_read(input, parser->buffer + off, parser->buffer_size - off);
+        if (ret < 0)
         {
-            ret = pdf_stream_get_data(stream, parser->buffer + off, parser->buffer_size - off);
+            return;
+        }
+        else if (ret == 0)
+        {
+            parser->end_pos = parser->buffer + off - 1;
+            parser->splite_pos = parser->buffer + off;
+            parser->eof = true;
         }
     }
-    if (ret == 0)
-    {
-        parser->end_pos = parser->buffer + off - 1;
-        parser->splite_pos = parser->buffer + off;
-        parser->eof = true;
-    }
-    else
-    {
-        int end_i = off + ret - 1;
-        _pdf_parser_split(parser, end_i);
-    }
+        
+    int end_i = off + ret - 1;
+    _pdf_parser_split(parser, end_i);
     parser->pause_read = false;
 }
 
@@ -931,12 +930,11 @@ pdf_parser_token_t* _pdf_next_token(pdf_parser_t* parser)
         pdf_parser_token_t* tk = _pdf_parser_next_one_token(parser, *start, end);
         if (tk == NULL)
         {
-            if (parser->reader.type == STREAM_READER)
+            if (parser->input->type == INPUT_TYPE_STREAM)
             {
-                pdf_stream_t* s = (pdf_stream_t*)parser->reader.source;
-                if (s->processed < s->stream_len)
+                if (parser->input->stream->processed < parser->input->stream->stream_len)
                 {
-                    parser->reader.read(parser, parser->reader.source);
+                    _pdf_parser_read_input(parser);
                     tk = _pdf_parser_next_one_token(parser, *start, end);
                     if (tk == NULL) break;
                 }
@@ -1036,15 +1034,11 @@ pdf_parser_token_t* pdf_parser_next_token(pdf_parser_t* parser)
 {
     if (parser == NULL)
         return NULL;
-    if (parser->pdf == NULL)
-        return NULL;
-    if (parser->pdf->input == NULL)
-        return NULL;
 
     // unsigned char* save_cur = parser->current_pos;
     if (parser->current_pos >= parser->splite_pos && !parser->eof)
     {
-        parser->reader.read(parser, parser->reader.source);
+        _pdf_parser_read_input(parser);
     }
     pdf_parser_token_t* tk = _pdf_next_token(parser);
     // if (tk == NULL)
@@ -1372,19 +1366,19 @@ pdf_obj_t* pdf_parser_build_obj(pdf_parser_t* parser)
         }
         else if (tk->type == TOKEN_STREAM_BEG)
         {
-            pdf_input_seek(parser->pdf->input, -(parser->end_pos - parser->current_pos + 1), SEEK_CUR);
+            input_seek(parser->input, -(parser->end_pos - parser->current_pos + 1), SEEK_CUR);
             char c;
             while (true)
             {
-                pdf_input_read(parser->pdf->input, &c, 1);
+                input_read(parser->input, &c, 1);
                 if (c != '\r' && c != '\n')
                 {
-                    pdf_input_seek(parser->pdf->input, -1, SEEK_CUR);
+                    input_seek(parser->input, -1, SEEK_CUR);
                     break;
                 }
             }
             // store current offset
-            int offset = pdf_input_tell(parser->pdf->input);
+            int offset = input_tell(parser->input);
             int len = pdf_dict_get_number(obj->value->val.dict, "/Length");
             if (len == -1)
             {
@@ -1395,7 +1389,7 @@ pdf_obj_t* pdf_parser_build_obj(pdf_parser_t* parser)
                     if (l_obj != NULL && l_obj->value->type == NUMBER)
                     {
                         len = l_obj->value->val.number;
-                        pdf_input_seek(parser->pdf->input, offset, SEEK_SET);
+                        input_seek(parser->input, offset, SEEK_SET);
                     }
                     else
                     {
@@ -1405,15 +1399,15 @@ pdf_obj_t* pdf_parser_build_obj(pdf_parser_t* parser)
                     }
                 } 
             }
-            //int offset = ftell(parser->pdf->pFile);
+            
             obj->stream = pdf_stream_init(parser->pdf, obj, len, offset);
-            pdf_input_seek(parser->pdf->input, len, SEEK_CUR);
+            input_seek(parser->input, len, SEEK_CUR);
             free(parser->remain.rem);
             parser->remain.rem = 0;
             parser->remain.len = 0;
             parser->splite_pos = NULL;
             parser->current_pos = NULL;
-            parser->reader.read(parser, parser->reader.source);
+            _pdf_parser_read_input(parser);
             pdf_parser_token_free(parser, tk);
 
             tk = pdf_parser_next_token(parser);
