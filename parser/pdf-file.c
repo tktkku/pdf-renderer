@@ -72,6 +72,8 @@ bool _read_xref_table(pdf_file_t* pdf)
     for (int i = 0; i < num; i++, seq++)
     {
         xref_t* xref = (xref_t*)malloc(sizeof(xref_t));
+        if (xref == NULL)
+            return false;
         xref->sequence = seq;
 
         _read_line(pdf, buffer, sizeof(buffer));
@@ -112,28 +114,147 @@ bool _read_xref_and_trailer(pdf_file_t* pdf)
     long xref_offset = strtol(buffer, NULL, 10);
     input_seek(pdf->input, xref_offset, SEEK_SET);
     ret = _read_line(pdf, buffer, sizeof(buffer));
+    bool findXref = false;
+    input_t* input = NULL;
+    input_buffer(&input, buffer, ret);
+    pdf_parser_t* parser = pdf_parser_init(pdf, input);
+    pdf_parser_token_t* tk = pdf_parser_next_token(parser);
+    if (tk == NULL)
+    {
+        findXref = false;
+        input_close(input);
+        pdf_parser_token_free(parser, tk);
+        pdf_parser_free(parser);
+    }
+    else if (tk->type == TOKEN_XREF)
+    {
+        findXref = true;
+        input_close(input);
+        pdf_parser_token_free(parser, tk);
+        pdf_parser_free(parser);
+        goto FIND_xref;
+    }
+    else if (tk->type == TOKEN_OBJ_BEG)
+    {
+        findXref = true;
+        input_close(input);
+        pdf_parser_token_free(parser, tk);
+        pdf_parser_free(parser);
+        goto FIND_XRef;
+    }
+    else
+    {
+        input_close(input);
+        pdf_parser_token_free(parser, tk);
+        pdf_parser_free(parser);
+        findXref = false;
+    }
 
-    if (strcmp(buffer, "xref") != 0)
+    if (!findXref)
     {
         // get wrong xref offset, find from the file start
         input_seek(pdf->input, 0, SEEK_SET);
-        while (true)
+        int carry = 0;
+        while (((ret = input_read(pdf->input, buffer + carry, sizeof(buffer) - carry)) > 0))
         {
-            ret = _read_line(pdf, buffer, sizeof(buffer));
-            if (strcmp(buffer, "xref") == 0)
+            int total = ret + carry;
+            for (int i = 0; i < total; i++)
             {
-                xref_offset = input_tell(pdf->input) - ret;
+                char c = buffer[i];
+                switch (c)
+                {
+                    case 'x':
+                    {
+                        if (i + 4 <= total && memcmp(buffer + i, "xref", 4) == 0)
+                        {
+                            xref_offset = input_tell(pdf->input) - ret + i;
+                            input_seek(pdf->input, xref_offset, SEEK_SET);
+                            findXref = true;
+                            goto FIND_xref;
+                        }
+                        break;
+                    }
+                    case 'X':
+                    {
+                        if (i + 4 <= total && memcmp(buffer + i, "XRef", 4) == 0)
+                        {
+                            // backtrace to find obj start
+                            int j = i - 1;
+                            for (; j >= 0; j--)
+                            {
+                                if (j - 3 < 0)
+                                {
+                                    long cur = input_tell(pdf->input);
+                                    if (cur - j >= 0)
+                                    {
+                                        cur = cur - total + j;
+                                        input_seek(pdf->input, cur, SEEK_SET);
+                                    }
+                                    if (cur >= sizeof(buffer))
+                                    {
+                                        cur -= (long)sizeof(buffer);
+                                    }
+                                    else
+                                    {
+                                        cur = 0;
+                                    }
+                                    input_seek(pdf->input, cur, SEEK_SET);
+                                    ret = input_read(pdf->input, buffer, sizeof(buffer));
+                                    j = sizeof(buffer) - 1;
+                                }
+                                char c1 = buffer[j];
+                                switch (c1)
+                                {
+                                    case 'j':
+                                    {
+                                        if (memcmp(buffer + j - 3 + 1, "obj", 3) == 0)
+                                        {
+                                            xref_offset = input_tell(pdf->input) - ret + j + 1;
+                                            input_seek(pdf->input, xref_offset, SEEK_SET);
+                                            findXref = true;
+                                            goto FIND_XRef;
+                                        }
+                                        break;
+                                    }
+                                    default:
+                                    break;
+                                }
+                            }
+                            break;
+                        }
+                        break;
+                    }
+                    default:
+                        break;
+                }
+                if (findXref)
+                {
+                    break;
+                }
+            }
+            if (findXref)
+            {
                 break;
             }
-            if (ret == 0)
+            if (total >= 4)
             {
-                printf("invalid pdf: could not find xref table\n");
-                return false;
+                carry = 4;
+                memmove(buffer, buffer + total - 4, 4);
+            }
+            else
+            {
+                carry = total;
+                memmove(buffer, buffer + total - carry, carry);
             }
         }
     }
+    if (!findXref)
+    {
+        printf("invalid pdf, xref not found\n");
+        return false;
+    }
 
-    if (strcmp(buffer, "xref") == 0)
+FIND_xref: 
     {
         while (true)
         {
@@ -190,7 +311,7 @@ bool _read_xref_and_trailer(pdf_file_t* pdf)
         pdf_parser_free(parser);
         return true;
     }
-    else //if (strstr(buffer, "obj") != NULL)
+FIND_XRef:
     {
         pdf_parser_t* parser = pdf_parser_init(pdf, pdf->input);
         pdf_obj_t* xref_obj = pdf_parser_build_obj(parser);
@@ -267,6 +388,8 @@ bool _read_xref_and_trailer(pdf_file_t* pdf)
                         start += 1;
                     }
                     xref_t* xref = (xref_t*)malloc(sizeof(xref_t));
+                    if (xref == NULL)
+                        return false;
                     xref->sequence = seq;
                     if (type == 0) // free objects
                     {
@@ -305,8 +428,6 @@ bool _read_xref_and_trailer(pdf_file_t* pdf)
         pdf_obj_free(xref_obj);
         return true;
     }
-
-    return false;
 }
 void _read_pages(pdf_file_t* pdf, pdf_obj_t* pages_obj);
 void _read_pages(pdf_file_t* pdf, pdf_obj_t* pages_obj)
@@ -429,6 +550,8 @@ pdf_file_t* pdf_file_read_buffer(const char* data, size_t size)
         return NULL;
     }
     pdf_file_t* pdf_file = (pdf_file_t*)malloc(sizeof(pdf_file_t));
+    if (pdf_file == NULL)
+        return NULL;
     memset(pdf_file, 0, sizeof(pdf_file_t));
     
     pdf_file->input = input;
@@ -449,6 +572,8 @@ pdf_file_t* pdf_file_read_file(const char* file_name)
         return NULL;
     }
     pdf_file_t* pdf_file = (pdf_file_t*)malloc(sizeof(pdf_file_t));
+    if (pdf_file == NULL)
+        return NULL;
     memset(pdf_file, 0, sizeof(pdf_file_t));
     
     pdf_file->input = input;
@@ -836,7 +961,7 @@ pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, int ref)
 
                     unsigned char* p1 = start + first_offset + offset;
                     input_t* input2 = NULL;
-                    input_buffer(&input2, p1, size - (first_offset + offset));
+                    input_buffer(&input2, p1, size - first_offset - offset);
                     pdf_parser_t* val_parser = pdf_parser_init(pdf, input2);
 
                     pdf_parser_token_t* tk1 = pdf_parser_next_token(val_parser);

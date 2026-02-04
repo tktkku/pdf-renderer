@@ -85,7 +85,7 @@ void pdf_obj_get_extgstate(pdf_obj_t* obj, const char* name)
 {
 
 }
-#include "CMap/CMaps.h"
+#include "pdf-cmap.h"
 pdf_font_t* _load_type0_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
 {
     pdf_font_t* font = pdf_font_init();
@@ -96,29 +96,7 @@ pdf_font_t* _load_type0_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
     font->encoding = (char*)pdf_dict_get_name(font_dict, "/Encoding");
     if (font->encoding != NULL)
     {
-        // pdf_cmap_t* cmap = pdf_file_get_cmap(obj->pdf, font->encoding);
-        // font->cmap = cmap;
-        int count = ARRAY_COUNT(g_CMAP_INDEX);
-        int left = 0;
-        int right = count - 1;
-        while (left <= right)
-        {
-            int mid = left + (right - left) / 2;
-            int cmp = strcmp(g_CMAP_INDEX[mid].name, font->encoding + 1);
-            if (cmp < 0)
-            {
-                left = mid + 1;
-            }
-            else if (cmp > 0)
-            {
-                right = mid - 1;
-            }
-            else
-            {
-                font->cmap = g_CMAP_INDEX[mid].cmap;
-                break;
-            }
-        }
+        font->cmap = pdf_cmap_find(font->encoding + 1);
     }
     int to_unicode_ref = pdf_dict_get_ref(font_dict, "/ToUnicode");
     if (to_unicode_ref != -1)
@@ -207,10 +185,13 @@ pdf_font_t* _load_type0_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
     font->cid_system_info_ref = pdf_dict_get_ref(font->descendant_font_dict, "/CIDSystemInfo");
     if (font->cid_system_info_ref != -1)
     {
-        // pdf_obj_t* obj = pdf_file_get_obj(page->pdf, font->cid_system_info_ref);
-        // char* registry = pdf_dict_get_string(obj->value->val.dict, "/Registry");
-        // char* ordering = pdf_dict_get_string(obj->value->val.dict, "/Ordering");
-        // int supplement = pdf_dict_get_number(obj->value->val.dict, "/Supplement");
+        pdf_obj_t* obj1 = pdf_file_get_obj(obj->pdf, font->cid_system_info_ref);
+        char* registry = pdf_dict_get_string(obj1->value->val.dict, "/Registry");
+        char* ordering = pdf_dict_get_string(obj1->value->val.dict, "/Ordering");
+        int supplement = pdf_dict_get_number(obj1->value->val.dict, "/Supplement");
+        font->cid_system_info.registry = strdup(registry + 1);
+        font->cid_system_info.ordering = strdup(ordering + 1);
+        font->cid_system_info.supplement = supplement;
     }
     int font_descriptor_ref = pdf_dict_get_ref(font->descendant_font_dict, "/FontDescriptor");
     font->font_descriptor = NULL;

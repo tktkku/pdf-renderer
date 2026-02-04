@@ -68,21 +68,6 @@ int main(int argc, char* argv[])
     pdf_file_t* pdf = pdf_file_read_buffer(filebuffer, filesize);
     int num_pages = pdf_file_get_pages(pdf);
 
-    f = fopen("fonts/SimSun.ttf", "rb");
-    fseek(f, 0, SEEK_END);
-    filesize = ftell(f);
-    fseek(f, 0, SEEK_SET);
-    char* fontbuffer = (char*)malloc(filesize);
-    if (fontbuffer == nullptr)
-    {
-        pdf_file_free(pdf);
-        fclose(f);
-        return -1;
-    }
-    fread(fontbuffer, 1, filesize, f);
-    fclose(f);
-
-    pdf_file_load_font(pdf, "SimSun", fontbuffer, filesize);
     if (pages == NULL)
     {
         for (int i = 1; i <= num_pages; i++)
@@ -160,9 +145,9 @@ int main(int argc, char* argv[])
 
     pdf_file_free(pdf);
     free(filebuffer);
-    free(fontbuffer);
+
     wall_end = get_wall_time();
-    printf("Elapsed %ld ms.\n", wall_end - wall_start);
+    printf("Elapsed %lld ms.\n", wall_end - wall_start);
 
     return 0;
 }

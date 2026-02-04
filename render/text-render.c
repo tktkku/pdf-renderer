@@ -17,7 +17,7 @@ uint32_t _get_unicode_from_cmap(pdf_cmap_t* cmap, uint32_t code)
  
         for (int k = 0; k < cmap->char_range_map_len && !found; k++)
         {
-            if (code >= cmap->char_range_map[k].dstStart &&
+            if (code >= cmap->char_range_map[k].srcStart &&
                 code <= cmap->char_range_map[k].srcEnd)
             {
                 return cmap->char_range_map[k].dstStart +
@@ -232,23 +232,22 @@ typedef struct unicode_text
 } unicode_text_t;
 void _do_text_render(pdf_render_t* context, char* buf, int len)
 {
+    if (context == NULL || context->state->textState.font == NULL || buf == NULL)
+    {
+        return;
+    } 
+    if (context->state->textState.font->subtype && 
+        (strcmp(context->state->textState.font->subtype, "/CIDFontType0") == 0 || 
+        strcmp(context->state->textState.font->subtype, "/CIDFontType2") == 0))
+    {
+        return;
+    }
     plutovg_canvas_save(context->canvas);
     int unicode_cnt = 0;
     unicode_text_t unicode[1024] = { 0 };
     unsigned char* pbuf = (unsigned char*)buf;
     if (pbuf[0] == '<')
     {
-        // if (context->state->textState.font->encoding && strstr(context->state->textState.font->encoding, "Identity"))
-        // {
-        //     for (char* p = &pbuf[1]; *p != '\0'; p += 4)
-        //     {
-        //         uint16_t t = _hex_str_to_16bit(p);
-        //         unicode[unicode_cnt].utf16 = t;
-        //         unicode[unicode_cnt].encoding = PLUTOVG_TEXT_ENCODING_UTF16;
-        //         unicode_cnt++;
-        //     }
-        // }
-        // else 
         if (context->state->textState.font->encoding == NULL)
         {
             for (char* p = &pbuf[1]; *p != '\0'; p += 2)
@@ -309,17 +308,8 @@ void _do_text_render(pdf_render_t* context, char* buf, int len)
                     }
                     if (found) break;
                 }
-                // uint16_t t = _hex_str_to_16bit(p);
-                // unicode[unicode_cnt++] = _get_unicode_from_cmap(context->state->textState.font->cmap, t);
             }
         }
-        // for (char* p = &pbuf[1]; *p != '\0'; p += 4)
-        // {
-        //     uint16_t t = _hex_str_to_16bit(p);
-        //     wchar_t w = _get_unicode_from_cmap(context->state->textState.font->to_unicode_map, t);
-        //     printf("%lc", w);
-        // }
-        // printf("\n");
     }
     else if (pbuf[0] == '(')
     {

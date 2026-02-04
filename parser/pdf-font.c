@@ -70,6 +70,14 @@ void pdf_font_free(pdf_font_t* font)
                 pdf_cmap_free(p);
             }
         }
+        if (font->cid_system_info.registry != NULL)
+        {
+            free(font->cid_system_info.registry);
+        }
+        if (font->cid_system_info.ordering != NULL)
+        {
+            free(font->cid_system_info.ordering);
+        }
         if (font->differences != NULL)
         {
             pdf_array_free(font->differences);

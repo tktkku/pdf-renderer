@@ -70,6 +70,14 @@ void handle_Tf(pdf_render_t* context)
             context->state->textState.font_face_loaded = true;
         }
     }
+    else if (font->subtype && strcmp(font->subtype, "/CIDFontType2") == 0)
+    {
+        if (font->cid_system_info.registry != NULL && !strcmp(font->cid_system_info.registry, "Adobe")
+        && font->cid_system_info.ordering != NULL && !strcmp(font->cid_system_info.ordering, "GB1"))
+        {
+            
+        }
+    }
     else
     {
         if (font->font_data == NULL)

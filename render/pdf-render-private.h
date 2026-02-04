@@ -31,7 +31,22 @@ typedef struct pdf_cff_char_render
     bool havewidth;
     double transient[32];
 } pdf_cff_char_render_t;
-
+typedef struct {
+    plutovg_matrix_t textMatrix;
+    plutovg_matrix_t textLineMatrix;
+    double characterSpacing;
+    double wordSpacing;
+    double horizontalScaling;
+    double textLeading;
+    double fontSize;
+    int textMode;
+    double textRise;
+    double TJValue;
+    plutovg_font_face_t* fontface;
+    bool font_face_loaded;
+    pdf_font_t* font;
+    double textLineWidth;
+ } pdf_text_state_t;
 typedef struct pdf_graphics_state {
     struct {
         char currentColorSpace[256];
@@ -50,22 +65,7 @@ typedef struct pdf_graphics_state {
         int dash_size;
         double offset;
     } dashPattern;
-    struct {
-        plutovg_matrix_t textMatrix;
-        plutovg_matrix_t textLineMatrix;
-        double characterSpacing;
-        double wordSpacing;
-        double horizontalScaling;
-        double textLeading;
-        double fontSize;
-        int textMode;
-        double textRise;
-        double TJValue;
-        plutovg_font_face_t* fontface;
-        bool font_face_loaded;
-        pdf_font_t* font;
-        double textLineWidth;
-    } textState;
+    pdf_text_state_t textState;
     struct pdf_graphics_state* next;
 } pdf_graphics_state_t;
 typedef struct

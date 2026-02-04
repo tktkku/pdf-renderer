@@ -239,7 +239,11 @@ struct pdf_page
     pdf_array_t* annots;
 };
 
-
+typedef struct {
+    char* registry;
+    char* ordering;
+    int supplement;
+} cid_system_info_t;
 struct pdf_font
 {
     char* type;
@@ -266,6 +270,7 @@ struct pdf_font
     int fontfile2_ref;
     int fontfile3_ref;
     int cid_system_info_ref;
+    cid_system_info_t cid_system_info;
     int dw;
     pdf_array_t* w_aar;
     unsigned char* cid_to_gid_map;

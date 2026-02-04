@@ -98,6 +98,7 @@ extern "C" {
     void pdf_array_free(pdf_array_t* array);
 
     pdf_cmap_t* pdf_cmap_init(void);
+    pdf_cmap_t* pdf_cmap_find(const char* name);
     void pdf_cmap_free(pdf_cmap_t* cmap);
 
     pdf_deque_t* pdf_deque_init();
