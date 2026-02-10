@@ -35,6 +35,7 @@ extern "C" {
     //typedef struct pdf_resources pdf_resources_t;
     typedef struct pdf_page pdf_page_t;
     typedef struct pdf_font pdf_font_t;
+    typedef struct pdf_font_descriptor pdf_font_descriptor_t;
     typedef struct pdf_stream pdf_stream_t;
 
     typedef struct pdf_image pdf_image_t;
@@ -92,7 +93,7 @@ extern "C" {
     pdf_font_t* pdf_font_init(void);
     void pdf_font_free(pdf_font_t* font);
     pdf_font_t* pdf_font_reference(pdf_font_t* font);
-    void pdf_cff_parse(pdf_font_t* font);
+    void pdf_cff_parse(pdf_font_descriptor_t* font_descriptor);
 
     pdf_array_t* pdf_array_init(void);
     void pdf_array_free(pdf_array_t* array);

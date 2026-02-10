@@ -13,6 +13,32 @@ pdf_font_t* pdf_font_reference(pdf_font_t* font)
     font->references++;
     return font;
 }
+void _free_cmap(pdf_cmap_t* cmap)
+{
+    if (cmap == NULL) return;
+    pdf_cmap_t* p = cmap;
+    pdf_cmap_t* q = cmap->next;
+    while (q != NULL)
+    {
+        if (!q->worldwide)
+        {
+            p->next = q->next;
+            pdf_cmap_free(q);
+            q = p->next;
+        }
+        else 
+        {
+            p = p->next;
+            q = p->next;
+        }
+    }
+    if (cmap != NULL && !cmap->worldwide)
+    {
+        p = cmap;
+        cmap = cmap->next;
+        pdf_cmap_free(p);
+    }
+}
 void pdf_font_free(pdf_font_t* font)
 {
     if (font == NULL)
@@ -20,83 +46,34 @@ void pdf_font_free(pdf_font_t* font)
     font->references--;
     if (font->references == 0)
     {
-        if (font->cmap != NULL)
+        if (font->subtype == FONT_SUBTYPE_TYPE0)
         {
-            pdf_cmap_t* p = font->cmap;
-            pdf_cmap_t* q = font->cmap->next;
-            while (q != NULL)
-            {
-                if (!q->worldwide)
-                {
-                    p->next = q->next;
-                    pdf_cmap_free(q);
-                    q = p->next;
-                }
-                else 
-                {
-                    p = p->next;
-                    q = p->next;
-                }
-            }
-            if (font->cmap != NULL && !font->cmap->worldwide)
-            {
-                p = font->cmap;
-                font->cmap = font->cmap->next;
-                pdf_cmap_free(p);
-            }
+            _free_cmap(font->type0->encoding);
+            _free_cmap(font->type0->to_unicode_map);
+            pdf_font_free(font->type0->descendant);
+            free(font->type0);
         }
-        if (font->to_unicode_map != NULL)
+        else if (font->subtype == FONT_SUBTYPE_TYPE1 || font->subtype == FONT_SUBTYPE_TRUETYPE)
         {
-            pdf_cmap_t* p = font->to_unicode_map;
-            pdf_cmap_t* q = font->to_unicode_map->next;
-            while (q != NULL)
-            {
-                if (!q->worldwide)
-                {
-                    p->next = q->next;
-                    pdf_cmap_free(q);
-                    q = p->next;
-                }
-                else 
-                {
-                    p = p->next;
-                    q = p->next;
-                }
-            }
-            if (font->to_unicode_map != NULL && !font->to_unicode_map->worldwide)
-            {
-                p = font->to_unicode_map;
-                font->to_unicode_map = font->to_unicode_map->next;
-                pdf_cmap_free(p);
-            }
+            _free_cmap(font->type1_truetype->to_unicode_map);
+            pdf_array_free(font->type1_truetype->differences);
+            free(font->type1_truetype->font_descriptor);
+            free(font->type1_truetype);
         }
-        if (font->cid_system_info.registry != NULL)
+        else if (font->subtype == FONT_SUBTYPE_TYPE3)
         {
-            free(font->cid_system_info.registry);
+            _free_cmap(font->type3->to_unicode_map);
+            pdf_array_free(font->type3->differences);
+            free(font->type3->font_descriptor);
+            free(font->type3);
         }
-        if (font->cid_system_info.ordering != NULL)
+        else if (font->subtype == FONT_SUBTYPE_CIDFONTTPYE0 || font->subtype == FONT_SUBTYPE_CIDFONTTPYE2)
         {
-            free(font->cid_system_info.ordering);
-        }
-        if (font->differences != NULL)
-        {
-            pdf_array_free(font->differences);
-        }
-        if (font->charstrings != NULL)
-        {
-            pdf_array_free(font->charstrings);
-        }
-        if (font->global_subr != NULL)
-        {
-            pdf_array_free(font->global_subr);
-        }
-        if (font->font_dict_arr != NULL)
-        {
-            pdf_array_free(font->font_dict_arr);
-        }
-        if (font->font_dict_select_arr != NULL)
-        {
-            pdf_array_free(font->font_dict_select_arr);
+            free(font->cidfont->cid_system_info.registry);
+            free(font->cidfont->cid_system_info.ordering);
+            _free_cmap(font->cidfont->cid_to_gid_map);
+            free(font->cidfont->font_descriptor);
+            free(font->cidfont);
         }
         free(font);
         font = NULL;

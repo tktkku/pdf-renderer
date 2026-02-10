@@ -239,65 +239,176 @@ struct pdf_page
     pdf_array_t* annots;
 };
 
+typedef enum
+{
+    FONT_SUBTYPE_TYPE0 = 0,
+    FONT_SUBTYPE_TYPE1,
+    FONT_SUBTYPE_TYPE3,
+    FONT_SUBTYPE_TRUETYPE,
+    FONT_SUBTYPE_CIDFONTTPYE0,
+    FONT_SUBTYPE_CIDFONTTPYE2,
+} pdf_font_subtype_t;
+
 typedef struct {
     char* registry;
     char* ordering;
     int supplement;
 } cid_system_info_t;
-struct pdf_font
-{
-    char* type;
-    char* subtype;
-    char* basefont;
-    char* encoding;
-    pdf_dict_t* encoding_dict;
-    pdf_array_t* differences;
-    pdf_dict_t* charProcs;
-    pdf_cmap_t* to_unicode_map;
-    pdf_dict_t* descendant_font_dict;
-    pdf_dict_t* font_descriptor;
-    int font_weight;
-    uint32_t flags;
-    int italic_angle;
-    pdf_array_t* font_matrix;
-    pdf_array_t* font_bbox;
-    int ascent;
-    int descent;
-    int cap_height;
-    int stemv;
-    int cid_set_ref;
-    int fontfile1_ref;
-    int fontfile2_ref;
-    int fontfile3_ref;
-    int cid_system_info_ref;
-    cid_system_info_t cid_system_info;
-    int dw;
-    pdf_array_t* w_aar;
-    unsigned char* cid_to_gid_map;
-    int cid_to_gid_map_ref;
-    unsigned char* font_data;
-    int font_data_length;
-    pdf_cmap_t* cmap;
-    int first_char;
-    int last_char;
-    pdf_array_t* widths;
 
+struct pdf_font_descriptor
+{
+    // Type=FontDescriptor
+    char* fontName;
+    char* fontFamily;
+    char* fontStretch;
+    double fontWeight;
+    uint32_t flags;
+    pdf_array_t* fontBBox;
+    double italicAngle;
+    double ascent;
+    double descent;
+    double leading;
+    double capHeight;
+    double xHeight;
+    double stemV;
+    double stemH;
+    double avgWidth;
+    double maxWidth;
+    double missingWidth;
+    unsigned char* fontfile;
+    int fontfile_len;
+    char* charSet;
+    // cff
     pdf_array_t* charstrings;
     pdf_array_t* font_dict_arr;
-    /*
-        the first element specifies format
-        if == 0 : 
-            fd = font_dict_select_arr[gid + 1];
-        if == 3 :
-            for i in ranges where i > 0:
-                if font_dict_select_arr[i] <= gid <= font_dict_select_arr[i + 1]:
-                    fd = font_dict_select_arr[i + 2]
-    */
     pdf_array_t* font_dict_select_arr;
     pdf_array_t* global_subr;
     uint16_t global_subr_bias;
+    pdf_array_t* font_matrix;
+
+    //fot cidfonts
+    pdf_dict_t* style;
+    char* lang;
+    pdf_dict_t* fd;
+    pdf_dict_t* cidSet;
+};
+
+typedef struct
+{
+    pdf_cmap_t* encoding;
+    pdf_font_t *descendant;
+    pdf_cmap_t* to_unicode_map;
+} pdf_font_type0_t;
+typedef struct
+{
+    char* name;
+    int first_char;
+    int last_char;
+    pdf_array_t* widths;
+    pdf_font_descriptor_t* font_descriptor;
+    char* encoding;
+    pdf_dict_t* encoding_dict;
+    pdf_cmap_t* to_unicode_map;
+    pdf_array_t* differences;
+} pdf_font_type1_t;
+typedef struct
+{
+    char* name;
+    char* encoding;
+    pdf_dict_t* encoding_dict;
+    pdf_array_t* font_matrix;
+    pdf_array_t* font_bbox;
+    pdf_dict_t* charProcs;
+    int first_char;
+    int last_char;
+    pdf_array_t* widths;
+    pdf_font_descriptor_t* font_descriptor;
+    pdf_dict_t* resources;
+    pdf_cmap_t* to_unicode_map;
+    pdf_array_t* differences;
+} pdf_font_type3_t;
+typedef struct 
+{
+    cid_system_info_t cid_system_info;
+    pdf_cmap_t* cid_to_gid_map; // default: Identity
+    int dw; // default: 1000
+    pdf_array_t* w_aar;
+    pdf_array_t* dw2_aar;
+    pdf_array_t* w2_aar;
+    pdf_font_descriptor_t* font_descriptor;
+} pdf_font_cidfont_t;
+
+struct pdf_font
+{
+    // Type = /Font
+    // Subtype
+    pdf_font_subtype_t subtype;
+    char* basefont;
+
+    union {
+        pdf_font_type0_t* type0;
+        pdf_font_type1_t* type1_truetype;
+        pdf_font_type3_t* type3;
+        pdf_font_cidfont_t* cidfont;
+    };
     int references;
 };
+
+
+// struct pdf_font
+// {
+//     char* type;
+//     char* subtype;
+//     char* basefont;
+//     char* encoding;
+//     pdf_dict_t* encoding_dict;
+//     pdf_array_t* differences;
+//     pdf_dict_t* charProcs;
+//     pdf_cmap_t* to_unicode_map;
+//     pdf_dict_t* descendant_font_dict;
+//     pdf_dict_t* font_descriptor;
+//     int font_weight;
+//     uint32_t flags;
+//     int italic_angle;
+//     pdf_array_t* font_matrix;
+//     pdf_array_t* font_bbox;
+//     int ascent;
+//     int descent;
+//     int cap_height;
+//     int stemv;
+//     int cid_set_ref;
+//     int fontfile1_ref;
+//     int fontfile2_ref;
+//     int fontfile3_ref;
+//     int cid_system_info_ref;
+//     cid_system_info_t cid_system_info;
+//     int dw;
+//     pdf_array_t* w_aar;
+//     unsigned char* cid_to_gid_map;
+//     int cid_to_gid_map_ref;
+//     unsigned char* font_data;
+//     int font_data_length;
+//     pdf_cmap_t* cmap;
+//     int first_char;
+//     int last_char;
+//     pdf_array_t* widths;
+
+//     pdf_array_t* charstrings;
+//     pdf_array_t* font_dict_arr;
+//     /*
+//         the first element specifies format
+//         if == 0 : 
+//             fd = font_dict_select_arr[gid + 1];
+//         if == 3 :
+//             for i in ranges where i > 0:
+//                 if font_dict_select_arr[i] <= gid <= font_dict_select_arr[i + 1]:
+//                     fd = font_dict_select_arr[i + 2]
+//     */
+//     pdf_array_t* font_dict_select_arr;
+//     pdf_array_t* global_subr;
+//     uint16_t global_subr_bias;
+//     int references;
+// };
 
 struct pdf_image
 {
@@ -396,6 +507,7 @@ bool _is_hex(char c);
 bool _is_digit(char c);
 bool _is_delimiter(char c);
 void _pdf_parser_read_input(pdf_parser_t* parser);
+uint32_t _str_to_32bit(char* str, int len);
 uint32_t _hex_str_to_32bit(char* hexStr, int len);
 uint16_t _hex_str_to_16bit(char hexStr[4]);
 uint8_t _hex_str_to_8bit(char hexStr[2]);

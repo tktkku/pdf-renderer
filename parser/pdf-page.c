@@ -78,6 +78,16 @@ int pdf_page_get_streams(pdf_page_t* page)
 //     // int AIS = pdf_dict_get_bool(ext_gstate, "/AIS");
 //     // int TK = pdf_dict_get_bool(ext_gstate, "/TK");
 // }
+uint32_t _str_to_32bit(char* str, int len)
+{
+    if (str == NULL || len <= 0 || len > 8) return 0;
+    uint32_t ret = 0;
+    for (int i = 0; i < len; i++)
+    {
+        ret = (ret << 8) | str[i];
+    }
+    return ret;
+}
 uint32_t _hex_str_to_32bit(char* hexStr, int len)
 {
     if (hexStr == NULL || len <= 0 || (len != 2 && len != 4 && len != 8)) return 0;

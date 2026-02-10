@@ -543,11 +543,11 @@ pdf_array_t* _parse_cff_charset(unsigned char* p, int count, pdf_array_t* string
     return charset_arr;
 }
 
-void pdf_cff_parse(pdf_font_t* font)
+void pdf_cff_parse(pdf_font_descriptor_t* font_descriptor)
 {
-    if (font == NULL || font->font_data == NULL) return;
-    unsigned char* p = font->font_data + 4;
-    unsigned char* end = font->font_data + font->font_data_length;
+    if (font_descriptor == NULL || font_descriptor->fontfile == NULL) return;
+    unsigned char* p = font_descriptor->fontfile + 4;
+    unsigned char* end = font_descriptor->fontfile + font_descriptor->fontfile_len;
     
     pdf_array_t* name_index = _parse_cff_index(&p);
     pdf_array_free(name_index);
@@ -556,21 +556,21 @@ void pdf_cff_parse(pdf_font_t* font)
     pdf_array_t* string_index = _parse_cff_index(&p);
     pdf_array_t* global_suber_index = _parse_cff_index(&p);
     pdf_dict_t* top_dict = pdf_dict_init();
-    _parse_cff_dict_data(font->font_data, top_dict_index->values[0]->val.string, 
+    _parse_cff_dict_data(font_descriptor->fontfile, (unsigned char*)top_dict_index->values[0]->val.string, 
         top_dict_index->values[0]->value_len, string_index, top_dict);
-
+        
     int offCharStrings = pdf_dict_get_number(top_dict, "CharStrings");
-    p = font->font_data + offCharStrings;
+    p = font_descriptor->fontfile + offCharStrings;
     pdf_array_t* charstrings_index = _parse_cff_index(&p);   
-    font->charstrings = charstrings_index;
+    font_descriptor->charstrings = charstrings_index;
 
     int offFDArray = pdf_dict_get_number(top_dict, "FDArray");
-    p = font->font_data + offFDArray;
+    p = font_descriptor->fontfile + offFDArray;
     pdf_array_t* font_dict_index = _parse_cff_index(&p);
     for (int i = 0; i < font_dict_index->num_elements; i++)
     {
         pdf_dict_t* font_dict = pdf_dict_init();
-        _parse_cff_dict_data(font->font_data, font_dict_index->values[i]->val.string, 
+        _parse_cff_dict_data(font_descriptor->fontfile, (unsigned char*)font_dict_index->values[i]->val.string, 
             font_dict_index->values[i]->value_len, string_index, font_dict);
         
         font_dict_index->values[i]->type = DICT;
@@ -579,7 +579,7 @@ void pdf_cff_parse(pdf_font_t* font)
     }
     
     int offFDSelect = pdf_dict_get_number(top_dict, "FDSelect");
-    p = font->font_data + offFDSelect;
+    p = font_descriptor->fontfile + offFDSelect;
     pdf_array_t* font_select = pdf_array_init();
     if (p[0] == 0)
     {
@@ -640,8 +640,8 @@ void pdf_cff_parse(pdf_font_t* font)
             i += 3;
         }
     }
-    font->font_dict_arr = font_dict_index;
-    font->font_dict_select_arr = font_select;
+    font_descriptor->font_dict_arr = font_dict_index;
+    font_descriptor->font_dict_select_arr = font_select;
 
     int type = pdf_dict_get_number(top_dict, "CharstringType");
     uint16_t global_bias;
@@ -652,8 +652,8 @@ void pdf_cff_parse(pdf_font_t* font)
     else if (global_suber_index->num_elements < 33900) global_bias = 1131;
     else global_bias = 32768;
 
-    font->global_subr = global_suber_index;
-    font->global_subr_bias = global_bias;
+    font_descriptor->global_subr = global_suber_index;
+    font_descriptor->global_subr_bias = global_bias;
 
     pdf_array_t* fontmatrix = pdf_dict_get_array(top_dict, "FontMatrix");
     if (fontmatrix == NULL)
@@ -680,7 +680,7 @@ void pdf_cff_parse(pdf_font_t* font)
         fontmatrix->values[5]->type = NUMBER;
         fontmatrix->values[5]->val.number = 0.001;
     }
-    font->font_matrix = fontmatrix;
+    font_descriptor->font_matrix = fontmatrix;
     // bool isCIDFont = pdf_dict_get_array(top_dict, "ROS") != NULL;
     // int offEncoding = pdf_dict_get_number(top_dict, "Encoding");
     

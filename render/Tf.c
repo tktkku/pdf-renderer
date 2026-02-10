@@ -12,7 +12,7 @@ void handle_Tf(pdf_render_t* context)
     float fontsize = strtof(buf, NULL);
     pdf_deque_pop_front(context->deque, &node);
 
-    pdf_font_t* font = pdf_obj_get_font(context->current_obj, buf);;
+    pdf_font_t* font = pdf_obj_get_font(context->current_obj, buf);
     context->state->textState.fontSize = fontsize;
     if (font == NULL)
         return;
@@ -41,72 +41,70 @@ void handle_Tf(pdf_render_t* context)
     // set font face
     // context->fontface = plutovg_font_face_load_from_file("fonts/SimSun.ttf",
     // 0); FT_Face face;
-    context->state->textState.font_face_loaded = false;
-    if (font->subtype && strcmp(font->subtype, "/TrueType") == 0)
-    {
-        if (font->font_data == NULL)
-        {
-            context->state->textState.fontface = NULL;
-            for (int i = 0; i < cvector_size(context->page->pdf->external_fonts); i++)
-            {
-                pdf_external_font_t* f = context->page->pdf->external_fonts[i];
-                if (strcmp(f->name, font->basefont + 1) == 0)
-                {
-                    font->font_data_length = f->data_len;
-                    font->font_data = f->data;
+    // context->state->textState.font_face_loaded = false;
+    // if (font->subtype && strcmp(font->subtype, "/TrueType") == 0)
+    // {
+    //     if (font->font_data == NULL)
+    //     {
+    //         context->state->textState.fontface = NULL;
+    //         for (int i = 0; i < cvector_size(context->page->pdf->external_fonts); i++)
+    //         {
+    //             pdf_external_font_t* f = context->page->pdf->external_fonts[i];
+    //             if (strcmp(f->name, font->basefont + 1) == 0)
+    //             {
+    //                 font->font_data_length = f->data_len;
+    //                 font->font_data = f->data;
                     
-                    context->state->textState.fontface = plutovg_font_face_load_from_data(
-                        font->font_data, font->font_data_length, 0, NULL, NULL);
-                    context->state->textState.font_face_loaded = true;
-                    break;
-                }
-            }
-            context->state->textState.font_face_loaded = true;
-        }
-        else
-        {
-            context->state->textState.fontface = plutovg_font_face_load_from_data(
-                font->font_data, font->font_data_length, 0, NULL, NULL);
-            context->state->textState.font_face_loaded = true;
-        }
-    }
-    else if (font->subtype && strcmp(font->subtype, "/CIDFontType2") == 0)
+    //                 context->state->textState.fontface = plutovg_font_face_load_from_data(
+    //                     font->font_data, font->font_data_length, 0, NULL, NULL);
+    //                 context->state->textState.font_face_loaded = true;
+    //                 break;
+    //             }
+    //         }
+    //         context->state->textState.font_face_loaded = true;
+    //     }
+    //     else
+    //     {
+    //         context->state->textState.fontface = plutovg_font_face_load_from_data(
+    //             font->font_data, font->font_data_length, 0, NULL, NULL);
+    //         context->state->textState.font_face_loaded = true;
+    //     }
+    // }
+    // else
+    if (font->subtype == FONT_SUBTYPE_TYPE0)
     {
-        if (font->cid_system_info.registry != NULL && !strcmp(font->cid_system_info.registry, "Adobe")
-        && font->cid_system_info.ordering != NULL && !strcmp(font->cid_system_info.ordering, "GB1"))
-        {
-            
-        }
-    }
-    else
-    {
-        if (font->font_data == NULL)
-        {
-            context->state->textState.fontface = NULL;
-            for (int i = 0; i < cvector_size(context->page->pdf->external_fonts); i++)
-            {
-                pdf_external_font_t* f = context->page->pdf->external_fonts[i];
-                if (strcmp(f->name, font->basefont + 1) == 0)
-                {
-                    font->font_data_length = f->data_len;
-                    font->font_data = f->data;
-                    
-                    context->state->textState.fontface = plutovg_font_face_load_from_data(
-                        font->font_data, font->font_data_length, 0, NULL, NULL);
-                    context->state->textState.font_face_loaded = true;
-                    break;
-                }
-            }
-            context->state->textState.font_face_loaded = true;
-        }
-        else
+        pdf_font_cidfont_t* cidfont = font->type0->descendant->cidfont;
+        if (cidfont->font_descriptor->fontfile != NULL)
         {
             if ((context->state->textState.fontface = plutovg_font_face_load_from_data(
-                font->font_data, font->font_data_length, 0, NULL, NULL)) == NULL)
+                cidfont->font_descriptor->fontfile, cidfont->font_descriptor->fontfile_len, 0, NULL, NULL)) == NULL)
             {
                 context->state->textState.font_face_loaded = false;
                 context->state->textState.fontface = plutovg_font_face_load_from_data1(
-                    font->font_data, font->font_data_length, 0, NULL, NULL);
+                    cidfont->font_descriptor->fontfile, cidfont->font_descriptor->fontfile_len, 0, NULL, NULL);
+            }
+            else
+            {
+                context->state->textState.font_face_loaded = true;
+            }
+        }
+        else
+        {
+            context->state->textState.font_face_loaded = true;
+            context->state->textState.fontface = plutovg_font_face_load_from_file("fonts/NotoSerifSC-Regular.ttf", 0);
+        }
+    }
+    else if (font->subtype == FONT_SUBTYPE_TRUETYPE || font->subtype == FONT_SUBTYPE_TYPE1)
+    {
+        pdf_font_type1_t* type1_truetype = font->type1_truetype;
+        if (type1_truetype->font_descriptor->fontfile != NULL)
+        {
+            if ((context->state->textState.fontface = plutovg_font_face_load_from_data(
+                type1_truetype->font_descriptor->fontfile, type1_truetype->font_descriptor->fontfile_len, 0, NULL, NULL)) == NULL)
+            {
+                context->state->textState.font_face_loaded = false;
+                context->state->textState.fontface = plutovg_font_face_load_from_data1(
+                    type1_truetype->font_descriptor->fontfile, type1_truetype->font_descriptor->fontfile_len, 0, NULL, NULL);
             }
             else
             {
@@ -119,9 +117,4 @@ void handle_Tf(pdf_render_t* context)
     cache->fontface = context->state->textState.fontface;
     cache->loaded = context->state->textState.font_face_loaded;
     cvector_push_back(context->fontcache, cache);
-    // set font face
-    //plutovg_canvas_set_font(context->canvas, context->state->textState.fontface, fontsize);
-    // set font matrix
-    // plutovg_matrix_init_scale(&context->fontMatrixPlutovg, fontsize, fontsize);
-    // plutovg_canvas_set_matrix(context->canvas, &context->fontMatrixPlutovg);
 }

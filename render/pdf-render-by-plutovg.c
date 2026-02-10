@@ -344,17 +344,17 @@ void pdf_render_do(pdf_render_t* context)
 
 void _do_render_operation(pdf_stream_t* stream, pdf_render_t* context, pdf_parser_token_t* tk)
 {
-    if (tk != NULL)
-    {
-        if (tk->token != NULL)
-        {
-            printf("%s\n", tk->token);
-        }
-        else
-        {
-            printf("%s\n", _token_to_string(tk->type));
-        }
-    }
+    // if (tk != NULL)
+    // {
+    //     if (tk->token != NULL)
+    //     {
+    //         printf("%s\n", tk->token);
+    //     }
+    //     else
+    //     {
+    //         printf("%s\n", _token_to_string(tk->type));
+    //     }
+    // }
 
     if (tk->type < TOKEN_OPERATOR && tk->token != NULL)
     {
