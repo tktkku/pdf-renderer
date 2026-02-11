@@ -159,17 +159,17 @@ def process_cid_file(input_file):
     cmap_var_name = f"cmap_{file_prefix}"
     
     output += f"pdf_cmap_t {cmap_var_name} = {{\n"
-    output += f"    .name = \"{cmap_name}\",\n"
-    output += f"    .worldwide = {worldwide},\n"
-    output += f"    .unicode_map_len = {unicode_len},\n"
-    output += f"    .unicode_map = {unicode_ptr},\n"
-    output += f"    .char_range_map_len = {char_range_len},\n"
-    output += f"    .char_range_map = {char_range_ptr},\n"
-    output += f"    .not_def_range_len = {notdef_len},\n"
-    output += f"    .not_def_range = {notdef_ptr},\n"
-    output += f"    .code_range_map_len = {codespace_len},\n"
-    output += f"    .code_range_map = {codespace_ptr},\n"
-    output += "    .next = NULL\n};\n\n"
+    output += f"    \"{cmap_name}\",    //name\n"
+    output += f"    {worldwide},        //worldwide\n"
+    output += f"    {unicode_len},      //unicode_map_len\n"
+    output += f"    {unicode_ptr},      //unicode_map\n"
+    output += f"    {char_range_len},   //char_range_map_len\n"
+    output += f"    {char_range_ptr},   //char_range_map\n"
+    output += f"    {notdef_len},       //not_def_range_len\n"
+    output += f"    {notdef_ptr},       //not_def_range\n"
+    output += f"    {codespace_len},    //code_range_map_len\n"
+    output += f"    {codespace_ptr},    //code_range_map\n"
+    output += "     NULL//next\n};\n\n"
     
     total_lines = sum(block['num_lines'] for block in blocks.values())
     print(f"processed {total_lines} lines")
@@ -184,6 +184,7 @@ if __name__ == "__main__":
         'cmap-resources/Adobe-Korea1-2/CMap',
         'cmap-resources/Adobe-KR-9/CMap',
         'cmap-resources/Adobe-Manga1-0/CMap',
+        'mapping-resources-pdf/pdf2unicode'
     ]
     output_path = './parser/CMap'
     if not os.path.exists(output_path):

@@ -35,16 +35,16 @@ static pdf_char_range_map_t char_range_map_WP_SYMBOL[] = {
 };
 
 pdf_cmap_t cmap_WP_SYMBOL = {
-    .name = "WP-Symbol",
-    .worldwide = true,
-    .unicode_map_len = 0,
-    .unicode_map = NULL,
-    .char_range_map_len = 27,
-    .char_range_map = char_range_map_WP_SYMBOL,
-    .not_def_range_len = 0,
-    .not_def_range = NULL,
-    .code_range_map_len = 1,
-    .code_range_map = code_range_map_WP_SYMBOL,
-    .next = NULL
+    "WP-Symbol",    //name
+    true,        //worldwide
+    0,      //unicode_map_len
+    NULL,      //unicode_map
+    27,   //char_range_map_len
+    char_range_map_WP_SYMBOL,   //char_range_map
+    0,       //not_def_range_len
+    NULL,       //not_def_range
+    1,    //code_range_map_len
+    code_range_map_WP_SYMBOL,    //code_range_map
+     NULL//next
 };
 

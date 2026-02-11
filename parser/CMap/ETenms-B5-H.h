@@ -5,16 +5,16 @@ static pdf_char_range_map_t char_range_map_ETENMS_B5_H[] = {
 };
 
 pdf_cmap_t cmap_ETENMS_B5_H = {
-    .name = "ETenms-B5-H",
-    .worldwide = true,
-    .unicode_map_len = 0,
-    .unicode_map = NULL,
-    .char_range_map_len = 1,
-    .char_range_map = char_range_map_ETENMS_B5_H,
-    .not_def_range_len = 0,
-    .not_def_range = NULL,
-    .code_range_map_len = 0,
-    .code_range_map = NULL,
-    .next = NULL
+    "ETenms-B5-H",    //name
+    true,        //worldwide
+    0,      //unicode_map_len
+    NULL,      //unicode_map
+    1,   //char_range_map_len
+    char_range_map_ETENMS_B5_H,   //char_range_map
+    0,       //not_def_range_len
+    NULL,       //not_def_range
+    0,    //code_range_map_len
+    NULL,    //code_range_map
+     NULL//next
 };
 

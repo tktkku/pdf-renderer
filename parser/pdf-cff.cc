@@ -1,7 +1,7 @@
 #include "pdf.h"
 #include "pdf-private.h"
 #include "pdf-cff.h"
-
+#include <string.h>
 pdf_array_t* _parse_cff_index(unsigned char** p)
 {
     if (p == NULL || *p == NULL) return NULL;
@@ -25,9 +25,9 @@ pdf_array_t* _parse_cff_index(unsigned char** p)
     {
         uint32_t len = offsets[i] - offsets[i - 1];
         arr->values[i - 1] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
-        arr->values[i - 1]->type = STRING;
+        arr->values[i - 1]->type = PDF_VALUE_STRING;
         arr->values[i - 1]->value_len = len;
-        arr->values[i - 1]->val.string = (unsigned char*)malloc(len + 1);
+        arr->values[i - 1]->val.string = (char*)malloc(len + 1);
         memcpy(arr->values[i - 1]->val.string, (*p), len);
         arr->values[i - 1]->val.string[len] = '\0';
         (*p) += len;
@@ -108,7 +108,7 @@ void _parse_cff_try_skip_value(unsigned char** pp, pdf_deque_t* deque)
             else if (l == 0xE) buf[cnt++] = '-';
             else if (l == 0xF) break;
         } while(h != 0xF && l != 0xF);
-        v = strtod(buf, NULL);
+        v = strtod((char*)buf, NULL);
         pdf_deque_push(deque, &v, sizeof(double)); 
     }
     else if (b0 >= 32 && b0 <= 246)
@@ -162,7 +162,7 @@ void _parse_cff_dict_data(unsigned char* font_data,
                 char* names[] = {"version", "Notice", "FullName", "FamilyName", "Weight"};
                 pdf_deque_pop_end(deque, &node);
                 uint32_t sid = *((double*)data);
-                pdf_dict_add(ret_dict, names[operator1], STRING, _parse_cff_sid_to_string(sid, string_index)); 
+                pdf_dict_add(ret_dict, names[operator1], PDF_VALUE_STRING, _parse_cff_sid_to_string(sid, string_index)); 
                 p++;
                 break;
             }
@@ -175,11 +175,11 @@ void _parse_cff_dict_data(unsigned char* font_data,
                 {
                     pdf_deque_pop_end(deque, &node);
                     pdf_array_element_value_t* arr_v = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
-                    arr_v->type = NUMBER;
+                    arr_v->type = PDF_VALUE_NUMBER;
                     arr_v->val.number = *((double*)data);
                     a->values[i] = arr_v;
                 }
-                pdf_dict_add(ret_dict, "FontBBox", ARRAY, a);
+                pdf_dict_add(ret_dict, "FontBBox", PDF_VALUE_ARRAY, a);
                 p++;
                 break;
             }
@@ -198,7 +198,7 @@ void _parse_cff_dict_data(unsigned char* font_data,
                 char* names[] = {"StdHW", "StdVW"};
                 pdf_deque_pop_end(deque, &node);
                 pdf_value_t* value = (pdf_value_t*)malloc(sizeof(pdf_value_t));
-                value->type = NUMBER;
+                value->type = PDF_VALUE_NUMBER;
                 value->val.number = *((double*)data);
                 pdf_dict_add_value(ret_dict, names[operator1 - 10], value);
                 p++;
@@ -218,7 +218,7 @@ void _parse_cff_dict_data(unsigned char* font_data,
                 char* names[] = {"UniqueID", "XUID", "charset", "Encoding", "CharStrings"};
                 pdf_deque_pop_end(deque, &node);
                 pdf_value_t* value = (pdf_value_t*)malloc(sizeof(pdf_value_t));
-                value->type = NUMBER;
+                value->type = PDF_VALUE_NUMBER;
                 value->val.number = *((double*)data);
                 pdf_dict_add_value(ret_dict, names[operator1 - 13], value);
                 p++;
@@ -243,7 +243,7 @@ void _parse_cff_dict_data(unsigned char* font_data,
                 char* names[] = {"Subrs", "defaultWidthX", "nominalWidthX"};
                 pdf_deque_pop_end(deque, &node);
                 pdf_value_t* value = (pdf_value_t*)malloc(sizeof(pdf_value_t));
-                value->type = NUMBER;
+                value->type = PDF_VALUE_NUMBER;
                 value->val.number = *((double*)data);
                 pdf_dict_add_value(ret_dict, names[operator1 - 19], value);
                 p++;
@@ -275,7 +275,7 @@ void _parse_cff_dict_data(unsigned char* font_data,
                     for (int i = 0; i < fontmatrix->num_elements; i++)
                     {
                         pdf_value_t* value = (pdf_value_t*)malloc(sizeof(pdf_value_t));
-                        value->type = NUMBER;
+                        value->type = PDF_VALUE_NUMBER;
                         pdf_deque_pop_end(deque, &node);
                         value->val.number = *((double*)data);
                         fontmatrix->values[i] = value;
@@ -295,7 +295,7 @@ void _parse_cff_dict_data(unsigned char* font_data,
                     "CharstringType", "FontMatrix", "StrokeWidth"};
 
                     pdf_value_t* value = (pdf_value_t*)malloc(sizeof(pdf_value_t));
-                    value->type = NUMBER;
+                    value->type = PDF_VALUE_NUMBER;
                     pdf_deque_pop_end(deque, &node);
                     value->val.number = *((double*)data);
                     pdf_dict_add_value(ret_dict, names[operator2 - 2], value);
@@ -351,23 +351,23 @@ void _parse_cff_dict_data(unsigned char* font_data,
                     double number = *((double*)data);
 
                     pdf_value_t* value = (pdf_value_t*)malloc(sizeof(pdf_value_t));
-                    value->type = ARRAY;
+                    value->type = PDF_VALUE_ARRAY;
                     value->val.array = pdf_array_init();
                     value->val.array->num_elements = 3;
                     value->val.array->values = (pdf_array_element_value_t**)malloc(sizeof(pdf_array_element_value_t**) * 3);
 
                     value->val.array->values[0] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
-                    value->val.array->values[0]->type = STRING;
+                    value->val.array->values[0]->type = PDF_VALUE_STRING;
                     char* s1 = _parse_cff_sid_to_string(sid1, string_index);
                     value->val.array->values[0]->val.string = strdup(s1);
                     
                     value->val.array->values[1] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
-                    value->val.array->values[1]->type = STRING;
+                    value->val.array->values[1]->type = PDF_VALUE_STRING;
                     char* s2 = _parse_cff_sid_to_string(sid2, string_index);
                     value->val.array->values[1]->val.string = strdup(s2);
 
                     value->val.array->values[2] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
-                    value->val.array->values[2]->type = NUMBER;
+                    value->val.array->values[2]->type = PDF_VALUE_NUMBER;
                     value->val.array->values[2]->val.number = number;
                     pdf_dict_add_value(ret_dict, "ROS", value);
 
@@ -386,7 +386,7 @@ void _parse_cff_dict_data(unsigned char* font_data,
                     "CIDCount", "UIDBase", "FDArray", "FDSelect"};
                     
                     pdf_value_t* value = (pdf_value_t*)malloc(sizeof(pdf_value_t));
-                    value->type = NUMBER;
+                    value->type = PDF_VALUE_NUMBER;
                     pdf_deque_pop_end(deque, &node);
                     value->val.number = *((double*)data);
                     pdf_dict_add_value(ret_dict, names[operator2 - 31], value);
@@ -424,26 +424,26 @@ pdf_array_t* _parse_cff_charset(unsigned char* p, int count, pdf_array_t* string
         charset_arr->values[0] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
         if (isCIDFont)
         {
-            charset_arr->values[0]->type = NUMBER;
+            charset_arr->values[0]->type = PDF_VALUE_NUMBER;
             charset_arr->values[0]->val.number = 0;
             for (int i = 1; i < count; i++)
             {
                 uint16_t sid = p[0] << 8 | p[1]; p += 2;
                 pdf_array_element_value_t* v = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
-                v->type = NUMBER;
+                v->type = PDF_VALUE_NUMBER;
                 v->val.number = sid;
                 charset_arr->values[i] = v;
             }
         }
         else
         {
-            charset_arr->values[0]->type = STRING;
+            charset_arr->values[0]->type = PDF_VALUE_STRING;
             charset_arr->values[0]->val.string = _parse_cff_sid_to_string(0, string_index);
             for (int i = 1; i < count; i++)
             {
                 uint16_t sid = p[0] << 8 | p[1]; p += 2;
                 pdf_array_element_value_t* v = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
-                v->type = STRING;
+                v->type = PDF_VALUE_STRING;
                 char* s = _parse_cff_sid_to_string(sid, string_index);
                 v->val.string = strdup(s);
                 charset_arr->values[i] = v;
@@ -455,7 +455,7 @@ pdf_array_t* _parse_cff_charset(unsigned char* p, int count, pdf_array_t* string
         charset_arr->values[0] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
         if (isCIDFont)
         {
-            charset_arr->values[0]->type = NUMBER;
+            charset_arr->values[0]->type = PDF_VALUE_NUMBER;
             charset_arr->values[0]->val.number = 0;
             int gid = 1;
             while (gid < count)
@@ -465,7 +465,7 @@ pdf_array_t* _parse_cff_charset(unsigned char* p, int count, pdf_array_t* string
                 for (int i = 0; i < left + 1; i++)
                 {
                     pdf_array_element_value_t* v = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
-                    v->type = NUMBER;
+                    v->type = PDF_VALUE_NUMBER;
                     v->val.number = sid;
                     sid++;
                     charset_arr->values[gid] = v;
@@ -475,7 +475,7 @@ pdf_array_t* _parse_cff_charset(unsigned char* p, int count, pdf_array_t* string
         }
         else
         {
-            charset_arr->values[0]->type = STRING;
+            charset_arr->values[0]->type = PDF_VALUE_STRING;
             charset_arr->values[0]->val.string = _parse_cff_sid_to_string(0, string_index);
             int gid = 1;
             while (gid < count)
@@ -485,7 +485,7 @@ pdf_array_t* _parse_cff_charset(unsigned char* p, int count, pdf_array_t* string
                 for (int i = 0; i < left + 1; i++)
                 {
                     pdf_array_element_value_t* v = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
-                    v->type = STRING;
+                    v->type = PDF_VALUE_STRING;
                     char* s = _parse_cff_sid_to_string(sid, string_index);
                     v->val.string = strdup(s);
                     sid++;
@@ -500,7 +500,7 @@ pdf_array_t* _parse_cff_charset(unsigned char* p, int count, pdf_array_t* string
         charset_arr->values[0] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
         if (isCIDFont)
         {
-            charset_arr->values[0]->type = NUMBER;
+            charset_arr->values[0]->type = PDF_VALUE_NUMBER;
             charset_arr->values[0]->val.number = 0;
             int gid = 1;
             while (gid < count)
@@ -510,7 +510,7 @@ pdf_array_t* _parse_cff_charset(unsigned char* p, int count, pdf_array_t* string
                 for (int i = 0; i < left + 1; i++)
                 {
                     pdf_array_element_value_t* v = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
-                    v->type = NUMBER;
+                    v->type = PDF_VALUE_NUMBER;
                     v->val.number = sid;
                     sid++;
                     charset_arr->values[gid] = v;
@@ -520,7 +520,7 @@ pdf_array_t* _parse_cff_charset(unsigned char* p, int count, pdf_array_t* string
         }
         else
         {
-            charset_arr->values[0]->type = STRING;
+            charset_arr->values[0]->type = PDF_VALUE_STRING;
             charset_arr->values[0]->val.string = _parse_cff_sid_to_string(0, string_index);
             int gid = 1;
             while (gid < count)
@@ -530,7 +530,7 @@ pdf_array_t* _parse_cff_charset(unsigned char* p, int count, pdf_array_t* string
                 for (int i = 0; i < left + 1; i++)
                 {
                     pdf_array_element_value_t* v = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
-                    v->type = STRING;
+                    v->type = PDF_VALUE_STRING;
                     char* s = _parse_cff_sid_to_string(sid, string_index);
                     v->val.string = strdup(s);
                     sid++;
@@ -573,7 +573,7 @@ void pdf_cff_parse(pdf_font_descriptor_t* font_descriptor)
         _parse_cff_dict_data(font_descriptor->fontfile, (unsigned char*)font_dict_index->values[i]->val.string, 
             font_dict_index->values[i]->value_len, string_index, font_dict);
         
-        font_dict_index->values[i]->type = DICT;
+        font_dict_index->values[i]->type = PDF_VALUE_DICT;
         free(font_dict_index->values[i]->val.string);
         font_dict_index->values[i]->val.dict = font_dict;
     }
@@ -587,12 +587,12 @@ void pdf_cff_parse(pdf_font_descriptor_t* font_descriptor)
         font_select->num_elements = charstrings_index->num_elements + 1;
         font_select->values = (pdf_array_element_value_t**)malloc(font_select->num_elements * sizeof(pdf_array_element_value_t*));
         font_select->values[0] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
-        font_select->values[0]->type = NUMBER;
+        font_select->values[0]->type = PDF_VALUE_NUMBER;
         font_select->values[0]->val.number = 0;
         for (int i = 1; i < font_select->num_elements; i++)
         {
             font_select->values[i] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
-            font_select->values[i]->type = NUMBER;
+            font_select->values[i]->type = PDF_VALUE_NUMBER;
             font_select->values[i]->val.number = p[0];
             p++;
         }
@@ -604,7 +604,7 @@ void pdf_cff_parse(pdf_font_descriptor_t* font_descriptor)
         font_select->num_elements = ranges * 3 + 1;
         font_select->values = (pdf_array_element_value_t**)malloc(font_select->num_elements * sizeof(pdf_array_element_value_t*));
         font_select->values[0] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
-        font_select->values[0]->type = NUMBER;
+        font_select->values[0]->type = PDF_VALUE_NUMBER;
         font_select->values[0]->val.number = 3;
 
         uint16_t first = p[0] << 8 | p[1];
@@ -612,13 +612,13 @@ void pdf_cff_parse(pdf_font_descriptor_t* font_descriptor)
         uint16_t sentinel = p[3] << 8 | p[4];
 
         font_select->values[1] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
-        font_select->values[1]->type = NUMBER;
+        font_select->values[1]->type = PDF_VALUE_NUMBER;
         font_select->values[1]->val.number = first;
         font_select->values[2] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
-        font_select->values[2]->type = NUMBER;
+        font_select->values[2]->type = PDF_VALUE_NUMBER;
         font_select->values[2]->val.number = sentinel - 1;
         font_select->values[3] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
-        font_select->values[3]->type = NUMBER;
+        font_select->values[3]->type = PDF_VALUE_NUMBER;
         font_select->values[3]->val.number = fd;
         p += 5;
         for (int i = 4; i < font_select->num_elements; )
@@ -628,13 +628,13 @@ void pdf_cff_parse(pdf_font_descriptor_t* font_descriptor)
             sentinel = p[1] << 8 | p[2];
 
             font_select->values[i] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
-            font_select->values[i]->type = NUMBER;
+            font_select->values[i]->type = PDF_VALUE_NUMBER;
             font_select->values[i]->val.number = first;
             font_select->values[i + 1] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
-            font_select->values[i + 1]->type = NUMBER;
+            font_select->values[i + 1]->type = PDF_VALUE_NUMBER;
             font_select->values[i + 1]->val.number = sentinel - 1;
             font_select->values[i + 2] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
-            font_select->values[i + 2]->type = NUMBER;
+            font_select->values[i + 2]->type = PDF_VALUE_NUMBER;
             font_select->values[i + 2]->val.number = fd;
             p += 3;
             i += 3;
@@ -662,22 +662,22 @@ void pdf_cff_parse(pdf_font_descriptor_t* font_descriptor)
         fontmatrix->num_elements = 6;
         fontmatrix->values = (pdf_array_element_value_t**)malloc(sizeof(pdf_array_element_value_t*) * fontmatrix->num_elements);
         fontmatrix->values[0] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
-        fontmatrix->values[0]->type = NUMBER;
+        fontmatrix->values[0]->type = PDF_VALUE_NUMBER;
         fontmatrix->values[0]->val.number = 0.001;
         fontmatrix->values[1] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
-        fontmatrix->values[1]->type = NUMBER;
+        fontmatrix->values[1]->type = PDF_VALUE_NUMBER;
         fontmatrix->values[1]->val.number = 0;
         fontmatrix->values[2] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
-        fontmatrix->values[2]->type = NUMBER;
+        fontmatrix->values[2]->type = PDF_VALUE_NUMBER;
         fontmatrix->values[2]->val.number = 0;
         fontmatrix->values[3] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
-        fontmatrix->values[3]->type = NUMBER;
+        fontmatrix->values[3]->type = PDF_VALUE_NUMBER;
         fontmatrix->values[3]->val.number = 0.001;
         fontmatrix->values[4] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
-        fontmatrix->values[4]->type = NUMBER;
+        fontmatrix->values[4]->type = PDF_VALUE_NUMBER;
         fontmatrix->values[4]->val.number = 0;
         fontmatrix->values[5] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
-        fontmatrix->values[5]->type = NUMBER;
+        fontmatrix->values[5]->type = PDF_VALUE_NUMBER;
         fontmatrix->values[5]->val.number = 0.001;
     }
     font_descriptor->font_matrix = fontmatrix;

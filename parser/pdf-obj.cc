@@ -93,7 +93,7 @@ pdf_font_descriptor_t* _load_font_descriptor(pdf_obj_t* obj, pdf_dict_t* font_di
     if (font_descriptor_ref != -1)
     {
         pdf_obj_t* obj1 = pdf_file_get_obj(obj->pdf, font_descriptor_ref);
-        if (obj1 == NULL || obj1->value->type != DICT) 
+        if (obj1 == NULL || obj1->value->type != PDF_VALUE_DICT) 
             font_descriptor_dict = NULL;
         else
            font_descriptor_dict = obj1->value->val.dict;
@@ -153,7 +153,7 @@ pdf_font_descriptor_t* _load_font_descriptor(pdf_obj_t* obj, pdf_dict_t* font_di
                 pdf_stream_get_all(fontfile_obj->stream, &font_descriptor->fontfile, &font_descriptor->fontfile_len);
                 fontfile_obj->font_data = font_descriptor->fontfile;
                 fontfile_obj->font_data_len = font_descriptor->fontfile_len;
-                if (subtype != NULL)
+                if (subtype && (!strcmp(subtype, "/CIDFontType0C") || !strcmp(subtype, "Type1C")))
                     pdf_cff_parse(font_descriptor);
             }
         }
@@ -299,7 +299,7 @@ pdf_font_t* _load_type0_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
         if (data != NULL)
         {
             input_t* input = NULL;
-            input_buffer(&input, data, len);
+            input_buffer(&input, (char*)data, len);
             unsigned char* origin = data;
             pdf_parser_t* parser = pdf_parser_init(obj->pdf, input);
 
@@ -314,17 +314,17 @@ pdf_font_t* _load_type0_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
     // CIDFonts
     pdf_dict_t* descendant_font_dict = NULL;
     pdf_array_t* descendant_fonts_aar = pdf_dict_get_array(font_dict, "/DescendantFonts");
-    if (descendant_fonts_aar != NULL && descendant_fonts_aar->values[0]->type == DICT)
+    if (descendant_fonts_aar != NULL && descendant_fonts_aar->values[0]->type == PDF_VALUE_DICT)
     {
         descendant_font_dict = descendant_fonts_aar->values[0]->val.dict;
     }
-    else if (descendant_fonts_aar != NULL && descendant_fonts_aar->values[0]->type == INDIRECT)
+    else if (descendant_fonts_aar != NULL && descendant_fonts_aar->values[0]->type == PDF_VALUE_INDIRECT)
     {
         int descendant_fonts_ref = descendant_fonts_aar->values[0]->val.indirect;
         if (descendant_fonts_ref != -1)
         {
             pdf_obj_t* descendant_font_obj = pdf_file_get_obj(obj->pdf, descendant_fonts_ref);
-            if (descendant_font_obj != NULL && descendant_font_obj->value->type == DICT)
+            if (descendant_font_obj != NULL && descendant_font_obj->value->type == PDF_VALUE_DICT)
                 descendant_font_dict = descendant_font_obj->value->val.dict;
             else
                 descendant_font_dict = NULL;
@@ -336,18 +336,18 @@ pdf_font_t* _load_type0_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
         if (descendantfonts_ref != -1)
         {
             pdf_obj_t* descendant_font_obj = pdf_file_get_obj(obj->pdf, descendantfonts_ref);
-            if (descendant_font_obj != NULL && descendant_font_obj->value->type == DICT)
+            if (descendant_font_obj != NULL && descendant_font_obj->value->type == PDF_VALUE_DICT)
             {
                 descendant_font_dict = descendant_font_obj->value->val.dict;
             }
-            else if (descendant_font_obj != NULL && descendant_font_obj->value->type == ARRAY)
+            else if (descendant_font_obj != NULL && descendant_font_obj->value->type == PDF_VALUE_ARRAY)
             {
                 pdf_array_t* descendant_fonts_aar = descendant_font_obj->value->val.array;
-                if (descendant_fonts_aar->values[0]->type == DICT)
+                if (descendant_fonts_aar->values[0]->type == PDF_VALUE_DICT)
                 {
                     descendant_font_dict = descendant_fonts_aar->values[0]->val.dict;
                 }
-                else if (descendant_fonts_aar->values[0]->type == INDIRECT)
+                else if (descendant_fonts_aar->values[0]->type == PDF_VALUE_INDIRECT)
                 {
                     int descendant_fonts_ref = descendant_fonts_aar->values[0]->val.indirect;
                     pdf_obj_t* descendant_font_obj = pdf_file_get_obj(obj->pdf, descendant_fonts_ref);
@@ -360,7 +360,7 @@ pdf_font_t* _load_type0_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
     {
         font->type0->descendant = _load_cid_font(obj, descendant_font_dict);
     }
-
+    
     return font;
 }
 pdf_array_t* _load_differences(pdf_dict_t* font_dict)
@@ -378,24 +378,24 @@ pdf_array_t* _load_differences(pdf_dict_t* font_dict)
             int cnt = 0;
             for (int i = 0; i < arr->num_elements; i++)
             {
-                if (arr->values[i]->type == NUMBER)
+                if (arr->values[i]->type == PDF_VALUE_NUMBER)
                 {
                     differences->values[cnt] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
-                    differences->values[cnt]->type = NUMBER;
+                    differences->values[cnt]->type = PDF_VALUE_NUMBER;
                     differences->values[cnt]->val.number = arr->values[i]->val.number;
                     cnt++;
                 }
-                else if (arr->values[i]->type == NAME)
+                else if (arr->values[i]->type == PDF_VALUE_NAME)
                 {
-                    if (cnt > 1 && differences->values[cnt - 1]->type == NAME)
+                    if (cnt > 1 && differences->values[cnt - 1]->type == PDF_VALUE_NAME)
                     {
                         differences->values[cnt] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
-                        differences->values[cnt]->type = NUMBER;
+                        differences->values[cnt]->type = PDF_VALUE_NUMBER;
                         differences->values[cnt]->val.number = differences->values[cnt - 2]->val.number + 1;
                         cnt++;
                     }
                     differences->values[cnt] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
-                    differences->values[cnt]->type = NAME;
+                    differences->values[cnt]->type = PDF_VALUE_NAME;
                     differences->values[cnt]->val.name = strdup(arr->values[i]->val.name);
                     cnt++;
                 }
@@ -450,7 +450,7 @@ pdf_font_t* _load_type1_truetype_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
         if (data != NULL)
         {
             input_t* input = NULL;
-            input_buffer(&input, data, len);
+            input_buffer(&input, (char*)data, len);
             unsigned char* origin = data;
             pdf_parser_t* parser = pdf_parser_init(obj->pdf, input);
 
@@ -518,7 +518,7 @@ pdf_font_t* _load_type3_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
         if (data != NULL)
         {
             input_t* input = NULL;
-            input_buffer(&input, data, len);
+            input_buffer(&input, (char*)data, len);
             unsigned char* origin = data;
             pdf_parser_t* parser = pdf_parser_init(obj->pdf, input);
     
@@ -553,11 +553,11 @@ void pdf_obj_get_colorspace(pdf_obj_t* obj, const char* name, char* value)
         pdf_obj_t* color_space_obj = pdf_file_get_obj(obj->pdf, ref);
         if (color_space_obj != NULL)
         {
-            if (color_space_obj->value->type == NAME)
+            if (color_space_obj->value->type == PDF_VALUE_NAME)
             {
                 strcpy(value, color_space_obj->value->val.name);
             }
-            // else if (color_space_obj->value->type == ARRAY)
+            // else if (color_space_obj->value->type == PDF_VALUE_ARRAY)
             // {
             //     pdf_array_t* color_space_aar = color_space_obj->value->val.array;
             //     if (color_space_aar != NULL && color_space_aar->num_elements > 0)
@@ -565,7 +565,7 @@ void pdf_obj_get_colorspace(pdf_obj_t* obj, const char* name, char* value)
             //         strcpy(value, color_space_aar->values[0]->val.name);
             //     }
             // }
-            // else if (color_space_obj->value->type == DICT)
+            // else if (color_space_obj->value->type == PDF_VALUE_DICT)
             // {
             //     pdf_dict_t* color_space_dict = color_space_obj->value->val.dict;
             //     if (color_space_dict != NULL)
@@ -628,7 +628,7 @@ pdf_font_t* pdf_obj_get_font(pdf_obj_t* obj, const char* name)
     {
         return font_obj->font;
     }
-    if (font_obj->value->type != DICT) return NULL;
+    if (font_obj->value->type != PDF_VALUE_DICT) return NULL;
     pdf_dict_t* font_dict = font_obj->value->val.dict;
 
     char* type = (char*)pdf_dict_get_name(font_dict, "/Type"); // Font
@@ -757,7 +757,7 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj, const char* name)
         }
         if (strcmp(filter, "/FlateDecode") == 0)
         {
-            pdf_image_t* img = calloc(1, sizeof(pdf_image_t));
+            pdf_image_t* img = (pdf_image_t*)calloc(1, sizeof(pdf_image_t));
             img->width = width;
             img->height = height;
             img->bits_per_color = bits_per_component;
@@ -787,7 +787,7 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj, const char* name)
                         {
                             int lookup_cnt = color_space_aar->values[2]->val.number;
                             unsigned char* lookup = NULL;
-                            if (color_space_aar->values[3]->type == INDIRECT)
+                            if (color_space_aar->values[3]->type == PDF_VALUE_INDIRECT)
                             {
                                 int ref = color_space_aar->values[3]->val.indirect;
                                 pdf_obj_t* lookup_obj = pdf_file_get_obj(obj->pdf, ref);
@@ -811,7 +811,7 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj, const char* name)
                                     tmp[index2 + 3] = smask[index];
                                 }
                             }
-                            if (color_space_aar->values[3]->type == INDIRECT)
+                            if (color_space_aar->values[3]->type == PDF_VALUE_INDIRECT)
                             {
                                 free(lookup);
                             }
@@ -861,7 +861,7 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj, const char* name)
                 unsigned char* tmp = (unsigned char*)malloc(tmp_len);
                 int lookup_cnt = color_space_aar->values[2]->val.number;
                 unsigned char* lookup = NULL;
-                if (color_space_aar->values[3]->type == INDIRECT)
+                if (color_space_aar->values[3]->type == PDF_VALUE_INDIRECT)
                 {
                     int ref = color_space_aar->values[3]->val.indirect;
                     pdf_obj_t* lookup_obj = pdf_file_get_obj(obj->pdf, ref);
@@ -906,7 +906,7 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj, const char* name)
                         }
                     }
                 }
-                if (color_space_aar->values[3]->type == INDIRECT)
+                if (color_space_aar->values[3]->type == PDF_VALUE_INDIRECT)
                     free(lookup);
                 free(img->data);
                 img->data = tmp;
@@ -923,11 +923,11 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj, const char* name)
         }
         else if (strcmp(filter, "/DCTDecode") == 0)
         {
-            pdf_image_t* img = calloc(1, sizeof(pdf_image_t));
+            pdf_image_t* img = (pdf_image_t*)calloc(1, sizeof(pdf_image_t));
             img->width = width;
             img->height = height;
             img->bits_per_color = bits_per_component;
-            img->data = calloc(length, sizeof(char));
+            img->data = (unsigned char*)calloc(length, sizeof(char));
             if (color_space != NULL)
             {
                 strcpy(img->color_space, color_space);

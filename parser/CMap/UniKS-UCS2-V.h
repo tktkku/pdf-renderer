@@ -22,16 +22,16 @@ static pdf_char_range_map_t char_range_map_UNIKS_UCS2_V[] = {
 };
 
 pdf_cmap_t cmap_UNIKS_UCS2_V = {
-    .name = "UniKS-UCS2-V",
-    .worldwide = true,
-    .unicode_map_len = 0,
-    .unicode_map = NULL,
-    .char_range_map_len = 18,
-    .char_range_map = char_range_map_UNIKS_UCS2_V,
-    .not_def_range_len = 0,
-    .not_def_range = NULL,
-    .code_range_map_len = 0,
-    .code_range_map = NULL,
-    .next = NULL
+    "UniKS-UCS2-V",    //name
+    true,        //worldwide
+    0,      //unicode_map_len
+    NULL,      //unicode_map
+    18,   //char_range_map_len
+    char_range_map_UNIKS_UCS2_V,   //char_range_map
+    0,       //not_def_range_len
+    NULL,       //not_def_range
+    0,    //code_range_map_len
+    NULL,    //code_range_map
+     NULL//next
 };
 

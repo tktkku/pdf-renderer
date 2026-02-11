@@ -103,14 +103,14 @@ pdf_stream_t* pdf_stream_init(pdf_file_t* pdf, pdf_obj_t* obj, int len, int offs
     if (filter != NULL)
     {
         s->filter = (struct pdf_value*)calloc(1, sizeof(struct pdf_value));
-        s->filter->type = NAME;
+        s->filter->type = PDF_VALUE_NAME;
         s->filter->val.name = (char*)filter;
         s->filter->value_len = strlen(filter);
     }
     else if (filter_arr != NULL)
     {
         s->filter = (struct pdf_value*)calloc(1, sizeof(struct pdf_value));
-        s->filter->type = ARRAY;
+        s->filter->type = PDF_VALUE_ARRAY;
         s->filter->val.array = filter_arr;
     }
 
@@ -150,7 +150,7 @@ int pdf_stream_get_data(pdf_stream_t* stream, unsigned char* buf, int size)
     int ret = 0;
     if (stream->filter != NULL)
     {
-        if (stream->filter->type == NAME)
+        if (stream->filter->type == PDF_VALUE_NAME)
         {
             if (strcmp(stream->filter->val.name, "/FlateDecode") == 0)
             {
@@ -365,7 +365,7 @@ void pdf_stream_get_all(pdf_stream_t* stream, unsigned char** buffer, int* size)
         }
         else
         {
-            unsigned char* p = realloc(start, off + ret);
+            unsigned char* p = (unsigned char*)realloc(start, off + ret);
             if (p == NULL)
             {
                 free(start);

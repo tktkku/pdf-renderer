@@ -1,14 +1,14 @@
-project(render LANGUAGES C)
+project(render LANGUAGES CXX)
 
 set(RENDER_SOURCES
-    Do.c
-    Tf.c
-    color.c
-    handle_cff.c
-    text.c
-    text-render.c
-    path.c
-    pdf-render-by-plutovg.c
+    Do.cc
+    Tf.cc
+    color.cc
+    handle_cff.cc
+    text.cc
+    text-render.cc
+    path.cc
+    pdf-render-by-plutovg.cc
     pdf-render.h
 )
 set(RENDER_DEP pdf-parser plutovg)

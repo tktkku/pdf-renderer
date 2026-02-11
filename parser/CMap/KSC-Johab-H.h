@@ -4152,16 +4152,16 @@ static pdf_char_range_map_t char_range_map_KSC_JOHAB_H[] = {
 };
 
 pdf_cmap_t cmap_KSC_JOHAB_H = {
-    .name = "KSC-Johab-H",
-    .worldwide = true,
-    .unicode_map_len = 0,
-    .unicode_map = NULL,
-    .char_range_map_len = 4137,
-    .char_range_map = char_range_map_KSC_JOHAB_H,
-    .not_def_range_len = 1,
-    .not_def_range = not_def_range_KSC_JOHAB_H,
-    .code_range_map_len = 4,
-    .code_range_map = code_range_map_KSC_JOHAB_H,
-    .next = NULL
+    "KSC-Johab-H",    //name
+    true,        //worldwide
+    0,      //unicode_map_len
+    NULL,      //unicode_map
+    4137,   //char_range_map_len
+    char_range_map_KSC_JOHAB_H,   //char_range_map
+    1,       //not_def_range_len
+    not_def_range_KSC_JOHAB_H,       //not_def_range
+    4,    //code_range_map_len
+    code_range_map_KSC_JOHAB_H,    //code_range_map
+     NULL//next
 };
 

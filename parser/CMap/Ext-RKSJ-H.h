@@ -680,16 +680,16 @@ static pdf_char_range_map_t char_range_map_EXT_RKSJ_H[] = {
 };
 
 pdf_cmap_t cmap_EXT_RKSJ_H = {
-    .name = "Ext-RKSJ-H",
-    .worldwide = true,
-    .unicode_map_len = 0,
-    .unicode_map = NULL,
-    .char_range_map_len = 665,
-    .char_range_map = char_range_map_EXT_RKSJ_H,
-    .not_def_range_len = 1,
-    .not_def_range = not_def_range_EXT_RKSJ_H,
-    .code_range_map_len = 4,
-    .code_range_map = code_range_map_EXT_RKSJ_H,
-    .next = NULL
+    "Ext-RKSJ-H",    //name
+    true,        //worldwide
+    0,      //unicode_map_len
+    NULL,      //unicode_map
+    665,   //char_range_map_len
+    char_range_map_EXT_RKSJ_H,   //char_range_map
+    1,       //not_def_range_len
+    not_def_range_EXT_RKSJ_H,       //not_def_range
+    4,    //code_range_map_len
+    code_range_map_EXT_RKSJ_H,    //code_range_map
+     NULL//next
 };
 

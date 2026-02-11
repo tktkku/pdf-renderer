@@ -5,8 +5,6 @@ extern "C" {
 #include <stdbool.h>
 #include <stddef.h>
 
-    //#define CVECTOR_LINEAR_GROWTH
-#include "../c-vector/cvector.h"
     typedef struct pdf_parser_token pdf_parser_token_t;
 
     typedef struct pdf_node pdf_node_t;

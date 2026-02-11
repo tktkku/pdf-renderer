@@ -3,7 +3,7 @@
 #include <string.h>
 pdf_array_t* pdf_array_init()
 {
-    pdf_array_t* array = (pdf_array_t*)malloc(sizeof(pdf_array_t));
+    pdf_array_t* array = new pdf_array_t;
     memset(array, 0, sizeof(pdf_array_t));
 
     return array;
@@ -27,6 +27,6 @@ void pdf_array_free(pdf_array_t* array)
         array->values = NULL;
     }
 
-    free(array);
+    delete array;
     array = NULL;
 }

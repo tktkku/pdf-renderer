@@ -639,16 +639,16 @@ static pdf_char_range_map_t char_range_map_78_EUC_H[] = {
 };
 
 pdf_cmap_t cmap_78_EUC_H = {
-    .name = "78-EUC-H",
-    .worldwide = true,
-    .unicode_map_len = 0,
-    .unicode_map = NULL,
-    .char_range_map_len = 625,
-    .char_range_map = char_range_map_78_EUC_H,
-    .not_def_range_len = 1,
-    .not_def_range = not_def_range_78_EUC_H,
-    .code_range_map_len = 3,
-    .code_range_map = code_range_map_78_EUC_H,
-    .next = NULL
+    "78-EUC-H",    //name
+    true,        //worldwide
+    0,      //unicode_map_len
+    NULL,      //unicode_map
+    625,   //char_range_map_len
+    char_range_map_78_EUC_H,   //char_range_map
+    1,       //not_def_range_len
+    not_def_range_78_EUC_H,       //not_def_range
+    3,    //code_range_map_len
+    code_range_map_78_EUC_H,    //code_range_map
+     NULL//next
 };
 

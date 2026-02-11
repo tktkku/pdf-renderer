@@ -1,6 +1,6 @@
 #include "pdf.h"
 #include "pdf-private.h"
-
+#include <string.h>
 int input_file(input_t** input, const char* filename)
 {
     if (input == NULL || filename == NULL) return -1;
@@ -59,7 +59,7 @@ size_t input_read(input_t* input, void* ptr, size_t size)
             if ((input->stream->decomp.cur_pos >= input->stream->decomp.len && input->stream->readin_len < input->stream->stream_len)
                 || input->stream->processed < input->stream->stream_len)
             {
-                ret = pdf_stream_get_data(input->stream, ptr, size);
+                ret = pdf_stream_get_data(input->stream, (unsigned char*)ptr, size);
             }
             return ret;
         }

@@ -13993,16 +13993,16 @@ static pdf_char_range_map_t char_range_map_UNIJISX02132004_UTF32_H[] = {
 };
 
 pdf_cmap_t cmap_UNIJISX02132004_UTF32_H = {
-    .name = "UniJISX02132004-UTF32-H",
-    .worldwide = true,
-    .unicode_map_len = 13211,
-    .unicode_map = unicode_map_UNIJISX02132004_UTF32_H,
-    .char_range_map_len = 767,
-    .char_range_map = char_range_map_UNIJISX02132004_UTF32_H,
-    .not_def_range_len = 1,
-    .not_def_range = not_def_range_UNIJISX02132004_UTF32_H,
-    .code_range_map_len = 1,
-    .code_range_map = code_range_map_UNIJISX02132004_UTF32_H,
-    .next = NULL
+    "UniJISX02132004-UTF32-H",    //name
+    true,        //worldwide
+    13211,      //unicode_map_len
+    unicode_map_UNIJISX02132004_UTF32_H,      //unicode_map
+    767,   //char_range_map_len
+    char_range_map_UNIJISX02132004_UTF32_H,   //char_range_map
+    1,       //not_def_range_len
+    not_def_range_UNIJISX02132004_UTF32_H,       //not_def_range
+    1,    //code_range_map_len
+    code_range_map_UNIJISX02132004_UTF32_H,    //code_range_map
+     NULL//next
 };
 

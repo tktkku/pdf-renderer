@@ -4,6 +4,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <stdlib.h>
+#include <memory>
 const static char* TOKEN_NAMES[] = {
     #define TOKEN_DEF(v, t) v,
     #include "pdf-token.def"
@@ -79,7 +80,7 @@ bool _is_delimiter(char c)
 typedef struct
 {
     int nums;
-    pdf_parser_token_type_t tokens[40];
+    pdf_token_type_t tokens[40];
 } fixed_token_map_t;
 #define MAX_FIXED_TOKEN_LEN 19
 const static fixed_token_map_t fixed_token_map[MAX_FIXED_TOKEN_LEN + 1] =
@@ -244,7 +245,7 @@ const static fixed_token_map_t fixed_token_map[MAX_FIXED_TOKEN_LEN + 1] =
         TOKEN_BEGINCODESPACERANGE,
     }}
 };
-const char* _token_to_string(pdf_parser_token_type_t type)
+const char* _token_to_string(pdf_token_type_t type)
 {
     return TOKEN_NAMES[type];
 }
@@ -320,63 +321,32 @@ pdf_parser_token_t* _parse_number(pdf_parser_t* parser, const unsigned char* sta
     }
 }
 
-pdf_parser_token_t* pdf_parser_token_init(pdf_parser_t* parser, const unsigned char* start, pdf_parser_token_type_t type, int len)
+pdf_parser_token_t* pdf_parser_token_init(pdf_parser_t* parser, const unsigned char* start, pdf_token_type_t type, int len)
 {
     if (parser == NULL || start == NULL || len == 0) return NULL;
     pdf_parser_token_t* tk = NULL;
-    // if (len <= MAX_FIXED_TOKEN_LEN)
-    // {
-    //     if (parser->pdf->freed_tokens != NULL)
-    //     {
-    //         tk = parser->pdf->freed_tokens;
-    //         parser->pdf->freed_tokens = parser->pdf->freed_tokens->next;
-    //     }
-    //     else
-    //     {
-    //         tk = (pdf_parser_token_t*)malloc(sizeof(pdf_parser_token_t));
-    //         tk->token = malloc(MAX_FIXED_TOKEN_LEN + 1);
-    //     }
-    // }
-    // else
-    {
-        tk = (pdf_parser_token_t*)malloc(sizeof(pdf_parser_token_t));
-        tk->token = (char*)malloc(len + 1);
-    }
+
+    tk = new pdf_parser_token_t;
+    
     tk->type = type;
-    memcpy(tk->token, start, len);
-    tk->token[len] = '\0';
-    tk->token_len = len;
+    tk->token.insert(tk->token.end(), start, start + len);
     tk->steps = len;
     tk->next = NULL;
 
     return tk;
 }
-void pdf_parser_token_free(pdf_parser_t* parser, pdf_parser_token_t* token)
+void pdf_parser_token_free(pdf_parser_t* parser, pdf_parser_token_t* tk)
 {
-    if (token == NULL) return;
-    // if (token->token_len <= MAX_FIXED_TOKEN_LEN && parser != NULL)
-    // {
-    //     token->next = parser->pdf->freed_tokens;
-    //     parser->pdf->freed_tokens = token;
-    // }
-    // else
-    {
-        if (token->token)
-        {
-            free(token->token);
-            token->token = NULL;
-        }
+    if (tk == NULL) return;
 
-        free(token);
-        token = NULL;
-    }
+    delete tk;
 }
 
 const char* pdf_parser_token_get_token(pdf_parser_token_t* token)
 {
     if (token == NULL) return NULL;
 
-    return token->token;
+    return token->token.data();
 }
 pdf_parser_t* pdf_parser_init(pdf_file_t* pdf, input_t* input)
 {
@@ -461,13 +431,13 @@ size_t pdf_parser_read_data(pdf_parser_t* parser, void* ptr, size_t size)
 
     return bytes_read;
 }
-void _decode_hex_string(char* str, int len, int* out_len)
+void _decode_hex_string(pdf_parser_token_t* tk)
 {
-    char* p = str + 1; // skip '<'
-    char* end = str + len;
-    char* out = (char*)malloc(len);
+    char* p = tk->token.data() + 1; // skip '<'
+    char* end = tk->token.data() + tk->token.size();
+    char* out = (char*)malloc(tk->token.size());
     int ol = 0;
-    out[ol++] = *str;
+    out[ol++] = tk->token[0];
     while (p < end)
     {
         if (_is_hex(*p))
@@ -475,18 +445,17 @@ void _decode_hex_string(char* str, int len, int* out_len)
 
         p++;
     }
-    memcpy(str, out, ol);
-    str[ol] = '\0';
-    *out_len = ol;
+    tk->token.clear();
+    tk->token.insert(tk->token.end(), out, out + ol);
     free(out);
 }
-void _decode_name(char* str, int len, int* out_len)
+void _decode_name(pdf_parser_token_t* tk)
 {
-    char* p = str + 1; // skip '/'
-    char* end = str + len;
-    char* out = (char*)malloc(len);
+    char* p = tk->token.data() + 1; // skip '/'
+    char* end = tk->token.data() + tk->token.size();
+    char* out = (char*)malloc(tk->token.size());
     int ol = 0;
-    out[ol++] = *str; //'/'
+    out[ol++] = tk->token[0]; //'/'
     while (p < end)
     {
         if (*p == '#')
@@ -506,18 +475,17 @@ void _decode_name(char* str, int len, int* out_len)
             p++;
         }
     }
-    memcpy(str, out, ol);
-    str[ol] = '\0';
-    *out_len = ol;
+    tk->token.clear();
+    tk->token.insert(tk->token.end(), out, out + ol);
     free(out);
 }
-void _decode_string(char* str, int len, int* out_len)
+void _decode_string(pdf_parser_token_t* tk)
 {
-    char* p = str + 1; // skip '('
-    char* end = str + len;
-    char* out = (char*)malloc(len);
+    char* p = tk->token.data() + 1; // skip '('
+    char* end = tk->token.data() + tk->token.size();
+    char* out = (char*)malloc(tk->token.size());
     int ol = 0;
-    out[ol++] = *str; //'('
+    out[ol++] = tk->token[0]; //'('
     while (p < end)
     {
         if (*p == '\\')
@@ -581,9 +549,8 @@ void _decode_string(char* str, int len, int* out_len)
         }
         p++;
     }
-    memcpy(str, out, ol);
-    str[ol] = '\0';
-    *out_len = ol;
+    tk->token.clear();
+    tk->token.insert(tk->token.end(), out, out + ol);
     free(out);
 }
 
@@ -622,7 +589,7 @@ pdf_parser_token_t* _pdf_parser_next_one_token(pdf_parser_t* parser, const unsig
         if (len > MAX_FIXED_TOKEN_LEN)
             return NULL;
 
-        const pdf_parser_token_type_t* to_compare = fixed_token_map[len].tokens;
+        const pdf_token_type_t* to_compare = fixed_token_map[len].tokens;
         int operator_count = fixed_token_map[len].nums;
         bool isfind = false;
         int left = 0;
@@ -649,18 +616,14 @@ pdf_parser_token_t* _pdf_parser_next_one_token(pdf_parser_t* parser, const unsig
         if (isfind)
         {
             //tk = pdf_parser_token_init(parser, start, to_compare[mid].type, len);
-            tk = (pdf_parser_token_t*)malloc(sizeof(pdf_parser_token_t));
+            tk = new pdf_parser_token_t;
             tk->type = to_compare[mid];
             tk->next = NULL;
-            tk->token_len = len;
+            tk->token.resize(len);
             if (tk->type == TOKEN_NULL || tk->type == TOKEN_BOOLEAN_TRUE || tk->type == TOKEN_BOOLEAN_FALSE)
             {
-                tk->token = (char*)malloc(len + 1);
-                memcpy(tk->token, start, len);
-                tk->token[len] = '\0';
+                tk->token.insert(tk->token.end(), start, start + len);
             }
-            else
-                tk->token = NULL;
             
             tk->steps = len;
             start += len;
@@ -691,7 +654,7 @@ NOT_OPERATOR:
         tk = pdf_parser_token_init(parser, start, TOKEN_NAME, len);
         start += len;
         // decode name
-        _decode_name(tk->token, tk->token_len, &tk->token_len);
+        _decode_name(tk);
     }
     else if (c == '(') // parse string
     {
@@ -726,11 +689,10 @@ NOT_OPERATOR:
             return NULL;
         }
         tk = pdf_parser_token_init(parser, start, TOKEN_STRING, len);
-        tk->token[tk->token_len - 1] = '\0';
-        tk->token_len--;
+        tk->token.pop_back();
         start += len;
         // decode string
-        _decode_string(tk->token, tk->token_len, &tk->token_len);
+        _decode_string(tk);
     }
     else if (c == '[')
     {
@@ -769,11 +731,10 @@ NOT_OPERATOR:
             }
 
             tk = pdf_parser_token_init(parser, start, TOKEN_HEX_STRING, len);
-            tk->token[tk->token_len - 1] = '\0';
-            tk->token_len--;
+            tk->token.pop_back();
             start += len;
             // decode hex string
-            _decode_hex_string(tk->token, tk->token_len, &tk->token_len);
+            _decode_hex_string(tk);
         }
     }
     else if (c == '>')
@@ -985,39 +946,27 @@ pdf_parser_token_t* _pdf_next_token(pdf_parser_t* parser)
         if (parser->cached_tokens[1]->type == TOKEN_OBJ_BEG
             || parser->cached_tokens[1]->type == TOKEN_INDIRECT)
         {
-            pdf_parser_token_t* token = (pdf_parser_token_t*)malloc(sizeof(pdf_parser_token_t));
+            pdf_parser_token_t* token = new pdf_parser_token_t;
             token->type = parser->cached_tokens[1]->type;
             token->steps = tk->steps
                 + parser->cached_tokens[0]->steps
                 + parser->cached_tokens[1]->steps;
-            token->token_len = tk->token_len
-                + parser->cached_tokens[0]->token_len
-                + parser->cached_tokens[1]->token_len
-                + 2;// add 2 spaces
-            if (token->token_len <= MAX_FIXED_TOKEN_LEN)
-            {
-                token->token = (char*)malloc(MAX_FIXED_TOKEN_LEN + 1);
-            }
-            else
-            {
-                token->token = (char*)malloc(token->token_len + 1);
-            }
+            token->token.reserve(tk->token.size() 
+            + parser->cached_tokens[0]->token.size()
+            + parser->cached_tokens[1]->token.size() + 2);
+
             int off = 0;
-            memcpy(token->token, tk->token, tk->token_len);
-            off += tk->token_len;
-            token->token[off] = ' ';
+            token->token.insert(token->token.end(), tk->token.begin(), tk->token.end());
+            off += tk->token.size();
+            token->token.push_back(' ');
             off++;
             pdf_parser_token_free(parser, tk);
-
-            memcpy(token->token + off, parser->cached_tokens[0]->token, parser->cached_tokens[0]->token_len);
-            off += parser->cached_tokens[0]->token_len;
-            token->token[off] = ' ';
+            token->token.insert(token->token.end(), parser->cached_tokens[0]->token.begin(), parser->cached_tokens[0]->token.end());
+            off += parser->cached_tokens[0]->token.size();
+            token->token.push_back(' ');
             off++;
             pdf_parser_token_free(parser, parser->cached_tokens[0]);
 
-            // memcpy(token->token + off, parser->cached_tokens[1]->token, parser->cached_tokens[1]->token_len);
-            // off += parser->cached_tokens[1]->token_len;
-            token->token[off] = '\0';
             pdf_parser_token_free(parser, parser->cached_tokens[1]);
             parser->num_cached_tokens = 0;
             return token;
@@ -1078,7 +1027,7 @@ pdf_cmap_t* pdf_parser_build_cmap(pdf_parser_t* parser)
         {
             // single char mapping
             bool isCid = (current_token->type == TOKEN_BEGINCIDCHAR);
-            int unicode_map_len = strtol(last_token->token, NULL, 10);
+            int unicode_map_len = strtol(last_token->token.data(), NULL, 10);
             if (cmap->unicode_map == NULL)
             {
                 cmap->unicode_map = (pdf_unicode_map_t*)malloc(sizeof(pdf_unicode_map_t) * unicode_map_len);
@@ -1108,14 +1057,14 @@ pdf_cmap_t* pdf_parser_build_cmap(pdf_parser_t* parser)
                 pdf_unicode_map_t* unicode_map = cmap->unicode_map + i + cmap->unicode_map_len;
                 last_token = pdf_parser_next_token(parser);
                 current_token = pdf_parser_next_token(parser);
-                unicode_map->cid = _hex_str_to_32bit(last_token->token + 1, last_token->token_len - 1);
+                unicode_map->cid = _hex_str_to_32bit(last_token->token.data() + 1, last_token->token.size() - 1);
                 if (isCid)
                 {
-                    unicode_map->unicode = (uint32_t)strtol(current_token->token + 1, NULL, 10);
+                    unicode_map->unicode = (uint32_t)strtol(current_token->token.data() + 1, NULL, 10);
                 }
                 else
                 {
-                    unicode_map->unicode = _hex_str_to_32bit(current_token->token + 1, current_token->token_len - 1);
+                    unicode_map->unicode = _hex_str_to_32bit(current_token->token.data() + 1, current_token->token.size() - 1);
                 }
 
                 pdf_parser_token_free(parser, last_token);
@@ -1129,7 +1078,7 @@ pdf_cmap_t* pdf_parser_build_cmap(pdf_parser_t* parser)
         else if (current_token->type == TOKEN_BEGINBFRANGE || current_token->type == TOKEN_BEGINCIDRANGE)
         {
             bool isCid = (current_token->type == TOKEN_BEGINCIDRANGE);
-            int char_range_map_len = strtol(last_token->token, NULL, 10);
+            int char_range_map_len = strtol(last_token->token.data(), NULL, 10);
             if (cmap->char_range_map == NULL)
             {
                 cmap->char_range_map = (pdf_char_range_map_t*)malloc(sizeof(pdf_char_range_map_t) * char_range_map_len);
@@ -1159,30 +1108,44 @@ pdf_cmap_t* pdf_parser_build_cmap(pdf_parser_t* parser)
                 pdf_parser_token_t* tk1 = pdf_parser_next_token(parser);
                 pdf_parser_token_t* tk2 = pdf_parser_next_token(parser);
                 pdf_parser_token_t* tk3 = pdf_parser_next_token(parser);
-                char_range_map->srcStart = _hex_str_to_32bit(tk1->token + 1, tk1->token_len - 1);
-                char_range_map->srcEnd = _hex_str_to_32bit(tk2->token + 1, tk2->token_len - 1);
+                char_range_map->srcStart = _hex_str_to_32bit(tk1->token.data() + 1, tk1->token.size() - 1);
+                char_range_map->srcEnd = _hex_str_to_32bit(tk2->token.data()  + 1, tk2->token.size() - 1);
                 if (isCid)
                 {
-                    char_range_map->dstStart = (uint32_t)strtol(tk3->token, NULL, 10);
+                    char_range_map->dstStart = (uint32_t)strtol(tk3->token.data(), NULL, 10);
                 }
                 else
                 {
                     if (tk3->type != TOKEN_ARRAY_BEG)
                     {
-                        char_range_map->dstStart = _hex_str_to_32bit(tk3->token + 1, tk3->token_len - 1);
+                        char_range_map->dstStart = _hex_str_to_32bit(tk3->token.data() + 1, tk3->token.size() - 1);
                     }
                     else
                     {
                         pdf_array_t* arr = pdf_parser_build_array(parser);
-                        for (int i = 0; i < arr->num_elements; i++)
+                        pdf_char_range_map_t* t = (pdf_char_range_map_t*)realloc(cmap->char_range_map, 
+                            sizeof(pdf_char_range_map_t) * (char_range_map_len + cmap->char_range_map_len + arr->num_elements - 1));
+                        if (t == NULL)
                         {
-                            pdf_char_range_map_t* char_range_map1 = (pdf_char_range_map_t*)malloc(sizeof(pdf_char_range_map_t));
-                            char_range_map1->srcStart = char_range_map->srcStart + i;
-                            char_range_map1->srcEnd = char_range_map->srcStart + i;
-                            char_range_map1->dstStart = _hex_str_to_32bit(arr->values[i]->val.string + 1, arr->values[i]->value_len - 1);
+                            pdf_cmap_free(cmap);
+                            return NULL;
                         }
-                        pdf_array_free(arr);
-                        free(char_range_map);
+                        cmap->char_range_map = t;
+                        uint32_t start = _hex_str_to_32bit(tk1->token.data() + 1, tk1->token.size() - 1);
+                        for (int j = 0; j < arr->num_elements; j++)
+                        {
+                            char_range_map = cmap->char_range_map + i + j + cmap->char_range_map_len;
+                            char_range_map->srcStart = start;
+                            char_range_map->srcEnd = start;
+                            char_range_map->dstStart = _hex_str_to_32bit(arr->values[j]->val.string + 1, arr->values[j]->value_len - 1);
+                            start++;
+                        }
+                        cmap->char_range_map_len += (arr->num_elements - 1);
+                        pdf_parser_token_free(parser, tk1);
+                        pdf_parser_token_free(parser, tk2);
+                        pdf_parser_token_free(parser, tk3);
+                        
+                        continue;
                     }
                 }
                 pdf_parser_token_free(parser, tk1);
@@ -1194,7 +1157,7 @@ pdf_cmap_t* pdf_parser_build_cmap(pdf_parser_t* parser)
         }
         else if (current_token->type == TOKEN_BEGINNOTDEFRANGE)
         {
-            int char_range_map_len = strtol(last_token->token, NULL, 10);
+            int char_range_map_len = strtol(last_token->token.data(), NULL, 10);
             if (cmap->not_def_range == NULL)
             {
                 cmap->not_def_range = (pdf_char_range_map_t*)malloc(sizeof(pdf_char_range_map_t) * char_range_map_len);
@@ -1224,9 +1187,9 @@ pdf_cmap_t* pdf_parser_build_cmap(pdf_parser_t* parser)
                 pdf_parser_token_t* tk1 = pdf_parser_next_token(parser);
                 pdf_parser_token_t* tk2 = pdf_parser_next_token(parser);
                 pdf_parser_token_t* tk3 = pdf_parser_next_token(parser);
-                char_range_map->srcStart = _hex_str_to_32bit(tk1->token + 1, tk1->token_len - 1);
-                char_range_map->srcEnd = _hex_str_to_32bit(tk2->token + 1, tk2->token_len - 1);
-                char_range_map->dstStart = (uint32_t)strtol(tk3->token, NULL, 10);
+                char_range_map->srcStart = _hex_str_to_32bit(tk1->token.data() + 1, tk1->token.size() - 1);
+                char_range_map->srcEnd = _hex_str_to_32bit(tk2->token.data() + 1, tk2->token.size() - 1);
+                char_range_map->dstStart = (uint32_t)strtol(tk3->token.data(), NULL, 10);
                 pdf_parser_token_free(parser, tk1);
                 pdf_parser_token_free(parser, tk2);
                 pdf_parser_token_free(parser, tk3);
@@ -1236,7 +1199,7 @@ pdf_cmap_t* pdf_parser_build_cmap(pdf_parser_t* parser)
         }
         else if (current_token->type == TOKEN_BEGINCODESPACERANGE)
         {
-            int code_range_map_len = strtol(last_token->token, NULL, 10);
+            int code_range_map_len = strtol(last_token->token.data(), NULL, 10);
             if (cmap->code_range_map == NULL)
             {
                 cmap->code_range_map = (pdf_code_range_map_t*)malloc(sizeof(pdf_code_range_map_t) * code_range_map_len);
@@ -1265,9 +1228,9 @@ pdf_cmap_t* pdf_parser_build_cmap(pdf_parser_t* parser)
                 pdf_code_range_map_t* code_range_map = cmap->code_range_map + i + cmap->code_range_map_len;
                 pdf_parser_token_t* tk1 = pdf_parser_next_token(parser);
                 pdf_parser_token_t* tk2 = pdf_parser_next_token(parser);
-                code_range_map->srcStart = _hex_str_to_32bit(tk1->token + 1, tk1->token_len - 1);
-                code_range_map->srcEnd = _hex_str_to_32bit(tk2->token + 1, tk2->token_len - 1);
-                code_range_map->byte_len = (tk1->token_len - 1) / 2;
+                code_range_map->srcStart = _hex_str_to_32bit(tk1->token.data() + 1, tk1->token.size() - 1);
+                code_range_map->srcEnd = _hex_str_to_32bit(tk2->token.data() + 1, tk2->token.size() - 1);
+                code_range_map->byte_len = (tk1->token.size() - 1) / 2;
                 pdf_parser_token_free(parser, tk1);
                 pdf_parser_token_free(parser, tk2);
             }
@@ -1287,63 +1250,63 @@ bool _set_common_value(pdf_parser_t* parser, pdf_parser_token_t* tk, struct pdf_
 {
     if (tk->type == TOKEN_NULL)
     {
-        p->type = NUL;
+        p->type = PDF_VALUE_NULL;
     }
     else if (tk->type == TOKEN_ARRAY_BEG)
     {
         pdf_array_t* arr = pdf_parser_build_array(parser);
         if (arr == NULL) return false;
-        p->type = ARRAY;
+        p->type = PDF_VALUE_ARRAY;
         p->val.array = arr;
     }
     else if (tk->type == TOKEN_DICT_BEG)
     {
         pdf_dict_t* dict = pdf_parser_build_dict(parser);
         if (dict == NULL) return false;
-        p->type = DICT;
+        p->type = PDF_VALUE_DICT;
         p->val.dict = dict;
     }
     else if (tk->type == TOKEN_BOOLEAN_TRUE)
     {
-        p->type = BOOLEAN;
+        p->type = PDF_VALUE_BOOLEAN;
         p->val.boolean = true;
     }
     else if (tk->type == TOKEN_BOOLEAN_FALSE)
     {
-        p->type = BOOLEAN;
+        p->type = PDF_VALUE_BOOLEAN;
         p->val.boolean = false;
     }
     else if (tk->type == TOKEN_NAME)
     {
-        if (tk->token == NULL) return false;
-        p->type = NAME;
-        p->value_len = tk->token_len;
+        if (tk->token.empty()) return false;
+        p->type = PDF_VALUE_NAME;
+        p->value_len = tk->token.size();
         p->val.name = (char*)malloc(p->value_len + 1);
-        memcpy(p->val.name, tk->token, p->value_len);
+        memcpy(p->val.name, tk->token.data(), p->value_len);
         p->val.name[p->value_len] = '\0';
     }
     else if (tk->type == TOKEN_INDIRECT)
     {
-        if (tk->token == NULL) return false;
-        p->type = INDIRECT;
+        if (tk->token.empty()) return false;
+        p->type = PDF_VALUE_INDIRECT;
         char ref[256] = { 0 };
-        memcpy(ref, tk->token, tk->token_len);
+        memcpy(ref, tk->token.data(), tk->token.size());
         char* token = strtok(ref, " ");
         p->val.indirect = atoi(token);
     }
     else if (tk->type == TOKEN_NUMBER)
     {
-        if (tk->token == NULL) return false;
-        p->type = NUMBER;
-        p->val.number = strtod(tk->token, NULL);
+        if (tk->token.empty()) return false;
+        p->type = PDF_VALUE_NUMBER;
+        p->val.number = strtod(tk->token.data(), NULL);
     }
     else if (tk->type == TOKEN_STRING || tk->type == TOKEN_HEX_STRING)
     {
-        if (tk->token == NULL) return false;
-        p->type = STRING;
-        p->value_len = tk->token_len;
+        if (tk->token.empty()) return false;
+        p->type = PDF_VALUE_STRING;
+        p->value_len = tk->token.size();
         p->val.string = (char*)malloc(p->value_len + 1);
-        memcpy(p->val.string, tk->token, p->value_len);
+        memcpy(p->val.string, tk->token.data(), p->value_len);
         p->val.string[p->value_len] = '\0';
     }
     return true;
@@ -1386,7 +1349,7 @@ pdf_obj_t* pdf_parser_build_obj(pdf_parser_t* parser)
                 if (ref != -1)
                 {
                     pdf_obj_t* l_obj = pdf_file_get_obj(parser->pdf, ref);
-                    if (l_obj != NULL && l_obj->value->type == NUMBER)
+                    if (l_obj != NULL && l_obj->value->type == PDF_VALUE_NUMBER)
                     {
                         len = l_obj->value->val.number;
                         input_seek(parser->input, offset, SEEK_SET);
@@ -1446,7 +1409,7 @@ pdf_dict_t* pdf_parser_build_dict(pdf_parser_t* parser)
             pdf_parser_token_free(parser, tk);
             break;
         }
-        else if (tk->token == NULL)
+        else if (tk->token.empty())
         {
             pdf_parser_token_free(parser, tk);
             pdf_dict_free(dict);
@@ -1460,9 +1423,9 @@ pdf_dict_t* pdf_parser_build_dict(pdf_parser_t* parser)
             return NULL;
         }
         pdf_dict_pair_t* p = (pdf_dict_pair_t*)malloc(sizeof(pdf_dict_pair_t));
-        p->name_len = tk->token_len;
+        p->name_len = tk->token.size();
         p->name = (char*)malloc(p->name_len + 1);
-        memcpy(p->name, tk->token, p->name_len);
+        memcpy(p->name, tk->token.data(), p->name_len);
         p->name[p->name_len] = '\0';
         p->value = (pdf_dict_pair_value_t*)malloc(sizeof(pdf_dict_pair_value_t));
         if (!_set_common_value(parser, tk1, p->value))
@@ -1478,7 +1441,7 @@ pdf_dict_t* pdf_parser_build_dict(pdf_parser_t* parser)
 
         pdf_parser_token_free(parser, tk);
         pdf_parser_token_free(parser, tk1);
-        cvector_push_back(dict->pairs, p);
+        dict->pairs.push_back(p);
     }
 
     return dict;

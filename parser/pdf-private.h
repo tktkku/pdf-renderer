@@ -4,35 +4,36 @@
 #include <stdint.h>
 #include <stdio.h>
 #include "zlib.h"
-
+#include <string>
+#include <vector>
+#include <map>
 #define ARRAY_COUNT(a) (sizeof(a) / sizeof(a[0]))
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
-typedef enum pdf_parser_token_type
+typedef enum pdf_token_type
 {
 #define TOKEN_DEF(v, t) t,
 #include "pdf-token.def"
-} pdf_parser_token_type_t;
+} pdf_token_type_t;
 
 struct pdf_parser_token
 {
-    pdf_parser_token_type_t type;
-    char* token;
-    int token_len;
+    pdf_token_type_t type;
+    std::vector<char> token;
     int steps;
     struct pdf_parser_token* next;
 };
 
 typedef enum pdf_value_type
 {
-    NUL,
-    BOOLEAN,
-    NAME,
-    INDIRECT,
-    NUMBER,
-    ARRAY,
-    DICT,
-    STRING
+    PDF_VALUE_NULL,
+    PDF_VALUE_BOOLEAN,
+    PDF_VALUE_NAME,
+    PDF_VALUE_INDIRECT,
+    PDF_VALUE_NUMBER,
+    PDF_VALUE_ARRAY,
+    PDF_VALUE_DICT,
+    PDF_VALUE_STRING
 } pdf_value_type_t;
 
 struct pdf_value
@@ -83,7 +84,7 @@ struct pdf_dict_pair
 
 struct pdf_dict
 {
-    cvector_vector_type(pdf_dict_pair_t*) pairs;
+    std::vector<pdf_dict_pair_t*> pairs;
 };
 
 struct pdf_array
@@ -195,21 +196,15 @@ struct pdf_file
     input_t* input;
     long data_len;
     long current_index;
-    //int num_read_objs;
-    // pdf_obj_t** read_objs;
-    cvector_vector_type(pdf_obj_t*) read_objs;
+    std::vector<pdf_obj_t*> read_objs;
     int root_obj_ref;
     int info_obj_ref;
-    // xref_table_t* xref_table;
-    cvector_vector_type(xref_t*) xref_table;
-    //pdf_obj_t** pages;
-    //int num_pages;
-    cvector_vector_type(pdf_obj_t*) pages;
+    std::vector<xref_t*> xref_table;
+    std::vector<pdf_obj_t*> pages;
 
     pdf_cmap_t* cmaps;
     int num_cmaps;
-    //pdf_parser_token_t* freed_tokens;
-    cvector_vector_type(pdf_external_font_t*) external_fonts;
+    std::vector<pdf_external_font_t*> external_fonts;
 };
 
 // struct pdf_resources
@@ -511,7 +506,7 @@ uint32_t _str_to_32bit(char* str, int len);
 uint32_t _hex_str_to_32bit(char* hexStr, int len);
 uint16_t _hex_str_to_16bit(char hexStr[4]);
 uint8_t _hex_str_to_8bit(char hexStr[2]);
-const char* _token_to_string(pdf_parser_token_type_t type);
+const char* _token_to_string(pdf_token_type_t type);
 struct pdf_node
 {
     void* data;
@@ -544,7 +539,7 @@ int input_stream(input_t** input, pdf_stream_t* stream);
 pdf_parser_t* pdf_parser_init(pdf_file_t* pdf, input_t* input);
 void pdf_parser_free(pdf_parser_t* parser);
 size_t pdf_parser_read_data(pdf_parser_t* parser, void* ptr, size_t size);
-pdf_parser_token_t* pdf_parser_token_init(pdf_parser_t* parser, const unsigned char* start, pdf_parser_token_type_t type, int len);
+pdf_parser_token_t* pdf_parser_token_init(pdf_parser_t* parser, const unsigned char* start, pdf_token_type_t type, int len);
 const char* pdf_parser_token_get_token(pdf_parser_token_t* token);
 void pdf_parser_token_free(pdf_parser_t* parser, pdf_parser_token_t* token);
 pdf_parser_token_t* pdf_parser_next_token(pdf_parser_t* parser);

@@ -5,22 +5,22 @@ void pdf_value_free(struct pdf_value* value)
 {
     if (value == NULL) return;
     enum pdf_value_type type = value->type;
-    if (type == NAME)
+    if (type == PDF_VALUE_NAME)
     {
         free(value->val.name);
         value->val.name = NULL;
     }
-    else if (type == STRING)
+    else if (type == PDF_VALUE_STRING)
     {
         free(value->val.string);
         value->val.string = NULL;
     }
-    else if (type == DICT)
+    else if (type == PDF_VALUE_DICT)
     {
         pdf_dict_free(value->val.dict);
         value->val.dict = NULL;
     }
-    else if (type == ARRAY)
+    else if (type == PDF_VALUE_ARRAY)
     {
         pdf_array_free(value->val.array);
         value->val.array = NULL;

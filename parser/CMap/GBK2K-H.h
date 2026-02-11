@@ -5295,16 +5295,16 @@ static pdf_char_range_map_t char_range_map_GBK2K_H[] = {
 };
 
 pdf_cmap_t cmap_GBK2K_H = {
-    .name = "GBK2K-H",
-    .worldwide = true,
-    .unicode_map_len = 3000,
-    .unicode_map = unicode_map_GBK2K_H,
-    .char_range_map_len = 2278,
-    .char_range_map = char_range_map_GBK2K_H,
-    .not_def_range_len = 1,
-    .not_def_range = not_def_range_GBK2K_H,
-    .code_range_map_len = 3,
-    .code_range_map = code_range_map_GBK2K_H,
-    .next = NULL
+    "GBK2K-H",    //name
+    true,        //worldwide
+    3000,      //unicode_map_len
+    unicode_map_GBK2K_H,      //unicode_map
+    2278,   //char_range_map_len
+    char_range_map_GBK2K_H,   //char_range_map
+    1,       //not_def_range_len
+    not_def_range_GBK2K_H,       //not_def_range
+    3,    //code_range_map_len
+    code_range_map_GBK2K_H,    //code_range_map
+     NULL//next
 };
 

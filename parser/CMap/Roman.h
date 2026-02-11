@@ -9,16 +9,16 @@ static pdf_char_range_map_t char_range_map_ROMAN[] = {
 };
 
 pdf_cmap_t cmap_ROMAN = {
-    .name = "Roman",
-    .worldwide = true,
-    .unicode_map_len = 0,
-    .unicode_map = NULL,
-    .char_range_map_len = 1,
-    .char_range_map = char_range_map_ROMAN,
-    .not_def_range_len = 0,
-    .not_def_range = NULL,
-    .code_range_map_len = 1,
-    .code_range_map = code_range_map_ROMAN,
-    .next = NULL
+    "Roman",    //name
+    true,        //worldwide
+    0,      //unicode_map_len
+    NULL,      //unicode_map
+    1,   //char_range_map_len
+    char_range_map_ROMAN,   //char_range_map
+    0,       //not_def_range_len
+    NULL,       //not_def_range
+    1,    //code_range_map_len
+    code_range_map_ROMAN,    //code_range_map
+     NULL//next
 };
 

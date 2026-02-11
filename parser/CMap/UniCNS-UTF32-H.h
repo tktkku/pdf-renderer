@@ -18524,16 +18524,16 @@ static pdf_char_range_map_t char_range_map_UNICNS_UTF32_H[] = {
 };
 
 pdf_cmap_t cmap_UNICNS_UTF32_H = {
-    .name = "UniCNS-UTF32-H",
-    .worldwide = true,
-    .unicode_map_len = 17423,
-    .unicode_map = unicode_map_UNICNS_UTF32_H,
-    .char_range_map_len = 1086,
-    .char_range_map = char_range_map_UNICNS_UTF32_H,
-    .not_def_range_len = 1,
-    .not_def_range = not_def_range_UNICNS_UTF32_H,
-    .code_range_map_len = 1,
-    .code_range_map = code_range_map_UNICNS_UTF32_H,
-    .next = NULL
+    "UniCNS-UTF32-H",    //name
+    true,        //worldwide
+    17423,      //unicode_map_len
+    unicode_map_UNICNS_UTF32_H,      //unicode_map
+    1086,   //char_range_map_len
+    char_range_map_UNICNS_UTF32_H,   //char_range_map
+    1,       //not_def_range_len
+    not_def_range_UNICNS_UTF32_H,       //not_def_range
+    1,    //code_range_map_len
+    code_range_map_UNICNS_UTF32_H,    //code_range_map
+     NULL//next
 };
 

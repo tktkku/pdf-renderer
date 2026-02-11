@@ -73,7 +73,6 @@ pdf_render_t* pdf_render_init_with_size(pdf_page_t* page, int width, int height,
     r->deque = deque;
     _init_state(r);
     
-    r->fontcache = NULL;
     r->surface = surface;
     return r;
 }
@@ -166,7 +165,6 @@ pdf_render_t* pdf_render_init_for_paper(pdf_page_t* page,
     r->canvas = canvas;
     r->surface = surface;
     _init_state(r);
-    r->fontcache = NULL;
 
     return r;
 }
@@ -174,7 +172,7 @@ void pdf_render_free(pdf_render_t* context)
 {
     if (context == NULL) return;
     pdf_deque_free(context->deque);
-    for (int i = 0; i < cvector_size(context->fontcache); i++)
+    for (int i = 0; i < context->fontcache.size(); i++)
     {
         pdf_font_cache_t* fontcache = context->fontcache[i];
         if (fontcache->font != NULL)
@@ -187,7 +185,7 @@ void pdf_render_free(pdf_render_t* context)
         }
         free(fontcache);
     }
-    cvector_free(context->fontcache);
+    context->fontcache.clear();
     free(context->state);
     plutovg_canvas_destroy(context->canvas);
     plutovg_surface_destroy(context->surface);
@@ -237,12 +235,12 @@ void pdf_render_do(pdf_render_t* context)
         pdf_stream_t* stream = pdf_page_get_stream(context->page, j);
         if (stream == NULL)
         {
-            if (context->page->contents[j]->value->type == ARRAY)
+            if (context->page->contents[j]->value->type == PDF_VALUE_ARRAY)
             {
                 pdf_array_t* arr = context->page->contents[j]->value->val.array;
                 for (int i = 0; i < arr->num_elements; i++)
                 {
-                    if (arr->values[i]->type == INDIRECT)
+                    if (arr->values[i]->type == PDF_VALUE_INDIRECT)
                     {
                         pdf_obj_t* obj = pdf_file_get_obj(context->pdf, arr->values[i]->val.indirect);
                         if (obj != NULL && obj->stream != NULL)
@@ -252,7 +250,7 @@ void pdf_render_do(pdf_render_t* context)
                     }
                 }
             }
-            else if (context->page->contents[j]->value->type == INDIRECT)
+            else if (context->page->contents[j]->value->type == PDF_VALUE_INDIRECT)
             {
                 pdf_obj_t* obj = pdf_file_get_obj(context->pdf, context->page->contents[j]->value->val.indirect);
                 if (obj != NULL && obj->stream != NULL)
@@ -356,11 +354,11 @@ void _do_render_operation(pdf_stream_t* stream, pdf_render_t* context, pdf_parse
     //     }
     // }
 
-    if (tk->type < TOKEN_OPERATOR && tk->token != NULL)
+    if (tk->type < TOKEN_OPERATOR && !tk->token.empty())
     {
         // did not match any operation
         // push data to deque
-        pdf_deque_push(context->deque, tk->token, tk->token_len);
+        pdf_deque_push(context->deque, tk->token.data(), tk->token.size());
     }
     else if (tk->type > TOKEN_OPERATOR && tk->type <= TOKEN_OPERATOR_y)
     {
@@ -401,41 +399,41 @@ void _do_render_operation(pdf_stream_t* stream, pdf_render_t* context, pdf_parse
                         pdf_parser_token_t* t1 = pdf_stream_get_next_token(stream);
                         if (t1 != NULL)
                         {
-                            if (!strcmp(t->token, "/W"))
+                            if (!strcmp(t->token.data(), "/W"))
                             {
-                                width = atoi(t1->token);
+                                width = atoi(t1->token.data());
                             }
-                            else if (!strcmp(t->token, "/H"))
+                            else if (!strcmp(t->token.data(), "/H"))
                             {
-                                height = atoi(t1->token);
+                                height = atoi(t1->token.data());
                             }
-                            else if (!strcmp(t->token, "/BPC"))
+                            else if (!strcmp(t->token.data(), "/BPC"))
                             {
-                                bitsPerColor = atoi(t1->token);
+                                bitsPerColor = atoi(t1->token.data());
                             }
-                            else if (!strcmp(t->token, "/CS"))
+                            else if (!strcmp(t->token.data(), "/CS"))
                             {
-                                if (!strcmp(t1->token, "/RGB"))
+                                if (!strcmp(t1->token.data(), "/RGB"))
                                 {
                                     channels = 3;
                                 }
-                                else if (!strcmp(t1->token, "/Gray"))
+                                else if (!strcmp(t1->token.data(), "/Gray"))
                                 {
                                     channels = 1;
                                 }
                             }
-                            else if (!strcmp(t->token, "/F"))
+                            else if (!strcmp(t->token.data(), "/F"))
                             {
                                 if (t1->type == TOKEN_NAME)
                                 {
-                                    strcpy(filter, t1->token);
+                                    strcpy(filter, t1->token.data());
                                 }
                                 else if (t1->type == TOKEN_ARRAY_BEG)
                                 {
                                     pdf_parser_token_t* t2 = pdf_stream_get_next_token(stream);
                                     if (t2 != NULL && t2->type == TOKEN_NAME)
                                     {
-                                        strcpy(filter, t2->token);
+                                        strcpy(filter, t2->token.data());
                                     }
                                     pdf_parser_token_free(stream->parser, t2);
                                     pdf_parser_token_t* t3 = pdf_stream_get_next_token(stream);
@@ -540,20 +538,20 @@ void _do_render_operation(pdf_stream_t* stream, pdf_render_t* context, pdf_parse
                             off += real_line_bytes;
                         }
                         free(buffer);
-                        buffer = tmp;
+                        buffer = (char*)tmp;
                         size = off;
                     }
                     else
                     {
                         unsigned char* tmp =
-                            (unsigned char*)malloc(buffer + header_len);
+                            (unsigned char*)malloc(size + header_len);
                         int off = 0;
                         memcpy(tmp, header, header_len);
                         off += header_len;
                         memcpy(tmp + off, buffer, size);
                         off += size;
                         free(buffer);
-                        buffer = tmp;
+                        buffer = (char*)tmp;
                         size = off;
                     }
 
@@ -677,11 +675,11 @@ void handle_d(pdf_render_t* context)
     while (true)
     {
         pdf_deque_pop_front(context->deque, &node);
-        if (!strcmp(node.data, "]"))
+        if (!strcmp((char*)node.data, "]"))
         {
             // ignore
         }
-        else if (!strcmp(node.data, "["))
+        else if (!strcmp((char*)node.data, "["))
         {
             break;
         }
@@ -790,7 +788,7 @@ void handle_j(pdf_render_t* context)
     pdf_deque_pop_front(context->deque, &node);
     int j = atoi(buf);
 
-    plutovg_canvas_set_line_join(context->canvas, j);
+    plutovg_canvas_set_line_join(context->canvas, (plutovg_line_join_t)j);
     context->state->lineJoin = j;
 }
 
@@ -804,7 +802,7 @@ void handle_J(pdf_render_t* context)
     pdf_deque_pop_front(context->deque, &node);
     int c = atoi(buf);
 
-    plutovg_canvas_set_line_cap(context->canvas, c);
+    plutovg_canvas_set_line_cap(context->canvas, (plutovg_line_cap_t)c);
     context->state->lineCap = c;
 }
 

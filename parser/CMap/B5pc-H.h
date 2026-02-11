@@ -261,16 +261,16 @@ static pdf_char_range_map_t char_range_map_B5PC_H[] = {
 };
 
 pdf_cmap_t cmap_B5PC_H = {
-    .name = "B5pc-H",
-    .worldwide = true,
-    .unicode_map_len = 0,
-    .unicode_map = NULL,
-    .char_range_map_len = 247,
-    .char_range_map = char_range_map_B5PC_H,
-    .not_def_range_len = 1,
-    .not_def_range = not_def_range_B5PC_H,
-    .code_range_map_len = 3,
-    .code_range_map = code_range_map_B5PC_H,
-    .next = NULL
+    "B5pc-H",    //name
+    true,        //worldwide
+    0,      //unicode_map_len
+    NULL,      //unicode_map
+    247,   //char_range_map_len
+    char_range_map_B5PC_H,   //char_range_map
+    1,       //not_def_range_len
+    not_def_range_B5PC_H,       //not_def_range
+    3,    //code_range_map_len
+    code_range_map_B5PC_H,    //code_range_map
+     NULL//next
 };
 

@@ -24,7 +24,6 @@ else()
 endif()
 set(BUILD_SHARED_LIBS OFF)
 
-add_subdirectory(c-vector)
 add_subdirectory(plutovg)
 add_subdirectory(zlib)
 add_subdirectory(parser)

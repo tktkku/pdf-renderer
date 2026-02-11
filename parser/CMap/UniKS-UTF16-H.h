@@ -8573,16 +8573,16 @@ static pdf_char_range_map_t char_range_map_UNIKS_UTF16_H[] = {
 };
 
 pdf_cmap_t cmap_UNIKS_UTF16_H = {
-    .name = "UniKS-UTF16-H",
-    .worldwide = true,
-    .unicode_map_len = 6586,
-    .unicode_map = unicode_map_UNIKS_UTF16_H,
-    .char_range_map_len = 1970,
-    .char_range_map = char_range_map_UNIKS_UTF16_H,
-    .not_def_range_len = 1,
-    .not_def_range = not_def_range_UNIKS_UTF16_H,
-    .code_range_map_len = 3,
-    .code_range_map = code_range_map_UNIKS_UTF16_H,
-    .next = NULL
+    "UniKS-UTF16-H",    //name
+    true,        //worldwide
+    6586,      //unicode_map_len
+    unicode_map_UNIKS_UTF16_H,      //unicode_map
+    1970,   //char_range_map_len
+    char_range_map_UNIKS_UTF16_H,   //char_range_map
+    1,       //not_def_range_len
+    not_def_range_UNIKS_UTF16_H,       //not_def_range
+    3,    //code_range_map_len
+    code_range_map_UNIKS_UTF16_H,    //code_range_map
+     NULL//next
 };
 

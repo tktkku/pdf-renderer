@@ -12,16 +12,16 @@ static pdf_char_range_map_t char_range_map_UNIMANGA_UTF32_V[] = {
 };
 
 pdf_cmap_t cmap_UNIMANGA_UTF32_V = {
-    .name = "UniManga-UTF32-V",
-    .worldwide = true,
-    .unicode_map_len = 1,
-    .unicode_map = unicode_map_UNIMANGA_UTF32_V,
-    .char_range_map_len = 4,
-    .char_range_map = char_range_map_UNIMANGA_UTF32_V,
-    .not_def_range_len = 0,
-    .not_def_range = NULL,
-    .code_range_map_len = 0,
-    .code_range_map = NULL,
-    .next = NULL
+    "UniManga-UTF32-V",    //name
+    true,        //worldwide
+    1,      //unicode_map_len
+    unicode_map_UNIMANGA_UTF32_V,      //unicode_map
+    4,   //char_range_map_len
+    char_range_map_UNIMANGA_UTF32_V,   //char_range_map
+    0,       //not_def_range_len
+    NULL,       //not_def_range
+    0,    //code_range_map_len
+    NULL,    //code_range_map
+     NULL//next
 };
 

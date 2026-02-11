@@ -267,16 +267,16 @@ static pdf_char_range_map_t char_range_map_ETEN_B5_H[] = {
 };
 
 pdf_cmap_t cmap_ETEN_B5_H = {
-    .name = "ETen-B5-H",
-    .worldwide = true,
-    .unicode_map_len = 0,
-    .unicode_map = NULL,
-    .char_range_map_len = 254,
-    .char_range_map = char_range_map_ETEN_B5_H,
-    .not_def_range_len = 1,
-    .not_def_range = not_def_range_ETEN_B5_H,
-    .code_range_map_len = 2,
-    .code_range_map = code_range_map_ETEN_B5_H,
-    .next = NULL
+    "ETen-B5-H",    //name
+    true,        //worldwide
+    0,      //unicode_map_len
+    NULL,      //unicode_map
+    254,   //char_range_map_len
+    char_range_map_ETEN_B5_H,   //char_range_map
+    1,       //not_def_range_len
+    not_def_range_ETEN_B5_H,       //not_def_range
+    2,    //code_range_map_len
+    code_range_map_ETEN_B5_H,    //code_range_map
+     NULL//next
 };
 

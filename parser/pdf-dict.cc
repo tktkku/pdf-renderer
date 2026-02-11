@@ -4,10 +4,9 @@
 
 pdf_dict_t* pdf_dict_init()
 {
-    pdf_dict_t* dict = (pdf_dict_t*)malloc(sizeof(pdf_dict_t));
+    pdf_dict_t* dict = new pdf_dict_t;
     if (dict == NULL) 
         return NULL;
-    dict->pairs = NULL;
     return dict;
 }
 void pdf_dict_free(pdf_dict_t* dict)
@@ -16,7 +15,7 @@ void pdf_dict_free(pdf_dict_t* dict)
     {
         return;
     }
-    int nums = cvector_size(dict->pairs);
+    int nums = dict->pairs.size();
     for (int i = 0; i < nums; i++)
     {
         if (dict->pairs[i]->name)
@@ -29,21 +28,20 @@ void pdf_dict_free(pdf_dict_t* dict)
         free(dict->pairs[i]);
         //dict->pairs[i] = NULL;
     }
-    cvector_free(dict->pairs);
-    dict->pairs = NULL;
-    free(dict);
+    dict->pairs.clear();
+    delete dict;
     dict = NULL;
 }
 
 double pdf_dict_get_number(pdf_dict_t* dict, const char* name)
 {
     if (dict == NULL || name == NULL) return 0.0;
-    int nums = cvector_size(dict->pairs);
+    int nums = dict->pairs.size();
     for (int i = 0; i < nums; i++)
     {
         if (strcmp(dict->pairs[i]->name, name) == 0)
         {
-            if (dict->pairs[i]->value->type == NUMBER)
+            if (dict->pairs[i]->value->type == PDF_VALUE_NUMBER)
             {
                 return dict->pairs[i]->value->val.number;
             }
@@ -57,13 +55,13 @@ int pdf_dict_get_ref(pdf_dict_t* dict, const char* name)
 {
     if (dict == NULL || name == NULL) return -1;
 
-    if (dict->pairs == NULL) return -1;
-    int nums = cvector_size(dict->pairs);
+    if (dict->pairs.empty()) return -1;
+    int nums = dict->pairs.size();
     for (int i = 0; i < nums; i++)
     {
         if (strcmp(dict->pairs[i]->name, name) == 0)
         {
-            if (dict->pairs[i]->value->type == INDIRECT)
+            if (dict->pairs[i]->value->type == PDF_VALUE_INDIRECT)
             {
                 return dict->pairs[i]->value->val.indirect;
             }
@@ -76,12 +74,12 @@ int pdf_dict_get_ref(pdf_dict_t* dict, const char* name)
 pdf_array_t* pdf_dict_get_array(pdf_dict_t* dict, const char* name)
 {
     if (dict == NULL || name == NULL) return 0;
-    int nums = cvector_size(dict->pairs);
+    int nums = dict->pairs.size();
     for (int i = 0; i < nums; i++)
     {
         if (strcmp(dict->pairs[i]->name, name) == 0)
         {
-            if (dict->pairs[i]->value->type == ARRAY)
+            if (dict->pairs[i]->value->type == PDF_VALUE_ARRAY)
             {
                 return dict->pairs[i]->value->val.array;
             }
@@ -94,12 +92,12 @@ pdf_array_t* pdf_dict_get_array(pdf_dict_t* dict, const char* name)
 pdf_dict_t* pdf_dict_get_dict(pdf_dict_t* dict, const char* name)
 {
     if (dict == NULL || name == NULL) return NULL;
-    int nums = cvector_size(dict->pairs);
+    int nums = dict->pairs.size();
     for (int i = 0; i < nums; i++)
     {
         if (strcmp(dict->pairs[i]->name, name) == 0)
         {
-            if (dict->pairs[i]->value->type == DICT)
+            if (dict->pairs[i]->value->type == PDF_VALUE_DICT)
             {
                 return dict->pairs[i]->value->val.dict;
             }
@@ -112,12 +110,12 @@ pdf_dict_t* pdf_dict_get_dict(pdf_dict_t* dict, const char* name)
 char* pdf_dict_get_name(pdf_dict_t* dict, const char* name)
 {
     if (dict == NULL || name == NULL) return NULL;
-    int nums = cvector_size(dict->pairs);
+    int nums = dict->pairs.size();
     for (int i = 0; i < nums; i++)
     {
         if (strcmp(dict->pairs[i]->name, name) == 0)
         {
-            if (dict->pairs[i]->value->type == NAME)
+            if (dict->pairs[i]->value->type == PDF_VALUE_NAME)
             {
                 return dict->pairs[i]->value->val.name;
             }
@@ -130,12 +128,12 @@ char* pdf_dict_get_name(pdf_dict_t* dict, const char* name)
 char* pdf_dict_get_string(pdf_dict_t* dict, const char* name)
 {
     if (dict == NULL || name == NULL) return NULL;
-    int nums = cvector_size(dict->pairs);
+    int nums = dict->pairs.size();
     for (int i = 0; i < nums; i++)
     {
         if (strcmp(dict->pairs[i]->name, name) == 0)
         {
-            if (dict->pairs[i]->value->type == STRING)
+            if (dict->pairs[i]->value->type == PDF_VALUE_STRING)
             {
                 return dict->pairs[i]->value->val.string;
             }
@@ -148,12 +146,12 @@ char* pdf_dict_get_string(pdf_dict_t* dict, const char* name)
 int pdf_dict_get_bool(pdf_dict_t* dict, const char* name)
 {
     if (dict == NULL || name == NULL) return -1;
-    int nums = cvector_size(dict->pairs);
+    int nums = dict->pairs.size();
     for (int i = 0; i < nums; i++)
     {
         if (strcmp(dict->pairs[i]->name, name) == 0)
         {
-            if (dict->pairs[i]->value->type == BOOLEAN)
+            if (dict->pairs[i]->value->type == PDF_VALUE_BOOLEAN)
             {
                 return dict->pairs[i]->value->val.boolean;
             }
@@ -174,10 +172,10 @@ bool pdf_dict_add_array(pdf_dict_t* dict, const char* name, pdf_array_t* array)
     p->name[len] = '\0';
     p->name_len = len;
     p->value = (pdf_dict_pair_value_t*)malloc(sizeof(pdf_dict_pair_value_t));
-    p->value->type = ARRAY;
+    p->value->type = PDF_VALUE_ARRAY;
     p->value->val.array = array;
 
-    cvector_push_back(dict->pairs, p);
+    dict->pairs.push_back(p);
     return true;
 }
 bool pdf_dict_add_value(pdf_dict_t* dict, const char* name, pdf_value_t* value)
@@ -190,7 +188,7 @@ bool pdf_dict_add_value(pdf_dict_t* dict, const char* name, pdf_value_t* value)
     p->name[len] = '\0';
     p->name_len = len;
     p->value = value;
-    cvector_push_back(dict->pairs, p);
+    dict->pairs.push_back(p);
     return true;
 }
 
@@ -208,10 +206,10 @@ bool pdf_dict_add(pdf_dict_t* dict, const char* name, pdf_value_type_t type, voi
     p->value->type = type;
     switch (type)
     {
-        case BOOLEAN:
+        case PDF_VALUE_BOOLEAN:
             p->value->val.boolean = *((bool*)data);
             break;
-        case NAME:
+        case PDF_VALUE_NAME:
             {
                 len = strlen((char*)data);
                 p->value->val.name = (char*)malloc(len + 1);
@@ -219,19 +217,19 @@ bool pdf_dict_add(pdf_dict_t* dict, const char* name, pdf_value_type_t type, voi
                 p->value->val.name[len] = '\0';
             }
             break;
-        case INDIRECT:
+        case PDF_VALUE_INDIRECT:
             p->value->val.indirect = *((int*)data);
             break;
-        case NUMBER:
+        case PDF_VALUE_NUMBER:
             p->value->val.number = *((double*)data);
             break;
-        case ARRAY:
+        case PDF_VALUE_ARRAY:
             p->value->val.array = (pdf_array_t*)data;
             break;
-        case DICT:
+        case PDF_VALUE_DICT:
             p->value->val.dict = (pdf_dict_t*)data;
             break;
-        case STRING:
+        case PDF_VALUE_STRING:
             {
                 len = strlen((char*)data);
                 p->value->val.string = (char*)malloc(len + 1);
@@ -248,6 +246,6 @@ bool pdf_dict_add(pdf_dict_t* dict, const char* name, pdf_value_type_t type, voi
         }
     }
     
-    cvector_push_back(dict->pairs, p);
+    dict->pairs.push_back(p);
     return true;
 }

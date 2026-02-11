@@ -31,16 +31,16 @@ static pdf_char_range_map_t char_range_map_78_V[] = {
 };
 
 pdf_cmap_t cmap_78_V = {
-    .name = "78-V",
-    .worldwide = true,
-    .unicode_map_len = 0,
-    .unicode_map = NULL,
-    .char_range_map_len = 27,
-    .char_range_map = char_range_map_78_V,
-    .not_def_range_len = 0,
-    .not_def_range = NULL,
-    .code_range_map_len = 0,
-    .code_range_map = NULL,
-    .next = NULL
+    "78-V",    //name
+    true,        //worldwide
+    0,      //unicode_map_len
+    NULL,      //unicode_map
+    27,   //char_range_map_len
+    char_range_map_78_V,   //char_range_map
+    0,       //not_def_range_len
+    NULL,       //not_def_range
+    0,    //code_range_map_len
+    NULL,    //code_range_map
+     NULL//next
 };
 

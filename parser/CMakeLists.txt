@@ -1,19 +1,19 @@
-project(pdf-parser LANGUAGES C)
+project(pdf-parser LANGUAGES CXX)
 
 set(PARSER_SOURCES
-    pdf-array.c
-    pdf-common.c
-    pdf-cff.c
-    pdf-cmap.c
-    pdf-deque.c
-    pdf-dict.c
-    pdf-file.c
-    pdf-font.c
-    pdf-obj.c
-    pdf-page.c
-    pdf-parser.c
-    pdf-stream.c
-    pdf-input.c
+    pdf-array.cc
+    pdf-common.cc
+    pdf-cff.cc
+    pdf-cmap.cc
+    pdf-deque.cc
+    pdf-dict.cc
+    pdf-file.cc
+    pdf-font.cc
+    pdf-obj.cc
+    pdf-page.cc
+    pdf-parser.cc
+    pdf-stream.cc
+    pdf-input.cc
     pdf-private.h
     pdf.h
 )

@@ -136,7 +136,7 @@ void handle_Tj(pdf_render_t* context)
     if (context->state->textState.font == NULL)
         return;
 
-    _do_text_render(context, node.data, node.size);
+    _do_text_render(context, (char*)node.data, node.size);
 }
 
 void handle_TJ(pdf_render_t* context)
@@ -176,7 +176,7 @@ void handle_TJ(pdf_render_t* context)
         pdf_deque_pop_front(tmp_deque, &node);
         if (buf[0] == '<' || buf[0] == '(')
         {
-            _do_text_render(context, node.data, node.size);
+            _do_text_render(context, (char*)node.data, node.size);
         }
         else // a number
         {

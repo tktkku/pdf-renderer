@@ -178,7 +178,7 @@ pdf_stream_t* pdf_page_get_stream(pdf_page_t* page, int index)
     pdf_obj_t* obj = page->contents[index];
     if (obj == NULL)
     {
-        return false;
+        return NULL;
     }
 
     return obj->stream;

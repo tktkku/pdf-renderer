@@ -480,16 +480,16 @@ static pdf_char_range_map_t char_range_map_KSC_EUC_H[] = {
 };
 
 pdf_cmap_t cmap_KSC_EUC_H = {
-    .name = "KSC-EUC-H",
-    .worldwide = true,
-    .unicode_map_len = 0,
-    .unicode_map = NULL,
-    .char_range_map_len = 467,
-    .char_range_map = char_range_map_KSC_EUC_H,
-    .not_def_range_len = 1,
-    .not_def_range = not_def_range_KSC_EUC_H,
-    .code_range_map_len = 2,
-    .code_range_map = code_range_map_KSC_EUC_H,
-    .next = NULL
+    "KSC-EUC-H",    //name
+    true,        //worldwide
+    0,      //unicode_map_len
+    NULL,      //unicode_map
+    467,   //char_range_map_len
+    char_range_map_KSC_EUC_H,   //char_range_map
+    1,       //not_def_range_len
+    not_def_range_KSC_EUC_H,       //not_def_range
+    2,    //code_range_map_len
+    code_range_map_KSC_EUC_H,    //code_range_map
+     NULL//next
 };
 

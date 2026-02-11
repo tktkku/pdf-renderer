@@ -12258,16 +12258,16 @@ static pdf_char_range_map_t char_range_map_UNIAKR_UTF8_H[] = {
 };
 
 pdf_cmap_t cmap_UNIAKR_UTF8_H = {
-    .name = "UniAKR-UTF8-H",
-    .worldwide = true,
-    .unicode_map_len = 8290,
-    .unicode_map = unicode_map_UNIAKR_UTF8_H,
-    .char_range_map_len = 3950,
-    .char_range_map = char_range_map_UNIAKR_UTF8_H,
-    .not_def_range_len = 1,
-    .not_def_range = not_def_range_UNIAKR_UTF8_H,
-    .code_range_map_len = 4,
-    .code_range_map = code_range_map_UNIAKR_UTF8_H,
-    .next = NULL
+    "UniAKR-UTF8-H",    //name
+    true,        //worldwide
+    8290,      //unicode_map_len
+    unicode_map_UNIAKR_UTF8_H,      //unicode_map
+    3950,   //char_range_map_len
+    char_range_map_UNIAKR_UTF8_H,   //char_range_map
+    1,       //not_def_range_len
+    not_def_range_UNIAKR_UTF8_H,       //not_def_range
+    4,    //code_range_map_len
+    code_range_map_UNIAKR_UTF8_H,    //code_range_map
+     NULL//next
 };
 

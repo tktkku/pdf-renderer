@@ -14278,16 +14278,16 @@ static pdf_char_range_map_t char_range_map_UNIGB_UTF8_H[] = {
 };
 
 pdf_cmap_t cmap_UNIGB_UTF8_H = {
-    .name = "UniGB-UTF8-H",
-    .worldwide = true,
-    .unicode_map_len = 11010,
-    .unicode_map = unicode_map_UNIGB_UTF8_H,
-    .char_range_map_len = 3250,
-    .char_range_map = char_range_map_UNIGB_UTF8_H,
-    .not_def_range_len = 1,
-    .not_def_range = not_def_range_UNIGB_UTF8_H,
-    .code_range_map_len = 4,
-    .code_range_map = code_range_map_UNIGB_UTF8_H,
-    .next = NULL
+    "UniGB-UTF8-H",    //name
+    true,        //worldwide
+    11010,      //unicode_map_len
+    unicode_map_UNIGB_UTF8_H,      //unicode_map
+    3250,   //char_range_map_len
+    char_range_map_UNIGB_UTF8_H,   //char_range_map
+    1,       //not_def_range_len
+    not_def_range_UNIGB_UTF8_H,       //not_def_range
+    4,    //code_range_map_len
+    code_range_map_UNIGB_UTF8_H,    //code_range_map
+     NULL//next
 };
 

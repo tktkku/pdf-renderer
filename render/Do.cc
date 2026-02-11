@@ -20,7 +20,7 @@ void handle_Do(pdf_render_t* context)
         // tmp_dict = pdf_dict_get_dict(tmp_dict, "/XObject");
         // int ref = pdf_dict_get_ref(tmp_dict, buf);
         // tmp_obj = pdf_file_get_obj(context->page->pdf, ref);
-        xobj = pdf_obj_get_xobject(context->current_obj, buf);
+        xobj = pdf_obj_get_xobject(context->current_obj, (char*)buf);
     }
     else
     {

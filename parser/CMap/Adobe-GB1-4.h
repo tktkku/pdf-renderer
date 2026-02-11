@@ -122,16 +122,16 @@ static pdf_char_range_map_t char_range_map_ADOBE_GB1_4[] = {
 };
 
 pdf_cmap_t cmap_ADOBE_GB1_4 = {
-    .name = "Adobe-GB1-4",
-    .worldwide = true,
-    .unicode_map_len = 0,
-    .unicode_map = NULL,
-    .char_range_map_len = 114,
-    .char_range_map = char_range_map_ADOBE_GB1_4,
-    .not_def_range_len = 0,
-    .not_def_range = NULL,
-    .code_range_map_len = 1,
-    .code_range_map = code_range_map_ADOBE_GB1_4,
-    .next = NULL
+    "Adobe-GB1-4",    //name
+    true,        //worldwide
+    0,      //unicode_map_len
+    NULL,      //unicode_map
+    114,   //char_range_map_len
+    char_range_map_ADOBE_GB1_4,   //char_range_map
+    0,       //not_def_range_len
+    NULL,       //not_def_range
+    1,    //code_range_map_len
+    code_range_map_ADOBE_GB1_4,    //code_range_map
+     NULL//next
 };
 
