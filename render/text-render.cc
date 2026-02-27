@@ -4,31 +4,139 @@
 #include "plutovg-private.h"
 #include <stdint.h>
 #include <wchar.h>
-#include "plutovg-stb-truetype.h"
+#include <iostream>
 #include <assert.h>
+#include "pdf-encoding.h"
+
+uint32_t _convert_unicode_from_latin_encoding(uint16_t code, pdf_latin_encoding_type_t encoding)
+{
+    const pdf_latin_encoding_map_t* map = NULL;
+    switch (encoding)
+    {
+        case PDF_LATIN_ENCODING_STD:
+            map = macRomanEncoding;
+            break;
+        case PDF_LATIN_ENCODING_MAC:
+            map = macRomanEncoding;
+            break;
+        case PDF_LATIN_ENCODING_WIN:
+            map = winAnsiEncoding;
+            break;
+        case PDF_LATIN_ENCODING_PDF:
+            map = pdfDocEncoding;
+            break;
+        default:
+            return 0;
+    }
+    if (map == NULL) return 0;
+    int len = ARRAY_COUNT(map);
+    const char* name = NULL;
+    for (int i = 0; i < len; i++)
+    {
+        if (map[i].code == code)
+        {
+            name = map[i].name;
+            break;
+        }
+    }
+    if (name == NULL) return 0;
+    FILE * f = fopen("agl-aglfn/glyphlist.txt", "r");
+    if (f == NULL) return 0;
+    char line[256] = {0};
+    uint32_t unicode = 0;
+    while (fgets(line, sizeof(line), f))
+    {   
+        if (line[0] == '#' || line[0] == '\n') continue;
+        char* token = strtok(line, ";");
+        if (token != NULL && strcmp(token, name) == 0)
+        {            
+            token = strtok(NULL, ";");
+            if (token != NULL)            {
+                unicode = strtoul(token, NULL, 16);
+                break;
+            }
+        }
+    }
+    fclose(f);
+    return unicode;
+}
 uint32_t _convert_code_from_cmap(pdf_cmap_t* cmap, uint32_t code)
 {
-    bool found = false;
-    while (cmap != NULL && !found)
+    if (cmap != NULL)
     {
-        for (int k = 0; k < cmap->unicode_map_len; k++)
+        for (int k = 0; k < cmap->cid_map.size(); k++)
         {
-            if (code == cmap->unicode_map[k].cid)
+            if (code == cmap->cid_map[k].code)
+            {
+                return cmap->cid_map[k].cid;
+            }
+        }
+ 
+        for (int k = 0; k < cmap->cid_range_map.size(); k++)
+        {
+            if (code >= cmap->cid_range_map[k].srcStart &&
+                code <= cmap->cid_range_map[k].srcEnd)
+            {
+                return cmap->cid_range_map[k].dstStart +
+                    (code - cmap->cid_range_map[k].srcStart);
+            }
+        }
+    }
+    return code;
+}
+std::string codepoint_to_utf8(uint32_t cp)
+{
+    std::string result;
+    if (cp <= 0x7F)
+    {
+        result += static_cast<char>(cp);
+    }
+    else if (cp <= 0x7FF)
+    {
+        result += static_cast<char>(0xC0 | ((cp >> 6) & 0x1F));
+        result += static_cast<char>(0x80 | (cp & 0x3F));
+    }
+    else if (cp <= 0xFFFF)
+    {
+        if (cp >= 0xD800 && cp <= 0xDFFF) return "";
+        result += static_cast<char>(0xE0 | ((cp >> 12) & 0x0F));
+        result += static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
+        result += static_cast<char>(0x80 | (cp & 0x3F));
+    }
+    else if (cp <= 0x10FFFF)
+    {
+        result += static_cast<char>(0xF0 | ((cp >> 18) & 0x07));
+        result += static_cast<char>(0x80 | ((cp >> 12) & 0x3F));
+        result += static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
+        result += static_cast<char>(0x80 | (cp & 0x3F));
+    }
+    else
+    {
+        return "";
+    }
+    return result;
+}
+uint32_t _convert_unicode_from_cmap(pdf_cmap_t* cmap, uint32_t code)
+{
+    if (cmap != NULL)
+    {
+        for (int k = 0; k < cmap->unicode_map.size(); k++)
+        {
+            if (code == cmap->unicode_map[k].code)
             {
                 return cmap->unicode_map[k].unicode;
             }
         }
  
-        for (int k = 0; k < cmap->char_range_map_len && !found; k++)
+        for (int k = 0; k < cmap->unicode_range_map.size(); k++)
         {
-            if (code >= cmap->char_range_map[k].srcStart &&
-                code <= cmap->char_range_map[k].srcEnd)
+            if (code >= cmap->unicode_range_map[k].srcStart &&
+                code <= cmap->unicode_range_map[k].srcEnd)
             {
-                return cmap->char_range_map[k].dstStart +
-                    (code - cmap->char_range_map[k].srcStart);
+                return cmap->unicode_range_map[k].dstStart +
+                    (code - cmap->unicode_range_map[k].srcStart);
             }
         }
-        cmap = cmap->next;
     }
     return code;
 }
@@ -226,33 +334,6 @@ void _cff_do_render_char(pdf_cff_char_render_t* context, pdf_deque_t* deque)
     }
 }
 
-typedef struct {
-    stbtt_vertex* vertices;
-    int nvertices;
-    int index;
-    int advance_width;
-    int left_side_bearing;
-    int x1;
-    int y1;
-    int x2;
-    int y2;
-} glyph_t;
-#define GLYPH_CACHE_SIZE 256
-struct plutovg_font_face {
-    int ref_count;
-    int ascent;
-    int descent;
-    int line_gap;
-    int x1;
-    int y1;
-    int x2;
-    int y2;
-    stbtt_fontinfo info;
-    glyph_t** glyphs[GLYPH_CACHE_SIZE];
-    plutovg_destroy_func_t destroy_func;
-    void* closure;
-};
-
 typedef struct unicode_text
 {
     union {
@@ -261,13 +342,13 @@ typedef struct unicode_text
         uint32_t utf32;
     };
     plutovg_text_encoding_t encoding;
-    bool isCidEqualGid;
+    bool isGid;
 } unicode_text_t;
 
 float plutovg_font_face_traverse_glyph_path1(plutovg_font_face_t* face, 
     float size, 
     float x, float y, 
-    plutovg_codepoint_t codepoint, bool isCidEqualGid,
+    plutovg_codepoint_t codepoint, bool isGid,
     plutovg_path_traverse_func_t traverse_func, void* closure)
 {
     float scale = stbtt_ScaleForMappingEmToPixels(&face->info, size);
@@ -285,7 +366,7 @@ float plutovg_font_face_traverse_glyph_path1(plutovg_font_face_t* face,
     unsigned int lsb = codepoint & 0xFF;
     if(face->glyphs[msb][lsb] == NULL) {
         glyph_t* glyph = (glyph_t*)malloc(sizeof(glyph_t));
-        if (isCidEqualGid) glyph->index = codepoint;
+        if (isGid) glyph->index = codepoint;
         else glyph->index = stbtt_FindGlyphIndex(&face->info, codepoint);
         glyph->nvertices = stbtt_GetGlyphShape(&face->info, glyph->index, &glyph->vertices);
         stbtt_GetGlyphHMetrics(&face->info, glyph->index, &glyph->advance_width, &glyph->left_side_bearing);
@@ -358,7 +439,7 @@ static void glyph_traverse_func(void* closure, plutovg_path_command_t command, c
     }
 }
 
-float plutovg_canvas_add_text1(plutovg_canvas_t* canvas, const void* text, int length, plutovg_text_encoding_t encoding, float x, float y, bool isCidEqualGid)
+float plutovg_canvas_add_text1(plutovg_canvas_t* canvas, const void* text, int length, plutovg_text_encoding_t encoding, float x, float y, bool isGid)
 {
     plutovg_state_t* state = canvas->state;
     if(state->font_face == NULL || state->font_size <= 0.f)
@@ -373,7 +454,7 @@ float plutovg_canvas_add_text1(plutovg_canvas_t* canvas, const void* text, int l
             state->font_size, 
             x + advance_width, y, 
             codepoint,
-            isCidEqualGid, 
+            isGid, 
             glyph_traverse_func, 
             canvas->path);
     }
@@ -386,8 +467,19 @@ void _do_text_render(pdf_render_t* context, char* buf, int len)
     if (context == NULL || context->state->textState.font == NULL || buf == NULL)
     {
         return;
-    } 
-
+    }
+    std::vector<uint8_t> bytes;
+    if (buf[0] == '<')
+    {
+        for (int i = 1; i < len; i += 2)
+        {
+            bytes.push_back(_hex_str_to_8bit(buf + i));
+        }
+    }
+    else
+    {
+        bytes.insert(bytes.end(), (uint8_t*)buf + 1, (uint8_t*)buf + len);
+    }
     plutovg_canvas_save(context->canvas);
     int unicode_cnt = 0;
     unicode_text_t unicode[1024] = { 0 };
@@ -403,37 +495,23 @@ void _do_text_render(pdf_render_t* context, char* buf, int len)
             return;
         }
         pdf_cmap_t* to_unicode_map = type3->to_unicode_map;
-        unsigned char* p = pbuf + 1;
-        unsigned char* end = pbuf + len;
-        if (pbuf[0] == '<')
+        if (to_unicode_map != NULL)
         {
-            if (to_unicode_map != NULL)
-            {
-                while (p < end)
-                {
-                    bool found = false;
-                    for (int blen = 8; blen >= 2; blen /= 2)
-                    {
-                        if (p + blen > end) continue;
-                        uint32_t code = _hex_str_to_32bit((char*)p, blen);
-                        
-                        for (int i = 0; i < to_unicode_map->code_range_map_len; i++)
-                        {
-                            if (to_unicode_map->code_range_map[i].byte_len != (blen / 2)) continue;
-                            if (code >= to_unicode_map->code_range_map[i].srcStart && code <= to_unicode_map->code_range_map[i].srcEnd)
-                            {
-                                uint32_t tmp = _convert_code_from_cmap(to_unicode_map, code);
-                                wchar_t wc = tmp;
-                                printf("code = %d unicdoe = %d (%lc)\n", code, tmp, wc);
-                                p += blen;
-                                found = true;
-                                break;
-                            }
-                        }
-                        if (found) break;
-                    }
-                }
-            }
+            // for (int i = 0; i < bytes.size(); i++)
+            // {
+            //     uint32_t code = bytes[i];
+                
+            //     for (int i = 0; i < to_unicode_map->code_range_map.size(); i++)
+            //     {
+            //         if (code >= to_unicode_map->code_range_map[i].srcStart && code <= to_unicode_map->code_range_map[i].srcEnd)
+            //         {
+            //             uint32_t tmp = _convert_code_from_cmap(to_unicode_map, code);
+            //             wchar_t wc = tmp;
+            //             printf("code = %d unicdoe = %d (%lc)\n", code, tmp, wc);
+            //             break;
+            //         }
+            //     }
+            // }
         }
     }
     else if (font->subtype == FONT_SUBTYPE_TRUETYPE || font->subtype == FONT_SUBTYPE_TYPE1)
@@ -443,50 +521,55 @@ void _do_text_render(pdf_render_t* context, char* buf, int len)
         {
             return;
         }
+        char* encoding = type1_truetype->encoding;
         pdf_cmap_t* to_unicode_map = type1_truetype->to_unicode_map;
-        unsigned char* p = pbuf + 1;
-        unsigned char* end = pbuf + len;
-        if (pbuf[0] == '<')
-        {
-            if (to_unicode_map != NULL)
-            {
-                while (p < end)
-                {
-                    bool found = false;
-                    for (int blen = 8; blen >= 2; blen /= 2)
-                    {
-                        if (p + blen > end) continue;
-                        uint32_t code = _hex_str_to_32bit((char*)p, blen);
-                        
-                        for (int i = 0; i < to_unicode_map->code_range_map_len; i++)
-                        {
-                            if (to_unicode_map->code_range_map[i].byte_len != (blen / 2)) continue;
-                            if (code >= to_unicode_map->code_range_map[i].srcStart && code <= to_unicode_map->code_range_map[i].srcEnd)
-                            {
-                                uint32_t tmp = _convert_code_from_cmap(to_unicode_map, code);
-                                wchar_t wc = tmp;
-                                printf("code = %d unicdoe = %d (%lc)\n", code, tmp, wc);
-                                p += blen;
-                                found = true;
-                                break;
-                            }
-                        }
-                        if (found) break;
-                    }
-                }
-            }
 
-            p = pbuf + 1;
-            end = pbuf + len;
-            while (p < end)
+        if (encoding != NULL)
+        {
+            pdf_latin_encoding_type_t latin_encoding = PDF_LATIN_ENCODING_STD;
+            if (!strcmp(encoding, "/WinAnsiEncoding"))
             {
-                uint8_t code = _hex_str_to_8bit((char*)p);
-                p += 2;
-                unicode[unicode_cnt].utf8 = code;
-                unicode[unicode_cnt].encoding = PLUTOVG_TEXT_ENCODING_UTF8;
-                unicode[unicode_cnt].isCidEqualGid = true;
-                unicode_cnt++;
+                latin_encoding = PDF_LATIN_ENCODING_WIN;
             }
+            else if (!strcmp(encoding, "/MacRomanEncoding"))
+            {
+                latin_encoding = PDF_LATIN_ENCODING_MAC;
+            }
+            else if (!strcmp(encoding, "/PDFDocEncoding"))
+            {
+                latin_encoding = PDF_LATIN_ENCODING_PDF;
+            }
+            
+            for (int i = 0; i < bytes.size(); i++)
+            {
+                uint16_t code = bytes[i];
+                uint32_t uni = _convert_unicode_from_latin_encoding(code, latin_encoding);
+                unicode[unicode_cnt].utf8 = uni;
+                unicode[unicode_cnt].encoding = PLUTOVG_TEXT_ENCODING_UTF32;
+                unicode[unicode_cnt].isGid = false;
+                unicode_cnt++;
+                wchar_t wc = uni;
+                printf("code = %d unicode = %d (%lc)\n", code, uni, wc);
+            }
+        }
+
+        if (to_unicode_map != NULL)
+        {
+            // for (int i = 0; i < bytes.size(); i++)
+            // {
+            //     uint32_t code = bytes[i];
+                
+            //     for (int i = 0; i < to_unicode_map->code_range_map.size(); i++)
+            //     {
+            //         if (code >= to_unicode_map->code_range_map[i].srcStart && code <= to_unicode_map->code_range_map[i].srcEnd)
+            //         {
+            //             uint32_t tmp = _convert_code_from_cmap(to_unicode_map, code);
+            //             wchar_t wc = tmp;
+            //             printf("code = %d unicdoe = %d (%lc)\n", code, tmp, wc);
+            //             break;
+            //         }
+            //     }
+            // }
         }
     }
     else if (font->subtype == FONT_SUBTYPE_TYPE0)
@@ -509,373 +592,155 @@ void _do_text_render(pdf_render_t* context, char* buf, int len)
         pdf_cmap_t* cid_to_gid_map = cidfont->cid_to_gid_map;
         if (descendant->subtype == FONT_SUBTYPE_CIDFONTTPYE0)
         {
-            unsigned char* p = pbuf + 1;
-            unsigned char* end = pbuf + len;
-            if (pbuf[0] == '(')
+            for (int i = 0; i < bytes.size(); )
             {
-                if (to_unicode_map != NULL)
-                {
-
-                }
-                else if (encoding && encoding->name && !strncmp(encoding->name, "Uni", 3))
-                {
-                    while (p < end)
-                    {
-                        uint16_t code = ((uint16_t)p[0] << 8) | ((uint16_t)p[1]);
-                        wchar_t wc = code;
-                        printf("code = %d(%lc)\n", code, wc);
-                        p += 2;
-                        unicode[unicode_cnt].utf16 = code;
-                        unicode[unicode_cnt].encoding = PLUTOVG_TEXT_ENCODING_UTF16;
-                        unicode[unicode_cnt].isCidEqualGid = false;
-                        unicode_cnt++;
-                    }
-                }
-            }
-            else
-            {
-                if (to_unicode_map != NULL)
-                {
-                    while (p < end)
-                    {
-                        bool found = false;
-                        for (int blen = 8; blen >= 2; blen /= 2)
-                        {
-                            if (p + blen > end) continue;
-                            uint32_t code = _hex_str_to_32bit((char*)p, blen);
-                            
-                            for (int i = 0; i < to_unicode_map->code_range_map_len; i++)
-                            {
-                                if (to_unicode_map->code_range_map[i].byte_len != (blen / 2)) continue;
-                                if (code >= to_unicode_map->code_range_map[i].srcStart && code <= to_unicode_map->code_range_map[i].srcEnd)
-                                {
-                                    uint32_t tmp = _convert_code_from_cmap(to_unicode_map, code);
-                                    wchar_t wc = tmp;
-                                    printf("code = %d unicdoe = %d (%lc)\n", code, tmp, wc);
-                                    p += blen;
-                                    found = true;
-                                    break;
-                                }
-                            }
-                            if (found) break;
-                        }
-                    }
-                }
-                else if (encoding && encoding->name && !strncmp(encoding->name, "Uni", 3))
-                {
-                    while (p < end)
-                    {
-                        uint16_t code = ((uint16_t)p[0] << 8) | ((uint16_t)p[1]);
-                        wchar_t wc = code;
-                        printf("code = %d(%lc)\n", code, wc);
-                        p += 2;
-                        unicode[unicode_cnt].utf16 = code;
-                        unicode[unicode_cnt].encoding = PLUTOVG_TEXT_ENCODING_UTF16;
-                        unicode[unicode_cnt].isCidEqualGid = false;
-                        unicode_cnt++;
-                    }
-                }
-                p = pbuf + 1;
-                end = pbuf + len;
-                while (p < end)
+                uint32_t code = 0;
+                uint32_t cid = 0;
+                for (int j = 4; j >= 1; j /= 2)
                 {
                     bool found = false;
-                    for (int blen = 8; blen >= 2; blen /= 2)
+                    for (int k = 0; k < encoding->code_range_map.size(); k++)
                     {
-                        if (p + blen > end) continue;
-                        uint32_t code = _hex_str_to_32bit((char*)p, blen);
-                        
-                        uint32_t cid = code;
-                        for (int i = 0; i < encoding->code_range_map_len; i++)
+                        if (encoding->code_range_map[k].byte_len != j)
+                            continue;
+                        for (int l = j - 1; l >= 0; l--)
                         {
-                            if (encoding->code_range_map[i].byte_len != (blen / 2)) continue;
-                            if (code >= encoding->code_range_map[i].srcStart && code <= encoding->code_range_map[i].srcEnd)
-                            {
-                                if (blen == 8)
-                                {
-                                    cid = _convert_code_from_cmap(encoding, code);
-                                    unicode[unicode_cnt].utf32 = cid;
-                                    unicode[unicode_cnt].encoding = PLUTOVG_TEXT_ENCODING_UTF32;
-                                    unicode[unicode_cnt].isCidEqualGid = true;
-                                    unicode_cnt++;
-                                }
-                                else if (blen == 4)
-                                {
-                                    cid = (uint16_t)_convert_code_from_cmap(encoding, code);
-                                    unicode[unicode_cnt].utf32 = cid;
-                                    unicode[unicode_cnt].encoding = PLUTOVG_TEXT_ENCODING_UTF32;
-                                    unicode[unicode_cnt].isCidEqualGid = true;
-                                    unicode_cnt++;
-                                }
-                                else
-                                {
-                                    cid = (uint8_t)_convert_code_from_cmap(encoding, code);
-                                    unicode[unicode_cnt].utf32 = cid;
-                                    unicode[unicode_cnt].encoding = PLUTOVG_TEXT_ENCODING_UTF32;
-                                    unicode[unicode_cnt].isCidEqualGid = true;
-                                    unicode_cnt++;
-                                }
-                                p += blen;
-                                printf("code = %d cid = %d \n", code, cid);
-                                found = true;
-                                break;
-                            }
+                            code = code << 8 | bytes[i + (j - 1 - l)];
                         }
-                        if (found) break;
+                        if (code >= encoding->code_range_map[k].srcStart && code <= encoding->code_range_map[k].srcEnd)
+                        {
+                            cid = _convert_code_from_cmap(encoding, code);
+                            printf("code = %5d cid = %5d gid = %5d ", code, cid, cid);
+                            i += j;
+                            found = true;
+                            break;
+                        }
+                        else
+                        {
+                            code = 0;
+                        }
                     }
+                    if (found) break;
+                }
+                
+
+                unicode[unicode_cnt].utf32 = cid;
+                unicode[unicode_cnt].encoding = PLUTOVG_TEXT_ENCODING_UTF32;
+                unicode[unicode_cnt].isGid = true;
+                unicode_cnt++;
+                
+                if (to_unicode_map != NULL)
+                {
+                    for (int j = 0; j < to_unicode_map->code_range_map.size(); j++)
+                    {
+                        if (code >= to_unicode_map->code_range_map[j].srcStart && code <= to_unicode_map->code_range_map[j].srcEnd)
+                        {
+                            uint32_t uni = _convert_unicode_from_cmap(to_unicode_map, code);
+                            wchar_t wc = uni;
+                            printf("unicode = %5d (%lc)\n", code, uni, wc);
+                            break;
+                        }
+                    }
+                }
+                else if (encoding && encoding->name && !strncmp(encoding->name, "Uni", 3))
+                {
+                    wchar_t wc = code;
+                    printf("unicode = %5d(%lc)\n", code, wc);
+                }
+                else
+                {
+                    printf("\n");
                 }
             }
         }
         else
         {
-            if (cid_to_gid_map == NULL)
+            for (int i = 0; i < bytes.size(); )
             {
-                return;
-            }
-            
-            unsigned char* p = pbuf + 1;
-            unsigned char* end = pbuf + len;
-            if (pbuf[0] == '(')
-            {
-                if (to_unicode_map != NULL)
-                { 
-                    while (p < end)
+                uint32_t code = 0;
+                uint32_t cid = 0;
+                for (int j = 4; j >= 1; j /= 2)
+                {
+                    bool found = false;
+                    for (int k = 0; k < encoding->code_range_map.size(); k++)
                     {
-                        bool found = false;
-                        for (int blen = 4; blen >= 1; blen /= 2)
+                        if (encoding->code_range_map[k].byte_len != j)
+                            continue;
+                        for (int l = j - 1; l >= 0; l--)
                         {
-                            if (p + blen > end) continue;
-                            uint32_t code = 0;
-                            switch (blen)
-                            {
-                                case 4:
-                                {
-                                    code = ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16) | ((uint32_t)p[2] << 8) | ((uint32_t)p[3]);
-                                    break;
-                                }
-                                case 2:
-                                {
-                                    code = ((uint16_t)p[0] << 8) | ((uint16_t)p[1]);
-                                    break;
-                                }
-                                case 1:
-                                {
-                                    code = (uint8_t)p[0];
-                                    break;
-                                }
-                                default:
-                                    break;
-                            }
-                            
-                            for (int i = 0; i < to_unicode_map->code_range_map_len; i++)
-                            {
-                                if (to_unicode_map->code_range_map[i].byte_len != blen ) continue;
-                                if (code >= to_unicode_map->code_range_map[i].srcStart && code <= to_unicode_map->code_range_map[i].srcEnd)
-                                {
-                                    uint32_t tmp = _convert_code_from_cmap(to_unicode_map, code);
-                                    wchar_t wc = tmp;
-                                    printf("code = %d unicdoe = %d (%lc) ", code, tmp, wc);
-                                    p += blen;
-                                    found = true;
-                                    break;
-                                }
-                            }
-                            if (found) break;
+                            code = code << 8 | bytes[i + (j - 1 - l)];
+                        }
+                        if (code >= encoding->code_range_map[k].srcStart && code <= encoding->code_range_map[k].srcEnd)
+                        {
+                            cid = _convert_code_from_cmap(encoding, code);
+                            printf("code = %5d cid = %5d ", code, cid);
+                            i += j;
+                            found = true;
+                            break;
+                        }
+                        else
+                        {
+                            code = 0;
+                        }
+                    }
+                    if (found) break;
+                }
+                if (cid_to_gid_map != NULL)
+                {
+                    for (int j = 0; j < cid_to_gid_map->code_range_map.size(); j++)
+                    {
+                        if (cid >= cid_to_gid_map->code_range_map[j].srcStart && cid <= cid_to_gid_map->code_range_map[j].srcEnd)
+                        {
+                            uint32_t gid = _convert_code_from_cmap(cid_to_gid_map, cid);
+                            printf("gid = %5d ", gid);
+                            unicode[unicode_cnt].utf32 = gid;
+                            unicode[unicode_cnt].encoding = PLUTOVG_TEXT_ENCODING_UTF32;
+                            unicode[unicode_cnt].isGid = true;
+                            unicode_cnt++;
+                            break;
                         }
                     }
                 }
+                else
+                {
+                    char to_unicode_name[64] = {0};
+                    sprintf(to_unicode_name, "Adobe-%s-UCS2", cidfont->cid_system_info.ordering);
+                    pdf_cmap_t* c = pdf_file_get_cmap(context->pdf, to_unicode_name);
+                    if (c != NULL)
+                    {
+                        for (int j = 0; j < c->code_range_map.size(); j++)
+                        {
+                            if (cid >= c->code_range_map[j].srcStart && cid <= c->code_range_map[j].srcEnd)
+                            {
+                                uint32_t uni = _convert_unicode_from_cmap(c, cid);
+                                wchar_t wc = uni;
+                                printf("unicode = %5d (%lc)", uni, wc);
 
-                p = pbuf + 1;
-                end = pbuf + len;
-                while (p < end)
-                {
-                    bool found = false;
-                    for (int blen = 4; blen >= 1; blen /= 2)
-                    {
-                        if (p + blen > end) continue;
-                        uint32_t code = 0;
-                        switch (blen)
-                        {
-                            case 4:
-                            {
-                                code = ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16) | ((uint32_t)p[2] << 8) | ((uint32_t)p[3]);
-                                break;
-                            }
-                            case 2:
-                            {
-                                code = ((uint16_t)p[0] << 8) | ((uint16_t)p[1]);
-                                break;
-                            }
-                            case 1:
-                            {
-                                code = (uint8_t)p[0];
-                                break;
-                            }
-                            default:
-                                break;
-                        }
-                        
-                        uint32_t cid = code;
-                        for (int i = 0; i < encoding->code_range_map_len; i++)
-                        {
-                            if (encoding->code_range_map[i].byte_len != blen) continue;
-                            if (code >= encoding->code_range_map[i].srcStart && code <= encoding->code_range_map[i].srcEnd)
-                            {
-                                if (blen == 4)
-                                {
-                                    cid = _convert_code_from_cmap(encoding, code);
-                                }
-                                else if (blen == 2)
-                                {
-                                    cid = (uint16_t)_convert_code_from_cmap(encoding, code);
-                                }
-                                else
-                                {
-                                    cid = (uint8_t)_convert_code_from_cmap(encoding, code);
-                                }
-                                printf("code = %d cid = %d ", code, cid);
-                                found = true;
-                                break;
-                            }
-                        }
-                        
-                        found = false;
-                        uint32_t gid = cid;
-                        for (int i = 0; i < cid_to_gid_map->code_range_map_len; i++)
-                        {
-                            if (cid_to_gid_map->code_range_map[i].byte_len != blen) continue;
-                            if (code >= cid_to_gid_map->code_range_map[i].srcStart && code <= cid_to_gid_map->code_range_map[i].srcEnd)
-                            {
-                                if (blen == 4)
-                                {
-                                    gid = _convert_code_from_cmap(cid_to_gid_map, code);
-                                    unicode[unicode_cnt].utf32 = gid;
-                                    unicode[unicode_cnt].encoding = PLUTOVG_TEXT_ENCODING_UTF32;
-                                    unicode[unicode_cnt].isCidEqualGid = true;
-                                }
-                                else if (blen == 2)
-                                {
-                                    gid = (uint16_t)_convert_code_from_cmap(cid_to_gid_map, code);
-                                    unicode[unicode_cnt].utf16 = gid;
-                                    unicode[unicode_cnt].encoding = PLUTOVG_TEXT_ENCODING_UTF16;
-                                    unicode[unicode_cnt].isCidEqualGid = true;
-                                }
-                                else
-                                {
-                                    gid = (uint8_t)_convert_code_from_cmap(cid_to_gid_map, code);
-                                    unicode[unicode_cnt].utf8 = gid;
-                                    unicode[unicode_cnt].encoding = PLUTOVG_TEXT_ENCODING_UTF8;
-                                    unicode[unicode_cnt].isCidEqualGid = true;
-                                }
-                                printf("gid = %d\n", gid);
+                                unicode[unicode_cnt].utf32 = uni;
+                                unicode[unicode_cnt].encoding = PLUTOVG_TEXT_ENCODING_UTF32;
+                                unicode[unicode_cnt].isGid = false;
                                 unicode_cnt++;
-                                p += blen;
-                                found = true;
-                                break;
-                            }
-                        }
-                        
-                        if (found) break;
-                    }
-                }
-            }
-            else
-            {
-                while (p < end)
-                {
-                    bool found = false;
-                    for (int blen = 8; blen >= 2; blen /= 2)
-                    {
-                        if (p + blen > end) continue;
-                        uint32_t code = _hex_str_to_32bit((char*)p, blen);
-                        
-                        for (int i = 0; i < to_unicode_map->code_range_map_len; i++)
-                        {
-                            if (to_unicode_map->code_range_map[i].byte_len != (blen / 2)) continue;
-                            if (code >= to_unicode_map->code_range_map[i].srcStart && code <= to_unicode_map->code_range_map[i].srcEnd)
-                            {
-                                uint32_t tmp = _convert_code_from_cmap(to_unicode_map, code);
-                                wchar_t wc = tmp;
-                                printf("code = %d unicdoe = %d (%lc)\n", code, tmp, wc);
-                                p += blen;
-                                found = true;
                                 break;
                             }
                         }
                     }
                 }
-                p = pbuf + 1;
-                end = pbuf + len;
-                while (p < end)
+                if (to_unicode_map != NULL)
                 {
-                    bool found = false;
-                    for (int blen = 8; blen >= 2; blen /= 2)
+                    for (int j = 0; j < to_unicode_map->code_range_map.size(); j++)
                     {
-                        if (p + blen > end) continue;
-                        uint32_t code = _hex_str_to_32bit((char*)p, blen);
-                        
-                        uint32_t cid = code;
-                        for (int i = 0; i < encoding->code_range_map_len; i++)
+                        if (code >= to_unicode_map->code_range_map[j].srcStart && code <= to_unicode_map->code_range_map[j].srcEnd)
                         {
-                            if (encoding->code_range_map[i].byte_len != (blen / 2)) continue;
-                            if (code >= encoding->code_range_map[i].srcStart && code <= encoding->code_range_map[i].srcEnd)
-                            {
-                                if (blen == 8)
-                                {
-                                    cid = _convert_code_from_cmap(encoding, code);
-                                }
-                                else if (blen == 4)
-                                {
-                                    cid = (uint16_t)_convert_code_from_cmap(encoding, code);
-                                }
-                                else
-                                {
-                                    cid = (uint8_t)_convert_code_from_cmap(encoding, code);
-                                }
-                                printf("code = %d cid = %d ", code, cid);
-                                found = true;
-                                break;
-                            }
+                            uint32_t uni = _convert_unicode_from_cmap(to_unicode_map, code);
+                            wchar_t wc = uni;
+                            printf("unicode = %5d (%lc)\n", uni, wc);
+                            break;
                         }
-                        found = false;
-                        
-                        uint32_t gid = cid;
-                        for (int i = 0; i < cid_to_gid_map->code_range_map_len; i++)
-                        {
-                            if (cid_to_gid_map->code_range_map[i].byte_len != (blen / 2)) continue;
-                            if (code >= cid_to_gid_map->code_range_map[i].srcStart && code <= cid_to_gid_map->code_range_map[i].srcEnd)
-                            {
-                                if (blen == 8)
-                                {
-                                    gid = _convert_code_from_cmap(cid_to_gid_map, code);
-                                    unicode[unicode_cnt].utf32 = gid;
-                                    unicode[unicode_cnt].encoding = PLUTOVG_TEXT_ENCODING_UTF32;
-                                    unicode[unicode_cnt].isCidEqualGid = true;
-                                }
-                                else if (blen == 4)
-                                {
-                                    gid = (uint16_t)_convert_code_from_cmap(cid_to_gid_map, code);
-                                    unicode[unicode_cnt].utf16 = gid;
-                                    unicode[unicode_cnt].encoding = PLUTOVG_TEXT_ENCODING_UTF16;
-                                    unicode[unicode_cnt].isCidEqualGid = true;
-                                }
-                                else
-                                {
-                                    gid = (uint8_t)_convert_code_from_cmap(cid_to_gid_map, code);
-                                    unicode[unicode_cnt].utf8 = gid;
-                                    unicode[unicode_cnt].encoding = PLUTOVG_TEXT_ENCODING_UTF8;
-                                    unicode[unicode_cnt].isCidEqualGid = true;
-                                }
-                                printf("gid = %d\n", gid);
-                                unicode_cnt++;
-                                p += blen;
-                                found = true;
-                                break;
-                            }
-                        }
-                        
-                        if (found) break;
                     }
+                }
+                else
+                {
+                    printf("\n");
                 }
             }
         }
@@ -917,15 +782,15 @@ void _do_text_render(pdf_render_t* context, char* buf, int len)
             {
                 if (unicode[i].encoding == PLUTOVG_TEXT_ENCODING_UTF8)
                 {
-                    advance_width = plutovg_canvas_add_text1(context->canvas, &unicode[i].utf8, 1, unicode[i].encoding, context->state->textState.textLineWidth, 0, unicode[i].isCidEqualGid);
+                    advance_width = plutovg_canvas_add_text1(context->canvas, &unicode[i].utf8, 1, unicode[i].encoding, context->state->textState.textLineWidth, 0, unicode[i].isGid);
                 }
                 else if (unicode[i].encoding == PLUTOVG_TEXT_ENCODING_UTF16)
                 {
-                    advance_width = plutovg_canvas_add_text1(context->canvas, &unicode[i].utf16, 1, unicode[i].encoding, context->state->textState.textLineWidth, 0, unicode[i].isCidEqualGid);
+                    advance_width = plutovg_canvas_add_text1(context->canvas, &unicode[i].utf16, 1, unicode[i].encoding, context->state->textState.textLineWidth, 0, unicode[i].isGid);
                 }
                 else
                 {
-                    advance_width = plutovg_canvas_add_text1(context->canvas, &unicode[i].utf32, 1, unicode[i].encoding, context->state->textState.textLineWidth, 0, unicode[i].isCidEqualGid);
+                    advance_width = plutovg_canvas_add_text1(context->canvas, &unicode[i].utf32, 1, unicode[i].encoding, context->state->textState.textLineWidth, 0, unicode[i].isGid);
                 }
                 context->state->textState.textLineWidth += advance_width;
             }
@@ -1023,9 +888,9 @@ void _do_text_render(pdf_render_t* context, char* buf, int len)
                     plutovg_canvas_save(context->canvas);
                     plutovg_matrix_t font_matrix_plutovg, rm;
                     plutovg_matrix_init(&font_matrix_plutovg, 
-                        font_matrix->values[0]->val.number, font_matrix->values[1]->val.number,
-                        font_matrix->values[2]->val.number, font_matrix->values[3]->val.number,
-                        font_matrix->values[4]->val.number, font_matrix->values[5]->val.number);
+                        font_matrix->get(0)->val.number, font_matrix->get(1)->val.number,
+                        font_matrix->get(2)->val.number, font_matrix->get(3)->val.number,
+                        font_matrix->get(4)->val.number, font_matrix->get(5)->val.number);
                     plutovg_matrix_multiply(&rm, &font_matrix_plutovg, &context->state->textState.textMatrix);
                     plutovg_matrix_t m = {
                         context->state->textState.fontSize * context->state->textState.horizontalScaling / 100, 0,
@@ -1040,9 +905,9 @@ void _do_text_render(pdf_render_t* context, char* buf, int len)
                         context->state->fill.color[2]);
                     plutovg_canvas_new_path(context->canvas);
                     pdf_cff_char_render_t ctx;
-                    ctx.buf = (unsigned char*)charstrings_index->values[unicode[i].utf32]->val.string;
+                    ctx.buf = (unsigned char*)charstrings_index->get(unicode[i].utf32)->val.string;
                     ctx.cur = ctx.buf;
-                    ctx.len = charstrings_index->values[unicode[i].utf32]->value_len;
+                    ctx.len = charstrings_index->get(unicode[i].utf32)->value_len;
                     ctx.canvas = context->canvas;
                     ctx.fontSize = context->state->textState.fontSize;
                     ctx.global_bias = font_descriptor->global_subr_bias;
@@ -1059,20 +924,20 @@ void _do_text_render(pdf_render_t* context, char* buf, int len)
                     pdf_dict_t* font_dict = NULL;
                     double defaultWidthX = 0;
                     double nominalWidthX = 0;
-                    if ((int)(font_dict_select->values[0]->val.number) == 0)
+                    if ((int)(font_dict_select->get(0)->val.number) == 0)
                     {
-                        int fd = font_dict_select->values[unicode[i].utf32 + 1]->val.number;
-                        font_dict = font_dict_aar->values[fd]->val.dict;
+                        int fd = font_dict_select->get(unicode[i].utf32 + 1)->val.number;
+                        font_dict = font_dict_aar->get(fd)->val.dict;
                     }
                     else
                     {
-                        for (int j = 1; j < font_dict_select->num_elements; j += 3)
+                        for (int j = 1; j < font_dict_select->size(); j += 3)
                         {
-                            if (unicode[i].utf32 >= (int)(font_dict_select->values[j]->val.number)
-                            && unicode[i].utf32 <= (int)(font_dict_select->values[j + 1]->val.number))
+                            if (unicode[i].utf32 >= (int)(font_dict_select->get(j)->val.number)
+                            && unicode[i].utf32 <= (int)(font_dict_select->get(j + 1)->val.number))
                             {
-                                int fd = (int)(font_dict_select->values[j + 2]->val.number);
-                                font_dict = font_dict_aar->values[fd]->val.dict;
+                                int fd = (int)(font_dict_select->get(j + 2)->val.number);
+                                font_dict = font_dict_aar->get(fd)->val.dict;
                                 break;
                             }
                         }
@@ -1119,11 +984,11 @@ void _do_text_render(pdf_render_t* context, char* buf, int len)
             for (int i = 0; i < unicode_cnt; i++) 
             {
                 uint32_t c = unicode[i].utf32;
-                for (int j = 0; j < differences->num_elements; j += 2) 
+                for (int j = 0; j < differences->size(); j += 2) 
                 {
-                    if ((uint32_t)differences->values[j]->val.number == c) 
+                    if ((uint32_t)differences->get(j)->val.number == c) 
                     {
-                        const char* name = differences->values[j + 1]->val.name;
+                        const char* name = differences->get(j + 1)->val.name;
                         int ref = pdf_dict_get_ref(type3->charProcs, name);
                         if (ref != -1) 
                         {
@@ -1136,9 +1001,9 @@ void _do_text_render(pdf_render_t* context, char* buf, int len)
                                 plutovg_canvas_save(context->canvas);
                                 plutovg_matrix_t font_matrix_plutovg, rm;
                                 plutovg_matrix_init(&font_matrix_plutovg, 
-                                    font_matrix->values[0]->val.number, font_matrix->values[1]->val.number,
-                                    font_matrix->values[2]->val.number, font_matrix->values[3]->val.number,
-                                    font_matrix->values[4]->val.number, font_matrix->values[5]->val.number);
+                                    font_matrix->get(0)->val.number, font_matrix->get(1)->val.number,
+                                    font_matrix->get(2)->val.number, font_matrix->get(3)->val.number,
+                                    font_matrix->get(4)->val.number, font_matrix->get(5)->val.number);
                                 plutovg_matrix_multiply(&rm, &font_matrix_plutovg, &context->state->textState.textMatrix);
                                 plutovg_matrix_t m = {
                                     context->state->textState.fontSize * context->state->textState.horizontalScaling / 100, 0,
@@ -1152,7 +1017,7 @@ void _do_text_render(pdf_render_t* context, char* buf, int len)
                                     float width = 0;
                                     if (c >= type3->first_char && c <= type3->last_char)
                                     {
-                                        width = widths->values[c - type3->first_char]->val.number;
+                                        width = widths->get(c - type3->first_char)->val.number;
                                     }
                                     // plutovg_canvas_translate(context->canvas, x + context->state->textState.textLineWidth, 0);
                                     double advance = width * context->state->textState.fontSize / 1000.0;
@@ -1175,13 +1040,13 @@ void _do_text_render(pdf_render_t* context, char* buf, int len)
                                 // }
                                 plutovg_canvas_new_path(context->canvas);
                                 pdf_stream_open(obj->stream);
-                                pdf_parser_token_t* tk = NULL;
+                                pdf_token_t* tk = NULL;
                                 while ((tk = pdf_stream_get_next_token(obj->stream)) != NULL) 
                                 {
-                                    if (tk->type == TOKEN_STREAM_END)
+                                    if (tk->type() == TOKEN_STREAM_END)
                                         break;
                                     _do_render_operation(obj->stream, context, tk);
-                                    pdf_parser_token_free(obj->stream->parser, tk);
+                                    delete tk;
                                 }
                                 pdf_stream_close(obj->stream);
                                 context->current_obj = save_obj;

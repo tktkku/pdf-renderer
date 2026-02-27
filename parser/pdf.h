@@ -5,7 +5,7 @@ extern "C" {
 #include <stdbool.h>
 #include <stddef.h>
 
-    typedef struct pdf_parser_token pdf_parser_token_t;
+    typedef class pdf_token pdf_token_t;
 
     typedef struct pdf_node pdf_node_t;
     typedef struct pdf_deque pdf_deque_t;
@@ -14,7 +14,6 @@ extern "C" {
     typedef struct pdf_value pdf_value_t;
     typedef struct pdf_value pdf_obj_value_t;
     typedef struct pdf_value pdf_dict_pair_value_t;
-    typedef struct pdf_value pdf_array_element_value_t;
 
     struct pdf_obj;
     typedef struct pdf_obj pdf_obj_t;
@@ -67,7 +66,7 @@ extern "C" {
     pdf_stream_t* pdf_page_get_stream(pdf_page_t* page, int index);
 
     void pdf_stream_close(pdf_stream_t* stream);
-    pdf_parser_token_t* pdf_stream_get_next_token(pdf_stream_t* stream);
+    pdf_token_t* pdf_stream_get_next_token(pdf_stream_t* stream);
     int pdf_stream_get_data(pdf_stream_t* stream, unsigned char* buf, int size);
     pdf_stream_t* pdf_stream_init(pdf_file_t* pdf, pdf_obj_t* obj, int len, int offset);
     void pdf_stream_free(pdf_stream_t* stream);
@@ -92,13 +91,6 @@ extern "C" {
     void pdf_font_free(pdf_font_t* font);
     pdf_font_t* pdf_font_reference(pdf_font_t* font);
     void pdf_cff_parse(pdf_font_descriptor_t* font_descriptor);
-
-    pdf_array_t* pdf_array_init(void);
-    void pdf_array_free(pdf_array_t* array);
-
-    pdf_cmap_t* pdf_cmap_init(void);
-    pdf_cmap_t* pdf_cmap_find(const char* name);
-    void pdf_cmap_free(pdf_cmap_t* cmap);
 
     pdf_deque_t* pdf_deque_init();
     void pdf_deque_free(pdf_deque_t* deque);

@@ -5,32 +5,6 @@
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "plutovg-stb-truetype.h"
 
-typedef struct {
-    stbtt_vertex* vertices;
-    int nvertices;
-    int index;
-    int advance_width;
-    int left_side_bearing;
-    int x1;
-    int y1;
-    int x2;
-    int y2;
-} glyph_t;
-#define GLYPH_CACHE_SIZE 256
-struct plutovg_font_face {
-    int ref_count;
-    int ascent;
-    int descent;
-    int line_gap;
-    int x1;
-    int y1;
-    int x2;
-    int y2;
-    stbtt_fontinfo info;
-    glyph_t** glyphs[GLYPH_CACHE_SIZE];
-    plutovg_destroy_func_t destroy_func;
-    void* closure;
-};
 static int stbtt_InitFont_internal1(stbtt_fontinfo *info, unsigned char *data, int fontstart)
 {
    stbtt_uint32 cmap, t;
@@ -40,7 +14,7 @@ static int stbtt_InitFont_internal1(stbtt_fontinfo *info, unsigned char *data, i
    info->fontstart = fontstart;
    info->cff = stbtt__new_buf(NULL, 0);
 
-   //cmap = stbtt__find_table(data, fontstart, "cmap");       // required
+   cmap = stbtt__find_table(data, fontstart, "cmap");       // required
    info->loca = stbtt__find_table(data, fontstart, "loca"); // required
    info->head = stbtt__find_table(data, fontstart, "head"); // required
    info->glyf = stbtt__find_table(data, fontstart, "glyf"); // required
@@ -115,31 +89,33 @@ static int stbtt_InitFont_internal1(stbtt_fontinfo *info, unsigned char *data, i
    // find a cmap encoding table we understand *now* to avoid searching
    // later. (todo: could make this installable)
    // the same regardless of glyph.
-//    numTables = ttUSHORT(data + cmap + 2);
-//    info->index_map = 0;
-//    for (i=0; i < numTables; ++i) {
-//       stbtt_uint32 encoding_record = cmap + 4 + 8 * i;
-//       // find an encoding we understand:
-//       switch(ttUSHORT(data+encoding_record)) {
-//          case STBTT_PLATFORM_ID_MICROSOFT:
-//             switch (ttUSHORT(data+encoding_record+2)) {
-//                case STBTT_MS_EID_UNICODE_BMP:
-//                case STBTT_MS_EID_UNICODE_FULL:
-//                   // MS/Unicode
-//                   info->index_map = cmap + ttULONG(data+encoding_record+4);
-//                   break;
-//             }
-//             break;
-//         case STBTT_PLATFORM_ID_UNICODE:
-//             // Mac/iOS has these
-//             // all the encodingIDs are unicode, so we don't bother to check it
-//             info->index_map = cmap + ttULONG(data+encoding_record+4);
-//             break;
-//       }
-//    }
-//    if (info->index_map == 0)
-//       return 0;
-
+   if (cmap)
+   {
+        numTables = ttUSHORT(data + cmap + 2);
+        info->index_map = 0;
+        for (i=0; i < numTables; ++i) {
+            stbtt_uint32 encoding_record = cmap + 4 + 8 * i;
+            // find an encoding we understand:
+            switch(ttUSHORT(data+encoding_record)) {
+                case STBTT_PLATFORM_ID_MICROSOFT:
+                    switch (ttUSHORT(data+encoding_record+2)) {
+                    case STBTT_MS_EID_UNICODE_BMP:
+                    case STBTT_MS_EID_UNICODE_FULL:
+                        // MS/Unicode
+                        info->index_map = cmap + ttULONG(data+encoding_record+4);
+                        break;
+                    }
+                    break;
+                case STBTT_PLATFORM_ID_UNICODE:
+                    // Mac/iOS has these
+                    // all the encodingIDs are unicode, so we don't bother to check it
+                    info->index_map = cmap + ttULONG(data+encoding_record+4);
+                    break;
+            }
+        }
+        if (info->index_map == 0)
+            return 0;
+    }
    info->indexToLocFormat = ttUSHORT(data+info->head + 50);
    return 1;
 }
@@ -165,6 +141,67 @@ plutovg_font_face_t* plutovg_font_face_load_from_data1(const void* data,
     face->closure = closure;
     return face;
 }
+void load_font_from_external(pdf_render_t* context, pdf_font_descriptor_t* font_descriptor)
+{
+    //TODO
+    char fontname[256] = { 0 };
+    bool isSerif = (font_descriptor->flags & 0x02) != 0;
+    sprintf(fontname, "fonts/Noto%sSC-", isSerif ? "Serif" : "Sans");
+    //\xCB\xCE\xCC\xE5 -> SimSun
+    if (font_descriptor->fontWeight <= 0)
+    {
+        strcat(fontname, "Regular.ttf");
+    }
+    else if (font_descriptor->fontWeight <= 100)
+    {
+        strcat(fontname, "Thin.ttf");
+    }
+    else if (font_descriptor->fontWeight <= 200)
+    {
+        strcat(fontname, "ExtraLight.ttf");
+    }
+    else if (font_descriptor->fontWeight <= 300)
+    {
+        strcat(fontname, "Light.ttf");
+    }
+    else if (font_descriptor->fontWeight == 400)
+    {
+        strcat(fontname, "Regular.ttf");
+    }
+    else if (font_descriptor->fontWeight <= 500)
+    {
+        strcat(fontname, "Medium.ttf");
+    }
+    else if (font_descriptor->fontWeight <= 600)
+    {
+        strcat(fontname, "SemiBold.ttf");
+    }
+    else if (font_descriptor->fontWeight <= 700)
+    {
+        strcat(fontname, "Bold.ttf");
+    }
+    else if (font_descriptor->fontWeight <= 800)
+    {
+        strcat(fontname, "ExtraBold.ttf");
+    }
+    else
+    {
+        strcat(fontname, "Black.ttf");
+    }
+    FILE* f = fopen(fontname, "rb");
+    if (f)
+    {
+        fseek(f, 0, SEEK_END);
+        long len = ftell(f);
+        fseek(f, 0, SEEK_SET);
+        unsigned char* data = (unsigned char*)malloc(len);
+        fread(data, 1, len, f);
+        fclose(f);
+        context->state->textState.fontface = plutovg_font_face_load_from_data1(
+            data, len, 0, free, data);
+    }
+    context->state->textState.font_face_loaded = true;
+}
 void handle_Tf(pdf_render_t* context)
 {
     // set font and font size to use
@@ -175,7 +212,7 @@ void handle_Tf(pdf_render_t* context)
     pdf_deque_pop_front(context->deque, &node);
     float fontsize = strtof(buf, NULL);
     pdf_deque_pop_front(context->deque, &node);
-
+    printf("font name = %s fontsize = %f\n", (char*)node.data, fontsize);
     pdf_font_t* font = pdf_obj_get_font(context->current_obj, buf);
     context->state->textState.fontSize = fontsize;
     if (font == NULL)
@@ -252,8 +289,7 @@ void handle_Tf(pdf_render_t* context)
         }
         else
         {
-            context->state->textState.font_face_loaded = true;
-            context->state->textState.fontface = plutovg_font_face_load_from_file("fonts/NotoSerifSC-Regular.ttf", 0);
+            load_font_from_external(context, cidfont->font_descriptor);
         }
     }
     else if (font->subtype == FONT_SUBTYPE_TRUETYPE || font->subtype == FONT_SUBTYPE_TYPE1)
@@ -270,6 +306,10 @@ void handle_Tf(pdf_render_t* context)
             {
                 context->state->textState.font_face_loaded = true;
             }
+        }
+        else
+        {
+            load_font_from_external(context, type1_truetype->font_descriptor);
         }
     }
     pdf_font_cache_t* cache = (pdf_font_cache_t*)malloc(sizeof(pdf_font_cache_t));

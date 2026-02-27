@@ -53,13 +53,13 @@ void handle_Do(pdf_render_t* context)
             pdf_obj_t* save_obj = context->current_obj;
             context->current_obj = xobj->obj;
             pdf_stream_open(xobj->obj->stream);
-            pdf_parser_token_t* tk = NULL;
+            pdf_token_t* tk = NULL;
             while ((tk = pdf_stream_get_next_token(xobj->obj->stream)) != NULL)
             {
-                if (tk->type == TOKEN_STREAM_END)
+                if (tk->type() == TOKEN_STREAM_END)
                     break;
                 _do_render_operation(xobj->obj->stream, context, tk);
-                pdf_parser_token_free(xobj->obj->stream->parser, tk);
+                delete tk;
             }
 
             pdf_stream_close(xobj->obj->stream);

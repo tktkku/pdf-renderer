@@ -111,6 +111,8 @@ pdf_font_descriptor_t* _load_font_descriptor(pdf_obj_t* obj, pdf_dict_t* font_di
     font_descriptor->fontFamily = (char*)pdf_dict_get_name(font_descriptor_dict, "/FontFamily");
     font_descriptor->fontStretch = (char*)pdf_dict_get_name(font_descriptor_dict, "/FontStyle");
     font_descriptor->fontWeight = pdf_dict_get_number(font_descriptor_dict, "/FontWeight");
+    if (font_descriptor->fontWeight < 0)
+        font_descriptor->fontWeight = 400;
     font_descriptor->flags = (uint32_t)pdf_dict_get_number(font_descriptor_dict, "/Flags");
     font_descriptor->fontBBox = pdf_dict_get_array(font_descriptor_dict, "/FontBBox");
     font_descriptor->italicAngle = pdf_dict_get_number(font_descriptor_dict, "/ItalicAngle");
@@ -239,7 +241,14 @@ pdf_font_t* _load_cid_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
     char* cid_to_gid_map = (char*)pdf_dict_get_name(font_dict, "/CIDToGIDMap");
     if (cid_to_gid_map != NULL)
     {
-        font->cidfont->cid_to_gid_map = pdf_cmap_find(cid_to_gid_map + 1);
+        if (!strcmp(cid_to_gid_map, "/Identity"))
+        {
+            font->cidfont->cid_to_gid_map = pdf_file_get_cmap(obj->pdf, "Identity-H");
+        }
+        else
+        {
+            font->cidfont->cid_to_gid_map = pdf_file_get_cmap(obj->pdf, cid_to_gid_map + 1);
+        }
     }
     else
     {   
@@ -256,10 +265,7 @@ pdf_font_t* _load_cid_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
             }
         }
     }
-    if (font->cidfont->cid_to_gid_map == NULL && font->subtype == FONT_SUBTYPE_CIDFONTTPYE2)
-    {
-        font->cidfont->cid_to_gid_map = pdf_cmap_find("Identity-H");
-    }
+
     return font;
 }
 
@@ -280,7 +286,7 @@ pdf_font_t* _load_type0_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
     char* encoding = (char*)pdf_dict_get_name(font_dict, "/Encoding");
     if (encoding != NULL)
     {
-        font->type0->encoding = pdf_cmap_find(encoding + 1);
+        font->type0->encoding = pdf_file_get_cmap(obj->pdf, encoding + 1);
     }
 
     int to_unicode_ref = pdf_dict_get_ref(font_dict, "/ToUnicode");
@@ -304,7 +310,6 @@ pdf_font_t* _load_type0_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
             pdf_parser_t* parser = pdf_parser_init(obj->pdf, input);
 
             pdf_cmap_t* cmap = pdf_parser_build_cmap(parser);
-            cmap->worldwide = false;
             font->type0->to_unicode_map = cmap;
             pdf_parser_free(parser);
             input_close(input);
@@ -314,13 +319,13 @@ pdf_font_t* _load_type0_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
     // CIDFonts
     pdf_dict_t* descendant_font_dict = NULL;
     pdf_array_t* descendant_fonts_aar = pdf_dict_get_array(font_dict, "/DescendantFonts");
-    if (descendant_fonts_aar != NULL && descendant_fonts_aar->values[0]->type == PDF_VALUE_DICT)
+    if (descendant_fonts_aar != NULL && descendant_fonts_aar->get(0)->type == PDF_VALUE_DICT)
     {
-        descendant_font_dict = descendant_fonts_aar->values[0]->val.dict;
+        descendant_font_dict = descendant_fonts_aar->get(0)->val.dict;
     }
-    else if (descendant_fonts_aar != NULL && descendant_fonts_aar->values[0]->type == PDF_VALUE_INDIRECT)
+    else if (descendant_fonts_aar != NULL && descendant_fonts_aar->get(0)->type == PDF_VALUE_INDIRECT)
     {
-        int descendant_fonts_ref = descendant_fonts_aar->values[0]->val.indirect;
+        int descendant_fonts_ref = descendant_fonts_aar->get(0)->val.indirect;
         if (descendant_fonts_ref != -1)
         {
             pdf_obj_t* descendant_font_obj = pdf_file_get_obj(obj->pdf, descendant_fonts_ref);
@@ -343,13 +348,13 @@ pdf_font_t* _load_type0_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
             else if (descendant_font_obj != NULL && descendant_font_obj->value->type == PDF_VALUE_ARRAY)
             {
                 pdf_array_t* descendant_fonts_aar = descendant_font_obj->value->val.array;
-                if (descendant_fonts_aar->values[0]->type == PDF_VALUE_DICT)
+                if (descendant_fonts_aar->get(0)->type == PDF_VALUE_DICT)
                 {
-                    descendant_font_dict = descendant_fonts_aar->values[0]->val.dict;
+                    descendant_font_dict = descendant_fonts_aar->get(0)->val.dict;
                 }
-                else if (descendant_fonts_aar->values[0]->type == PDF_VALUE_INDIRECT)
+                else if (descendant_fonts_aar->get(0)->type == PDF_VALUE_INDIRECT)
                 {
-                    int descendant_fonts_ref = descendant_fonts_aar->values[0]->val.indirect;
+                    int descendant_fonts_ref = descendant_fonts_aar->get(0)->val.indirect;
                     pdf_obj_t* descendant_font_obj = pdf_file_get_obj(obj->pdf, descendant_fonts_ref);
                     descendant_font_dict = descendant_font_obj->value->val.dict;
                 }
@@ -372,44 +377,34 @@ pdf_array_t* _load_differences(pdf_dict_t* font_dict)
         pdf_array_t* arr = pdf_dict_get_array(encoding_dict, "/Differences");
         if (arr != NULL)
         {
-            differences = pdf_array_init();
-            differences->num_elements = arr->num_elements * 2;
-            differences->values = (pdf_array_element_value_t**)malloc(differences->num_elements * sizeof(pdf_array_element_value_t*));
+            differences = new pdf_array_t;
             int cnt = 0;
-            for (int i = 0; i < arr->num_elements; i++)
+            for (int i = 0; i < arr->size(); i++)
             {
-                if (arr->values[i]->type == PDF_VALUE_NUMBER)
+                if (arr->get(i)->type == PDF_VALUE_NUMBER)
                 {
-                    differences->values[cnt] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
-                    differences->values[cnt]->type = PDF_VALUE_NUMBER;
-                    differences->values[cnt]->val.number = arr->values[i]->val.number;
+                    pdf_value_t* value = (pdf_value_t*)malloc(sizeof(pdf_value_t));
+                    value->type = PDF_VALUE_NUMBER;
+                    value->val.number = arr->get(i)->val.number;
+                    differences->add(value);
                     cnt++;
                 }
-                else if (arr->values[i]->type == PDF_VALUE_NAME)
+                else if (arr->get(i)->type == PDF_VALUE_NAME)
                 {
-                    if (cnt > 1 && differences->values[cnt - 1]->type == PDF_VALUE_NAME)
+                    if (cnt > 1 && differences->get(cnt - 1)->type == PDF_VALUE_NAME)
                     {
-                        differences->values[cnt] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
-                        differences->values[cnt]->type = PDF_VALUE_NUMBER;
-                        differences->values[cnt]->val.number = differences->values[cnt - 2]->val.number + 1;
+                        pdf_value_t* value = (pdf_value_t*)malloc(sizeof(pdf_value_t));
+                        value->type = PDF_VALUE_NUMBER;
+                        value->val.number = differences->get(cnt - 2)->val.number + 1;
+                        differences->add(value);
                         cnt++;
                     }
-                    differences->values[cnt] = (pdf_array_element_value_t*)malloc(sizeof(pdf_array_element_value_t));
-                    differences->values[cnt]->type = PDF_VALUE_NAME;
-                    differences->values[cnt]->val.name = strdup(arr->values[i]->val.name);
+                    pdf_value_t* value = (pdf_value_t*)malloc(sizeof(pdf_value_t));
+                    value->type = PDF_VALUE_NAME;
+                    value->val.name = strdup(arr->get(i)->val.name);
+                    differences->add(value);
                     cnt++;
                 }
-            }
-            pdf_array_element_value_t** tmp = (pdf_array_element_value_t**)realloc(differences->values, cnt * sizeof(pdf_array_element_value_t*));
-            if (tmp != NULL)
-            {
-                differences->values = tmp;
-                differences->num_elements = cnt;
-            }
-            else
-            {
-                pdf_array_free(differences);
-                differences = NULL;
             }
         }
     }
@@ -440,6 +435,10 @@ pdf_font_t* _load_type1_truetype_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
     {
         font->type1_truetype->differences = _load_differences(font_dict);
     }
+    else
+    {
+        font->type1_truetype->encoding = encoding;
+    }
     int to_unicode_ref = pdf_dict_get_ref(font_dict, "/ToUnicode");
     if (to_unicode_ref != -1)
     {
@@ -455,7 +454,6 @@ pdf_font_t* _load_type1_truetype_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
             pdf_parser_t* parser = pdf_parser_init(obj->pdf, input);
 
             pdf_cmap_t* cmap = pdf_parser_build_cmap(parser);
-            cmap->worldwide = false;
             font->type1_truetype->to_unicode_map = cmap;
             input_close(input);
             free(origin);
@@ -523,7 +521,6 @@ pdf_font_t* _load_type3_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
             pdf_parser_t* parser = pdf_parser_init(obj->pdf, input);
     
             pdf_cmap_t* cmap = pdf_parser_build_cmap(parser);
-            cmap->worldwide = false;
             font->type3->to_unicode_map = cmap;
             input_close(input);
             free(origin);
@@ -714,9 +711,9 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj, const char* name)
                 return NULL;
             }
 
-            if (filter_arr->num_elements == 1)
+            if (filter_arr->size() == 1)
             {
-                filter = filter_arr->values[0]->val.name;
+                filter = filter_arr->get(0)->val.name;
             }
         }
         int width = pdf_dict_get_number(xobject_dict, "/Width");
@@ -783,19 +780,19 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj, const char* name)
                         int tmp_len = sizeof(unsigned char) * width * 4 * height;
                         unsigned char* tmp = (unsigned char*)malloc(tmp_len);
                         int stride = img->data_len / height;
-                        if (color_space_aar != NULL && !strcmp(color_space_aar->values[0]->val.name, "/Indexed"))
+                        if (color_space_aar != NULL && !strcmp(color_space_aar->get(0)->val.name, "/Indexed"))
                         {
-                            int lookup_cnt = color_space_aar->values[2]->val.number;
+                            int lookup_cnt = color_space_aar->get(2)->val.number;
                             unsigned char* lookup = NULL;
-                            if (color_space_aar->values[3]->type == PDF_VALUE_INDIRECT)
+                            if (color_space_aar->get(3)->type == PDF_VALUE_INDIRECT)
                             {
-                                int ref = color_space_aar->values[3]->val.indirect;
+                                int ref = color_space_aar->get(3)->val.indirect;
                                 pdf_obj_t* lookup_obj = pdf_file_get_obj(obj->pdf, ref);
                                 pdf_stream_get_all(lookup_obj->stream, &lookup, &lookup_cnt);
                             }
                             else
                             {
-                                lookup = (unsigned char*)(color_space_aar->values[3]->val.string + 1);
+                                lookup = (unsigned char*)(color_space_aar->get(3)->val.string + 1);
                             }
                             for (int i = 0; i < height; i++)
                             {
@@ -811,7 +808,7 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj, const char* name)
                                     tmp[index2 + 3] = smask[index];
                                 }
                             }
-                            if (color_space_aar->values[3]->type == PDF_VALUE_INDIRECT)
+                            if (color_space_aar->get(3)->type == PDF_VALUE_INDIRECT)
                             {
                                 free(lookup);
                             }
@@ -854,22 +851,22 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj, const char* name)
                     }
                 }
             }
-            else if (color_space_aar != NULL && !strcmp(color_space_aar->values[0]->val.name, "/Indexed"))
+            else if (color_space_aar != NULL && !strcmp(color_space_aar->get(0)->val.name, "/Indexed"))
             {
                 int stride = img->data_len / height;
                 int tmp_len = sizeof(unsigned char) * width * 3 * height;
                 unsigned char* tmp = (unsigned char*)malloc(tmp_len);
-                int lookup_cnt = color_space_aar->values[2]->val.number;
+                int lookup_cnt = color_space_aar->get(2)->val.number;
                 unsigned char* lookup = NULL;
-                if (color_space_aar->values[3]->type == PDF_VALUE_INDIRECT)
+                if (color_space_aar->get(3)->type == PDF_VALUE_INDIRECT)
                 {
-                    int ref = color_space_aar->values[3]->val.indirect;
+                    int ref = color_space_aar->get(3)->val.indirect;
                     pdf_obj_t* lookup_obj = pdf_file_get_obj(obj->pdf, ref);
                     pdf_stream_get_all(lookup_obj->stream, &lookup, &lookup_cnt);
                 }
                 else
                 {
-                    lookup = (unsigned char*)(color_space_aar->values[3]->val.string + 1);
+                    lookup = (unsigned char*)(color_space_aar->get(3)->val.string + 1);
                 }
                 if (bits_per_component == 8)
                 {
@@ -906,7 +903,7 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj, const char* name)
                         }
                     }
                 }
-                if (color_space_aar->values[3]->type == PDF_VALUE_INDIRECT)
+                if (color_space_aar->get(3)->type == PDF_VALUE_INDIRECT)
                     free(lookup);
                 free(img->data);
                 img->data = tmp;
@@ -972,14 +969,14 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj, const char* name)
         xobj->form->bbox[2] = 0;
         xobj->form->bbox[3] = 0;
         pdf_array_t* ctm_aar = pdf_dict_get_array(xobject_dict, "/Matrix");
-        for (int i = 0; ctm_aar && i < ctm_aar->num_elements; i++)
+        for (int i = 0; ctm_aar && i < ctm_aar->size(); i++)
         {
-            xobj->form->matrix[i] = ctm_aar->values[i]->val.number;
+            xobj->form->matrix[i] = ctm_aar->get(i)->val.number;
         }
         pdf_array_t* bbox_aar = pdf_dict_get_array(xobject_dict, "/BBox");
-        for (int i = 0; bbox_aar && i < bbox_aar->num_elements; i++)
+        for (int i = 0; bbox_aar && i < bbox_aar->size(); i++)
         {
-            xobj->form->bbox[i] = bbox_aar->values[i]->val.number;
+            xobj->form->bbox[i] = bbox_aar->get(i)->val.number;
         }
         // obj->xobject = xobj;
         xobject->xobject = xobj;

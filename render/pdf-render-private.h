@@ -12,6 +12,34 @@
 #include "plutovg-stb-image-write.h"
 #include "plutovg-stb-image.h"
 #include <vector>
+#include "plutovg-stb-truetype.h"
+typedef struct {
+    stbtt_vertex* vertices;
+    int nvertices;
+    int index;
+    int advance_width;
+    int left_side_bearing;
+    int x1;
+    int y1;
+    int x2;
+    int y2;
+} glyph_t;
+#define GLYPH_CACHE_SIZE 256
+struct plutovg_font_face {
+    int ref_count;
+    int ascent;
+    int descent;
+    int line_gap;
+    int x1;
+    int y1;
+    int x2;
+    int y2;
+    stbtt_fontinfo info;
+    glyph_t** glyphs[GLYPH_CACHE_SIZE];
+    plutovg_destroy_func_t destroy_func;
+    void* closure;
+};
+
 typedef struct pdf_cff_char_render
 {
     bool fisr_stack_clear;
@@ -178,7 +206,7 @@ const static OPERATION_HANDLER handlers[] = {
     handle_m, handle_n, handle_q, handle_re, handle_rg, handle_ri, handle_s, 
     handle_sc, handle_scn, handle_sh, handle_v, handle_w, handle_y
 };
-void _do_render_operation(pdf_stream_t* stream, pdf_render_t* context, pdf_parser_token_t* tk);
+void _do_render_operation(pdf_stream_t* stream, pdf_render_t* context, pdf_token_t* tk);
 void stroke(pdf_render_t* context);
 void _do_text_render(pdf_render_t* context, char* buf, int len);
 void _init_state(pdf_render_t* context);

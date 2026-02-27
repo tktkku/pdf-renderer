@@ -1,10 +1,8 @@
 project(pdf-parser LANGUAGES CXX)
 
 set(PARSER_SOURCES
-    pdf-array.cc
     pdf-common.cc
     pdf-cff.cc
-    pdf-cmap.cc
     pdf-deque.cc
     pdf-dict.cc
     pdf-file.cc

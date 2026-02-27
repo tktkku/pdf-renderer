@@ -22,7 +22,7 @@ void pdf_value_free(struct pdf_value* value)
     }
     else if (type == PDF_VALUE_ARRAY)
     {
-        pdf_array_free(value->val.array);
+        delete value->val.array;
         value->val.array = NULL;
     }
     free(value);

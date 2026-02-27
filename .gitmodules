@@ -13,3 +13,6 @@
 [submodule "mapping-resources-pdf"]
 	path = mapping-resources-pdf
 	url = http://github.com/adobe-type-tools/mapping-resources-pdf
+[submodule "agl-aglfn"]
+	path = agl-aglfn
+	url = https://github.com/adobe-type-tools/agl-aglfn.git

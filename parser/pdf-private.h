@@ -16,12 +16,103 @@ typedef enum pdf_token_type
 #include "pdf-token.def"
 } pdf_token_type_t;
 
-struct pdf_parser_token
+class pdf_token
 {
-    pdf_token_type_t type;
-    std::vector<char> token;
-    int steps;
-    struct pdf_parser_token* next;
+private:
+    pdf_token_type_t _type;
+    std::vector<char> _data;
+    int _steps;
+public:
+    explicit pdf_token(pdf_token_type_t type)
+    {
+        _type = type;
+        _data.push_back('\0');
+    }
+    explicit pdf_token(const char* start, int len, pdf_token_type_t type)
+    {
+        _type = type;
+        _steps = len;
+        if (start != NULL)
+        {
+            _data.insert(_data.end(), start, start + len);
+        }
+        
+        if (type == TOKEN_NAME)
+        {
+            decode_name();
+        }
+        else if (type == TOKEN_STRING)
+        {
+            decode_string();
+        }
+        else if (type == TOKEN_HEX_STRING)
+        {
+            decode_hex_string();
+        }
+        _data.push_back('\0');
+    }
+    explicit pdf_token(const char* start, int len, pdf_token_type_t type, int steps)
+    {
+        _type = type;
+        _steps = steps;
+        if (start != NULL)
+        {
+            _data.insert(_data.end(), start, start + len);
+        }
+        
+        if (type == TOKEN_NAME)
+        {
+            decode_name();
+        }
+        else if (type == TOKEN_STRING)
+        {
+            decode_string();
+        }
+        else if (type == TOKEN_HEX_STRING)
+        {
+            decode_hex_string();
+        }
+        _data.push_back('\0');
+    }
+    void append(pdf_token* other)
+    {
+        _data.pop_back();
+        _data.insert(_data.end(), other->_data.begin(), other->_data.end() - 1);
+        _data.push_back('\0');
+        _steps += other->steps();
+    }
+    void append(const char* data, int len)
+    {
+        _data.pop_back();
+        _data.insert(_data.end(), data, data + len);
+        _data.push_back('\0');
+    }
+    const char* data()
+    {
+        return _data.data();
+    }
+
+    pdf_token_type_t type()
+    {
+        return _type;
+    }
+    size_t size()
+    {
+        return _data.size() - 1;
+    }
+    size_t steps()
+    {
+        return _steps;
+    }
+    bool empty()
+    {
+        return size() == 0;
+    }
+private:
+    void decode_hex_string();
+    void decode_name();
+    void decode_string();
+
 };
 
 typedef enum pdf_value_type
@@ -87,10 +178,41 @@ struct pdf_dict
     std::vector<pdf_dict_pair_t*> pairs;
 };
 
-struct pdf_array
+class pdf_array
 {
-    int num_elements;
-    pdf_array_element_value_t** values;
+private:
+    std::vector<pdf_value_t*> elements;
+public:
+    size_t size()
+    {
+        return elements.size();
+    }
+    void add(pdf_value_t* value)
+    {
+        elements.push_back(value);
+    }
+    pdf_value_t* get(size_t index)
+    {
+        if (index >= elements.size())
+        {
+            return NULL;
+        }
+        return elements[index];
+    }
+    pdf_value_t* operator[](size_t index)
+    {
+        return get(index);
+    }
+    pdf_array() {};
+    ~pdf_array()
+    {
+        for (size_t i = 0; i < elements.size(); i++)
+        {
+            pdf_value_free(elements[i]);
+            elements[i] = NULL;
+        }
+        elements.clear();
+    };
 };
 
 typedef struct rect_d
@@ -130,39 +252,43 @@ typedef struct xref_table {
     xref_t* xrefs;
 } xref_table_t;
 
-typedef struct
+struct pdf_cmap_unicode_map
 {
-    uint32_t cid;
+    uint32_t code;
     uint32_t unicode;
-} pdf_unicode_map_t;
+};
 
-typedef struct
+struct pdf_cmap_cid_map
+{
+    uint32_t code;
+    uint32_t cid;
+};
+
+struct pdf_cmap_char_range
 {
     uint32_t srcStart;
     uint32_t srcEnd;
     uint32_t dstStart;
-} pdf_char_range_map_t;
-
-typedef struct
+} ;
+struct pdf_cmap_code_range
 {
     uint8_t byte_len;
     uint32_t srcStart;
     uint32_t srcEnd;
-} pdf_code_range_map_t;
+};
 
 struct pdf_cmap
 {
     char name[256];
-    bool worldwide;
-    int unicode_map_len;
-    pdf_unicode_map_t* unicode_map;
-    int char_range_map_len;
-    pdf_char_range_map_t* char_range_map;
-    int not_def_range_len;
-    pdf_char_range_map_t* not_def_range;
-    int code_range_map_len;
-    pdf_code_range_map_t* code_range_map;
-    struct pdf_cmap* next;
+    std::vector<pdf_cmap_cid_map> cid_map;
+    std::vector<pdf_cmap_char_range> cid_range_map;
+    std::vector<pdf_cmap_unicode_map> unicode_map;
+    std::vector<pdf_cmap_char_range> unicode_range_map;
+
+    std::vector<pdf_cmap_char_range> not_def_range;
+    std::vector<pdf_cmap_code_range> code_range_map;
+    pdf_cmap() {};
+    ~pdf_cmap() {};
 };
 typedef enum {
     INPUT_TYPE_FILE,
@@ -202,8 +328,7 @@ struct pdf_file
     std::vector<xref_t*> xref_table;
     std::vector<pdf_obj_t*> pages;
 
-    pdf_cmap_t* cmaps;
-    int num_cmaps;
+    std::vector<pdf_cmap_t*> cmaps;
     std::vector<pdf_external_font_t*> external_fonts;
 };
 
@@ -456,7 +581,7 @@ struct pdf_parser
         unsigned char* rem;
         int len;
     } remain;
-    pdf_parser_token_t* cached_tokens[3];
+    pdf_token_t* cached_tokens[3];
     int num_cached_tokens;
     bool pause_read;
     bool eof;
@@ -503,7 +628,7 @@ bool _is_digit(char c);
 bool _is_delimiter(char c);
 void _pdf_parser_read_input(pdf_parser_t* parser);
 uint32_t _str_to_32bit(char* str, int len);
-uint32_t _hex_str_to_32bit(char* hexStr, int len);
+uint32_t _hex_str_to_32bit(const char* hexStr, int len);
 uint16_t _hex_str_to_16bit(char hexStr[4]);
 uint8_t _hex_str_to_8bit(char hexStr[2]);
 const char* _token_to_string(pdf_token_type_t type);
@@ -539,10 +664,7 @@ int input_stream(input_t** input, pdf_stream_t* stream);
 pdf_parser_t* pdf_parser_init(pdf_file_t* pdf, input_t* input);
 void pdf_parser_free(pdf_parser_t* parser);
 size_t pdf_parser_read_data(pdf_parser_t* parser, void* ptr, size_t size);
-pdf_parser_token_t* pdf_parser_token_init(pdf_parser_t* parser, const unsigned char* start, pdf_token_type_t type, int len);
-const char* pdf_parser_token_get_token(pdf_parser_token_t* token);
-void pdf_parser_token_free(pdf_parser_t* parser, pdf_parser_token_t* token);
-pdf_parser_token_t* pdf_parser_next_token(pdf_parser_t* parser);
+pdf_token_t* pdf_parser_next_token(pdf_parser_t* parser);
 pdf_obj_t* pdf_parser_build_obj(pdf_parser_t* parser);
 pdf_dict_t* pdf_parser_build_dict(pdf_parser_t* parser);
 pdf_array_t* pdf_parser_build_array(pdf_parser_t* parser);

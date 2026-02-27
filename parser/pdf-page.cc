@@ -88,7 +88,7 @@ uint32_t _str_to_32bit(char* str, int len)
     }
     return ret;
 }
-uint32_t _hex_str_to_32bit(char* hexStr, int len)
+uint32_t _hex_str_to_32bit(const char* hexStr, int len)
 {
     if (hexStr == NULL || len <= 0 || (len != 2 && len != 4 && len != 8)) return 0;
     // convert every 8 bit to hex value

@@ -514,9 +514,9 @@ void handle_callgsubr(pdf_cff_char_render_t* context, pdf_deque_t* deque)
     int savelen = context->len;
     unsigned char* savebuf = context->buf;
     unsigned char* savecur = context->cur;
-    context->buf = (unsigned char*)global_subr_index->values[off]->val.string;
+    context->buf = (unsigned char*)global_subr_index->get(off)->val.string;
     context->cur = context->buf;
-    context->len = global_subr_index->values[off]->value_len;
+    context->len = global_subr_index->get(off)->value_len;
     _cff_do_render_char(context, deque);
     context->buf = savebuf;
     context->cur = savecur;

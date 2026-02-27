@@ -10,12 +10,9 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${GLOBAL_OUTPUT_DIR})
 if(NOT MSVC)
     add_compile_options(
         -Wall 
-        -Wno-unused-variable 
-        -Wno-int-conversion 
-        -Wno-unused-function 
-        -Wno-pointer-sign 
-        -Wno-unused-but-set-variable 
-        -Wno-unused-private-field)
+        -Wno-unused-variable
+        -Wno-unused-function
+        -Wno-unused-but-set-variable)
 else()
     set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /MT")
     set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} /MTd /Od /Zi")

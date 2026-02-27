@@ -215,14 +215,14 @@ int pdf_render_copy_to_buffer(pdf_render_t* context, void* data, int len)
 void _pdf_process_stream(pdf_render_t* context, pdf_stream_t* stream)
 {
     pdf_stream_open(stream);
-    pdf_parser_token_t* tk;
+    pdf_token_t* tk;
     //int count = 0;
     while ((tk = pdf_stream_get_next_token(stream)) != NULL)
     {
-        if (tk->type == TOKEN_STREAM_END)
+        if (tk->type() == TOKEN_STREAM_END)
             break;
         _do_render_operation(stream, context, tk);
-        pdf_parser_token_free(stream->parser, tk);
+        delete tk;
     }
 
     pdf_stream_close(stream);
@@ -238,11 +238,11 @@ void pdf_render_do(pdf_render_t* context)
             if (context->page->contents[j]->value->type == PDF_VALUE_ARRAY)
             {
                 pdf_array_t* arr = context->page->contents[j]->value->val.array;
-                for (int i = 0; i < arr->num_elements; i++)
+                for (int i = 0; i < arr->size(); i++)
                 {
-                    if (arr->values[i]->type == PDF_VALUE_INDIRECT)
+                    if (arr->get(i)->type == PDF_VALUE_INDIRECT)
                     {
-                        pdf_obj_t* obj = pdf_file_get_obj(context->pdf, arr->values[i]->val.indirect);
+                        pdf_obj_t* obj = pdf_file_get_obj(context->pdf, arr->get(i)->val.indirect);
                         if (obj != NULL && obj->stream != NULL)
                         {
                             _pdf_process_stream(context, obj->stream);
@@ -266,9 +266,9 @@ void pdf_render_do(pdf_render_t* context)
     // Annots
     if (context->page->annots != NULL)
     {
-        for (int i = 0; i < context->page->annots->num_elements; i++)
+        for (int i = 0; i < context->page->annots->size(); i++)
         {
-            pdf_obj_t* anno_obj = pdf_file_get_obj(context->page->pdf, context->page->annots->values[i]->val.indirect);
+            pdf_obj_t* anno_obj = pdf_file_get_obj(context->page->pdf, context->page->annots->get(i)->val.indirect);
             if (anno_obj != NULL)
             { 
                 pdf_dict_get_name(anno_obj->value->val.dict, "/Type");
@@ -276,7 +276,7 @@ void pdf_render_do(pdf_render_t* context)
                 pdf_array_t* rect_aar = pdf_dict_get_array(anno_obj->value->val.dict, "/Rect");
                 if (rect_aar != NULL)
                 {
-                    plutovg_canvas_translate(context->canvas, rect_aar->values[0]->val.number, rect_aar->values[1]->val.number);
+                    plutovg_canvas_translate(context->canvas, rect_aar->get(0)->val.number, rect_aar->get(1)->val.number);
                 }
                 pdf_dict_get_string(anno_obj->value->val.dict, "/Contents");
                 pdf_dict_get_dict(anno_obj->value->val.dict, "/P");
@@ -318,13 +318,13 @@ void pdf_render_do(pdf_render_t* context)
                         {
                             context->current_obj = obj;
                             pdf_stream_open(obj->stream);
-                            pdf_parser_token_t* tk = NULL;
+                            pdf_token_t* tk = NULL;
                             while ((tk = pdf_stream_get_next_token(obj->stream)) != NULL)
                             {
-                                if (tk->type == TOKEN_STREAM_END)
+                                if (tk->type() == TOKEN_STREAM_END)
                                     break;
                                 _do_render_operation(obj->stream, context, tk);
-                                pdf_parser_token_free(obj->stream->parser, tk);
+                                delete tk;
                             }
                             pdf_stream_close(obj->stream);
                         }
@@ -340,29 +340,29 @@ void pdf_render_do(pdf_render_t* context)
     }
 }
 
-void _do_render_operation(pdf_stream_t* stream, pdf_render_t* context, pdf_parser_token_t* tk)
+void _do_render_operation(pdf_stream_t* stream, pdf_render_t* context, pdf_token_t* tk)
 {
     // if (tk != NULL)
     // {
-    //     if (tk->token != NULL)
+    //     if (tk->size() > 0)
     //     {
-    //         printf("%s\n", tk->token);
+    //         printf("%s\n", tk->data());
     //     }
     //     else
     //     {
-    //         printf("%s\n", _token_to_string(tk->type));
+    //         printf("%s\n", _token_to_string(tk->type()));
     //     }
     // }
 
-    if (tk->type < TOKEN_OPERATOR && !tk->token.empty())
+    if (tk->type() < TOKEN_OPERATOR && !tk->empty())
     {
         // did not match any operation
         // push data to deque
-        pdf_deque_push(context->deque, tk->token.data(), tk->token.size());
+        pdf_deque_push(context->deque, tk->data(), tk->size());
     }
-    else if (tk->type > TOKEN_OPERATOR && tk->type <= TOKEN_OPERATOR_y)
+    else if (tk->type() > TOKEN_OPERATOR && tk->type() <= TOKEN_OPERATOR_y)
     {
-        switch (tk->type)
+        switch (tk->type())
         {
             case TOKEN_OPERATOR_B:
             case TOKEN_OPERATOR_F:
@@ -382,74 +382,74 @@ void _do_render_operation(pdf_stream_t* stream, pdf_render_t* context, pdf_parse
             case TOKEN_OPERATOR_BI:
             {
                 plutovg_canvas_save(context->canvas);
-                pdf_parser_token_t* t = NULL;
+                pdf_token_t* t = NULL;
                 int width = 0, height = 0;
                 int channels = 3;
                 int bitsPerColor = 8;
                 char filter[64] = {0};
                 while ((t = pdf_stream_get_next_token(stream)) != NULL)
                 {
-                    if (t->type == TOKEN_OPERATOR_ID)
+                    if (t->type() == TOKEN_OPERATOR_ID)
                     {
-                        pdf_parser_token_free(stream->parser, t);
+                        delete t;
                         break;
                     }
-                    else if (t->type == TOKEN_NAME)
+                    else if (t->type() == TOKEN_NAME)
                     {
-                        pdf_parser_token_t* t1 = pdf_stream_get_next_token(stream);
+                        pdf_token_t* t1 = pdf_stream_get_next_token(stream);
                         if (t1 != NULL)
                         {
-                            if (!strcmp(t->token.data(), "/W"))
+                            if (!strcmp(t->data(), "/W"))
                             {
-                                width = atoi(t1->token.data());
+                                width = atoi(t1->data());
                             }
-                            else if (!strcmp(t->token.data(), "/H"))
+                            else if (!strcmp(t->data(), "/H"))
                             {
-                                height = atoi(t1->token.data());
+                                height = atoi(t1->data());
                             }
-                            else if (!strcmp(t->token.data(), "/BPC"))
+                            else if (!strcmp(t->data(), "/BPC"))
                             {
-                                bitsPerColor = atoi(t1->token.data());
+                                bitsPerColor = atoi(t1->data());
                             }
-                            else if (!strcmp(t->token.data(), "/CS"))
+                            else if (!strcmp(t->data(), "/CS"))
                             {
-                                if (!strcmp(t1->token.data(), "/RGB"))
+                                if (!strcmp(t1->data(), "/RGB"))
                                 {
                                     channels = 3;
                                 }
-                                else if (!strcmp(t1->token.data(), "/Gray"))
+                                else if (!strcmp(t1->data(), "/Gray"))
                                 {
                                     channels = 1;
                                 }
                             }
-                            else if (!strcmp(t->token.data(), "/F"))
+                            else if (!strcmp(t->data(), "/F"))
                             {
-                                if (t1->type == TOKEN_NAME)
+                                if (t1->type() == TOKEN_NAME)
                                 {
-                                    strcpy(filter, t1->token.data());
+                                    strcpy(filter, t1->data());
                                 }
-                                else if (t1->type == TOKEN_ARRAY_BEG)
+                                else if (t1->type() == TOKEN_ARRAY_BEG)
                                 {
-                                    pdf_parser_token_t* t2 = pdf_stream_get_next_token(stream);
-                                    if (t2 != NULL && t2->type == TOKEN_NAME)
+                                    pdf_token_t* t2 = pdf_stream_get_next_token(stream);
+                                    if (t2 != NULL && t2->type() == TOKEN_NAME)
                                     {
-                                        strcpy(filter, t2->token.data());
+                                        strcpy(filter, t2->data());
                                     }
-                                    pdf_parser_token_free(stream->parser, t2);
-                                    pdf_parser_token_t* t3 = pdf_stream_get_next_token(stream);
-                                    if (t3->type == TOKEN_ARRAY_END)
+                                    delete t2;
+                                    pdf_token_t* t3 = pdf_stream_get_next_token(stream);
+                                    if (t3->type() == TOKEN_ARRAY_END)
                                     {
 
                                     }
-                                    pdf_parser_token_free(stream->parser, t3);
+                                    delete t3;
 
                                 }
                             }
-                            pdf_parser_token_free(stream->parser, t1);
+                            delete t1;
                         }
                     }
  
-                    pdf_parser_token_free(stream->parser, t);
+                    delete t;
                 }
                 int size = width * channels * height;
                 char* buffer = (char*)malloc(size);
@@ -463,10 +463,10 @@ void _do_render_operation(pdf_stream_t* stream, pdf_render_t* context, pdf_parse
                         ret += 1;
                         if (ret >= 2 && !memcmp(buffer + ret - 2, "\xFF\xD9", 2))
                         {
-                            pdf_parser_token_t* t1 = pdf_stream_get_next_token(stream);
-                            if (t1 != NULL && t1->type == TOKEN_OPERATOR_EI)
+                            pdf_token_t* t1 = pdf_stream_get_next_token(stream);
+                            if (t1 != NULL && t1->type() == TOKEN_OPERATOR_EI)
                             {
-                                pdf_parser_token_free(stream->parser, t1);
+                                delete t1;
                                 break;
                             }
                         }
@@ -582,9 +582,9 @@ void _do_render_operation(pdf_stream_t* stream, pdf_render_t* context, pdf_parse
             default:
                 break;
         }
-        if (handlers[tk->type - TOKEN_OPERATOR])
+        if (handlers[tk->type() - TOKEN_OPERATOR])
         {
-            handlers[tk->type - TOKEN_OPERATOR](context);
+            handlers[tk->type() - TOKEN_OPERATOR](context);
         }
         // if (tk->type == TOKEN_OPERATOR_TJ || tk->type == TOKEN_OPERATOR_Tj)
         // {
@@ -594,7 +594,7 @@ void _do_render_operation(pdf_stream_t* stream, pdf_render_t* context, pdf_parse
     }
     else
     {
-        printf("unknow token %d\n", tk->type);
+        printf("unknow token %d\n", tk->type());
     }
 }
 
