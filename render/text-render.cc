@@ -944,8 +944,8 @@ void _do_text_render(pdf_render_t* context, char* buf, int len)
                     }
                     if (font_dict != NULL)
                     {
-                        defaultWidthX = pdf_dict_get_number(font_dict, "defaultWidthX");
-                        nominalWidthX = pdf_dict_get_number(font_dict, "nominalWidthX");
+                        defaultWidthX = font_dict->get_number("defaultWidthX");
+                        nominalWidthX = font_dict->get_number("nominalWidthX");
                     }
                     double advance = defaultWidthX;
                     if ((int)(ctx.width) != 0)
@@ -989,7 +989,7 @@ void _do_text_render(pdf_render_t* context, char* buf, int len)
                     if ((uint32_t)differences->get(j)->val.number == c) 
                     {
                         const char* name = differences->get(j + 1)->val.name;
-                        int ref = pdf_dict_get_ref(type3->charProcs, name);
+                        int ref = type3->charProcs->get_indirect(name);
                         if (ref != -1) 
                         {
                             pdf_obj_t* obj = pdf_file_get_obj(context->pdf, ref);
@@ -1041,7 +1041,7 @@ void _do_text_render(pdf_render_t* context, char* buf, int len)
                                 plutovg_canvas_new_path(context->canvas);
                                 pdf_stream_open(obj->stream);
                                 pdf_token_t* tk = NULL;
-                                while ((tk = pdf_stream_get_next_token(obj->stream)) != NULL) 
+                                while ((tk = pdf_parser_next_token(obj->stream->parser)) != NULL) 
                                 {
                                     if (tk->type() == TOKEN_STREAM_END)
                                         break;

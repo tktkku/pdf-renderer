@@ -13,7 +13,6 @@ extern "C" {
     struct pdf_value;
     typedef struct pdf_value pdf_value_t;
     typedef struct pdf_value pdf_obj_value_t;
-    typedef struct pdf_value pdf_dict_pair_value_t;
 
     struct pdf_obj;
     typedef struct pdf_obj pdf_obj_t;
@@ -23,7 +22,6 @@ extern "C" {
 
     struct pdf_dict;
     typedef struct pdf_dict pdf_dict_t;
-    typedef struct pdf_dict_pair pdf_dict_pair_t;
 
     struct pdf_array;
     typedef struct pdf_array pdf_array_t;
@@ -66,7 +64,6 @@ extern "C" {
     pdf_stream_t* pdf_page_get_stream(pdf_page_t* page, int index);
 
     void pdf_stream_close(pdf_stream_t* stream);
-    pdf_token_t* pdf_stream_get_next_token(pdf_stream_t* stream);
     int pdf_stream_get_data(pdf_stream_t* stream, unsigned char* buf, int size);
     pdf_stream_t* pdf_stream_init(pdf_file_t* pdf, pdf_obj_t* obj, int len, int offset);
     void pdf_stream_free(pdf_stream_t* stream);

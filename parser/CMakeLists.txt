@@ -4,7 +4,9 @@ set(PARSER_SOURCES
     pdf-common.cc
     pdf-cff.cc
     pdf-deque.cc
+    pdf-array.cc
     pdf-dict.cc
+    pdf-token.cc
     pdf-file.cc
     pdf-font.cc
     pdf-obj.cc

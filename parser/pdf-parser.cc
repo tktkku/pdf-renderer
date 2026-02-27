@@ -839,10 +839,14 @@ void _pdf_parser_read_input(pdf_parser_t* parser)
     parser->pause_read = false;
 }
 
-pdf_token_t* _pdf_next_token(pdf_parser_t* parser)
+pdf_token_t* pdf_parser_next_token(pdf_parser_t* parser)
 {
     if (parser == NULL)
         return NULL;
+    if (parser->current_pos >= parser->splite_pos && !parser->eof)
+    {
+        _pdf_parser_read_input(parser);
+    }
     unsigned char** start = &(parser->current_pos);
     unsigned char* end = parser->splite_pos;
     while (!parser->pause_read && *start < end && parser->num_cached_tokens < 3)
@@ -927,37 +931,7 @@ pdf_token_t* _pdf_next_token(pdf_parser_t* parser)
     }
     return tk;
 }
-pdf_token_t* pdf_stream_get_next_token(pdf_stream_t* stream)
-{
-    return pdf_parser_next_token(stream->parser);
-}
 
-pdf_token_t* pdf_parser_next_token(pdf_parser_t* parser)
-{
-    if (parser == NULL)
-        return NULL;
-
-    // unsigned char* save_cur = parser->current_pos;
-    if (parser->current_pos >= parser->splite_pos && !parser->eof)
-    {
-        _pdf_parser_read_input(parser);
-    }
-    pdf_token_t* tk = _pdf_next_token(parser);
-    // if (tk == NULL)
-    // {
-    //     if (parser->reader.type == STREAM_READER)
-    //     {
-    //         pdf_stream_t* s = (pdf_stream_t*)parser->reader.source;
-    //         if (s->processed < s->stream_len)
-    //         {
-    //             parser->current_pos = save_cur;
-    //             parser->reader.read(parser, parser->reader.source);
-    //             tk = _pdf_next_token(parser);
-    //         }
-    //     }
-    // }
-    return tk;
-}
 pdf_cmap_t* pdf_parser_build_cmap(pdf_parser_t* parser)
 {
     if (parser == NULL)
@@ -1247,25 +1221,32 @@ pdf_obj_t* pdf_parser_build_obj(pdf_parser_t* parser)
             }
             // store current offset
             int offset = input_tell(parser->input);
-            int len = pdf_dict_get_number(obj->value->val.dict, "/Length");
-            if (len == -1)
+            int len = 0;
+            if (obj->value->val.dict->has("/Length"))
             {
-                int ref = pdf_dict_get_ref(obj->value->val.dict, "/Length");
-                if (ref != -1)
+                if (obj->value->val.dict->is_number("/Length"))
                 {
-                    pdf_obj_t* l_obj = pdf_file_get_obj(parser->pdf, ref);
-                    if (l_obj != NULL && l_obj->value->type == PDF_VALUE_NUMBER)
+                    len = obj->value->val.dict->get_number("/Length");
+                }
+                else if (obj->value->val.dict->is_indirect("/Length"))
+                {
+                    int ref = obj->value->val.dict->get_indirect("/Length");
+                    if (ref != -1)
                     {
-                        len = l_obj->value->val.number;
-                        input_seek(parser->input, offset, SEEK_SET);
+                        pdf_obj_t* l_obj = pdf_file_get_obj(parser->pdf, ref);
+                        if (l_obj != NULL && l_obj->value->type == PDF_VALUE_NUMBER)
+                        {
+                            len = l_obj->value->val.number;
+                            input_seek(parser->input, offset, SEEK_SET);
+                        }
+                        else
+                        {
+                            delete tk;
+                            pdf_obj_free(obj);
+                            return NULL;
+                        }
                     }
-                    else
-                    {
-                        delete tk;
-                        pdf_obj_free(obj);
-                        return NULL;
-                    }
-                } 
+                }
             }
             
             obj->stream = pdf_stream_init(parser->pdf, obj, len, offset);
@@ -1306,7 +1287,7 @@ pdf_dict_t* pdf_parser_build_dict(pdf_parser_t* parser)
         return NULL;
 
     pdf_token_t* tk, * tk1;
-    pdf_dict_t* dict = pdf_dict_init();
+    pdf_dict_t* dict = new pdf_dict_t();
     while ((tk = pdf_parser_next_token(parser)) != NULL)
     {
         if (tk->type() == TOKEN_DICT_END)
@@ -1317,36 +1298,29 @@ pdf_dict_t* pdf_parser_build_dict(pdf_parser_t* parser)
         else if (tk->empty())
         {
             delete tk;
-            pdf_dict_free(dict);
+            delete dict;
             return NULL;
         }
         tk1 = pdf_parser_next_token(parser);
         if (tk1 == NULL)
         {
             delete tk;
-            pdf_dict_free(dict);
+            delete dict;
             return NULL;
         }
-        pdf_dict_pair_t* p = (pdf_dict_pair_t*)malloc(sizeof(pdf_dict_pair_t));
-        p->name_len = tk->size();
-        p->name = (char*)malloc(p->name_len + 1);
-        memcpy(p->name, tk->data(), tk->size());
-        p->name[p->name_len] = '\0';
-        p->value = (pdf_dict_pair_value_t*)malloc(sizeof(pdf_dict_pair_value_t));
-        if (!_set_common_value(parser, tk1, p->value))
+       
+        pdf_value_t* value = (pdf_value_t*)malloc(sizeof(pdf_value_t));
+        if (!_set_common_value(parser, tk1, value))
         {
             delete tk;
             delete tk1;
-            free(p->name);
-            pdf_value_free(p->value);
-            free(p);
-            pdf_dict_free(dict);
+            pdf_value_free(value);
+            delete dict;
             return NULL;
         }
-
+        dict->add(tk->data(), value);
         delete tk;
         delete tk1;
-        dict->pairs.push_back(p);
     }
 
     return dict;

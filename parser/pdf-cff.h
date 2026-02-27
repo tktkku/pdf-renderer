@@ -1,6 +1,6 @@
 #pragma once
 const static int CFF_NUM_STANDARD_STRINGS = 390;
-static char* CFF_STANDARD_STRINGS[] = {
+static const char* CFF_STANDARD_STRINGS[] = {
     //Appendix A: Standard Strings
     ".notdef",
     "space",

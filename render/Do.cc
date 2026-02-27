@@ -54,7 +54,7 @@ void handle_Do(pdf_render_t* context)
             context->current_obj = xobj->obj;
             pdf_stream_open(xobj->obj->stream);
             pdf_token_t* tk = NULL;
-            while ((tk = pdf_stream_get_next_token(xobj->obj->stream)) != NULL)
+            while ((tk = pdf_parser_next_token(xobj->obj->stream->parser)) != NULL)
             {
                 if (tk->type() == TOKEN_STREAM_END)
                     break;

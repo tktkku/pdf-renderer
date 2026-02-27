@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 #include "zlib.h"
 #include <string>
 #include <vector>
@@ -23,91 +24,16 @@ private:
     std::vector<char> _data;
     int _steps;
 public:
-    explicit pdf_token(pdf_token_type_t type)
-    {
-        _type = type;
-        _data.push_back('\0');
-    }
-    explicit pdf_token(const char* start, int len, pdf_token_type_t type)
-    {
-        _type = type;
-        _steps = len;
-        if (start != NULL)
-        {
-            _data.insert(_data.end(), start, start + len);
-        }
-        
-        if (type == TOKEN_NAME)
-        {
-            decode_name();
-        }
-        else if (type == TOKEN_STRING)
-        {
-            decode_string();
-        }
-        else if (type == TOKEN_HEX_STRING)
-        {
-            decode_hex_string();
-        }
-        _data.push_back('\0');
-    }
-    explicit pdf_token(const char* start, int len, pdf_token_type_t type, int steps)
-    {
-        _type = type;
-        _steps = steps;
-        if (start != NULL)
-        {
-            _data.insert(_data.end(), start, start + len);
-        }
-        
-        if (type == TOKEN_NAME)
-        {
-            decode_name();
-        }
-        else if (type == TOKEN_STRING)
-        {
-            decode_string();
-        }
-        else if (type == TOKEN_HEX_STRING)
-        {
-            decode_hex_string();
-        }
-        _data.push_back('\0');
-    }
-    void append(pdf_token* other)
-    {
-        _data.pop_back();
-        _data.insert(_data.end(), other->_data.begin(), other->_data.end() - 1);
-        _data.push_back('\0');
-        _steps += other->steps();
-    }
-    void append(const char* data, int len)
-    {
-        _data.pop_back();
-        _data.insert(_data.end(), data, data + len);
-        _data.push_back('\0');
-    }
-    const char* data()
-    {
-        return _data.data();
-    }
-
-    pdf_token_type_t type()
-    {
-        return _type;
-    }
-    size_t size()
-    {
-        return _data.size() - 1;
-    }
-    size_t steps()
-    {
-        return _steps;
-    }
-    bool empty()
-    {
-        return size() == 0;
-    }
+    explicit pdf_token(pdf_token_type_t type);
+    explicit pdf_token(const char* start, int len, pdf_token_type_t type);
+    explicit pdf_token(const char* start, int len, pdf_token_type_t type, int steps);
+    void append(pdf_token* other);
+    void append(const char* data, int len);
+    const char* data();
+    pdf_token_type_t type();
+    size_t size();
+    size_t steps();
+    bool empty();
 private:
     void decode_hex_string();
     void decode_name();
@@ -166,16 +92,33 @@ struct pdf_obj
     pdf_file_t* pdf;
 };
 
-struct pdf_dict_pair
+class pdf_dict
 {
-    char* name;
-    int name_len;
-    pdf_dict_pair_value_t* value;
-};
+private:
+    std::map<std::string, pdf_value_t*> pairs;
+public:
+    void add(const char* key, pdf_value_t* value);
+    void add(const char* key, pdf_value_type_t type, void* data);
+    pdf_value_t* get(const char* key);
+    pdf_value_t* operator[](const char* key);
+    bool has(const char* key);
+    bool is_array(const char* key);
+    pdf_array_t* get_array(const char* key);
+    bool is_dict(const char* key);
+    pdf_dict_t* get_dict(const char* key);
+    bool is_name(const char* key);
+    char* get_name(const char* key);
+    bool is_string(const char* key);
+    char* get_string(const char* key);
+    bool is_number(const char* key);
+    double get_number(const char* key);
+    bool is_boolean(const char* key);
+    int get_boolean(const char* key);
+    bool is_indirect(const char* key);
+    int get_indirect(const char* key);
 
-struct pdf_dict
-{
-    std::vector<pdf_dict_pair_t*> pairs;
+    pdf_dict();
+    ~pdf_dict();
 };
 
 class pdf_array
@@ -183,36 +126,12 @@ class pdf_array
 private:
     std::vector<pdf_value_t*> elements;
 public:
-    size_t size()
-    {
-        return elements.size();
-    }
-    void add(pdf_value_t* value)
-    {
-        elements.push_back(value);
-    }
-    pdf_value_t* get(size_t index)
-    {
-        if (index >= elements.size())
-        {
-            return NULL;
-        }
-        return elements[index];
-    }
-    pdf_value_t* operator[](size_t index)
-    {
-        return get(index);
-    }
-    pdf_array() {};
-    ~pdf_array()
-    {
-        for (size_t i = 0; i < elements.size(); i++)
-        {
-            pdf_value_free(elements[i]);
-            elements[i] = NULL;
-        }
-        elements.clear();
-    };
+    size_t size();
+    void add(pdf_value_t* value);
+    pdf_value_t* get(size_t index);
+    pdf_value_t* operator[](size_t index);
+    pdf_array();
+    ~pdf_array();
 };
 
 typedef struct rect_d
@@ -669,16 +588,3 @@ pdf_obj_t* pdf_parser_build_obj(pdf_parser_t* parser);
 pdf_dict_t* pdf_parser_build_dict(pdf_parser_t* parser);
 pdf_array_t* pdf_parser_build_array(pdf_parser_t* parser);
 pdf_cmap_t* pdf_parser_build_cmap(pdf_parser_t* parser);
-
-    pdf_dict_t* pdf_dict_init(void);
-    void pdf_dict_free(pdf_dict_t* dict);
-    double pdf_dict_get_number(pdf_dict_t* dict, const char* name);
-    int pdf_dict_get_ref(pdf_dict_t* dict, const char* name);
-    pdf_array_t* pdf_dict_get_array(pdf_dict_t* dict, const char* name);
-    pdf_dict_t* pdf_dict_get_dict(pdf_dict_t* dict, const char* name);
-    char* pdf_dict_get_name(pdf_dict_t* dict, const char* name);
-    int pdf_dict_get_bool(pdf_dict_t* dict, const char* name);
-    bool pdf_dict_add_array(pdf_dict_t* dict, const char* name, pdf_array_t* array);
-    bool pdf_dict_add(pdf_dict_t* dict, const char* name, pdf_value_type_t type, void* data);
-    char* pdf_dict_get_string(pdf_dict_t* dict, const char* name);
-    bool pdf_dict_add_value(pdf_dict_t* dict, const char* name, pdf_value_t* value);

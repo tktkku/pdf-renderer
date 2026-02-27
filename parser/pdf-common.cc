@@ -17,7 +17,7 @@ void pdf_value_free(struct pdf_value* value)
     }
     else if (type == PDF_VALUE_DICT)
     {
-        pdf_dict_free(value->val.dict);
+        delete value->val.dict;
         value->val.dict = NULL;
     }
     else if (type == PDF_VALUE_ARRAY)

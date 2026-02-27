@@ -42,19 +42,25 @@ pdf_stream_t* pdf_stream_init(pdf_file_t* pdf, pdf_obj_t* obj, int len, int offs
         return NULL;
     }
     pdf_dict_t* content_dict = obj->value->val.dict;
-    const char* filter = pdf_dict_get_name(content_dict, "/Filter");
+    const char* filter = NULL;
     pdf_array_t* filter_arr = NULL;
-
-    if (filter == NULL)
+    if (content_dict->has("/Filter"))
     {
-        filter_arr = pdf_dict_get_array(content_dict, "/Filter");
-
-        if (filter_arr != NULL && filter_arr->size() == 1)
+        if (content_dict->is_name("/Filter"))
         {
-            filter = filter_arr->get(0)->val.name;
+            filter = content_dict->get_name("/Filter");
+        }
+        else if (content_dict->is_array("/Filter"))
+        {
+            filter_arr = content_dict->get_array("/Filter");
+            if (filter_arr != NULL && filter_arr->size() == 1)
+            {
+                filter = filter_arr->get(0)->val.name;
+            }
         }
     }
-    pdf_dict_t* parms_dict = pdf_dict_get_dict(content_dict, "/DecodeParms");
+
+    pdf_dict_t* parms_dict = content_dict->get_dict("/DecodeParms");
     /**
      * 1 no prediction
      * 2 TIFF predictor 2
@@ -69,22 +75,22 @@ pdf_stream_t* pdf_stream_init(pdf_file_t* pdf, pdf_obj_t* obj, int len, int offs
         colors = 1, bitspercomponent = 8, columns = 1, earlychange = 1;
     if (parms_dict != NULL)
     {
-        predictor = pdf_dict_get_number(parms_dict, "/Predictor");
+        predictor = parms_dict->get_number("/Predictor");
         if (predictor < 1) predictor = 1;
 
-        colors = pdf_dict_get_number(parms_dict, "/Colors");
+        colors = parms_dict->get_number("/Colors");
         if (colors < 1 || colors > 4) colors = 1;
 
-        bitspercomponent = pdf_dict_get_number(parms_dict, "/BitsPerComponent");
+        bitspercomponent = parms_dict->get_number("/BitsPerComponent");
         if (bitspercomponent != 1
             && bitspercomponent != 4
             && bitspercomponent != 8
             && bitspercomponent != 16) bitspercomponent = 8;
 
-        columns = pdf_dict_get_number(parms_dict, "/Columns");
+        columns = parms_dict->get_number("/Columns");
         if (columns < 1) columns = 1;
 
-        earlychange = pdf_dict_get_number(parms_dict, "/EarlyChange");
+        earlychange = parms_dict->get_number("/EarlyChange");
         if (earlychange != 0 && earlychange != 1) earlychange = 1;
     }
 

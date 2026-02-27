@@ -217,7 +217,7 @@ void _pdf_process_stream(pdf_render_t* context, pdf_stream_t* stream)
     pdf_stream_open(stream);
     pdf_token_t* tk;
     //int count = 0;
-    while ((tk = pdf_stream_get_next_token(stream)) != NULL)
+    while ((tk = pdf_parser_next_token(stream->parser)) != NULL)
     {
         if (tk->type() == TOKEN_STREAM_END)
             break;
@@ -271,18 +271,18 @@ void pdf_render_do(pdf_render_t* context)
             pdf_obj_t* anno_obj = pdf_file_get_obj(context->page->pdf, context->page->annots->get(i)->val.indirect);
             if (anno_obj != NULL)
             { 
-                pdf_dict_get_name(anno_obj->value->val.dict, "/Type");
-                pdf_dict_get_name(anno_obj->value->val.dict, "/SubType");
-                pdf_array_t* rect_aar = pdf_dict_get_array(anno_obj->value->val.dict, "/Rect");
+                anno_obj->value->val.dict->get_name("/Type");
+                anno_obj->value->val.dict->get_name("/SubType");
+                pdf_array_t* rect_aar = anno_obj->value->val.dict->get_array("/Rect");
                 if (rect_aar != NULL)
                 {
                     plutovg_canvas_translate(context->canvas, rect_aar->get(0)->val.number, rect_aar->get(1)->val.number);
                 }
-                pdf_dict_get_string(anno_obj->value->val.dict, "/Contents");
-                pdf_dict_get_dict(anno_obj->value->val.dict, "/P");
-                pdf_dict_get_string(anno_obj->value->val.dict, "/NM");
-                pdf_dict_get_string(anno_obj->value->val.dict, "/M");
-                int F = pdf_dict_get_number(anno_obj->value->val.dict, "/F");
+                anno_obj->value->val.dict->get_string("/Contents");
+                anno_obj->value->val.dict->get_dict("/P");
+                anno_obj->value->val.dict->get_string("/NM");
+                anno_obj->value->val.dict->get_string("/M");
+                int F = anno_obj->value->val.dict->get_number("/F");
                 if (F != -1)
                 {
                     if (F & 0b0000000001)
@@ -306,20 +306,20 @@ void pdf_render_do(pdf_render_t* context)
                     if (F & 0b1000000000)
                         ; // lockedcontents
                 }
-                pdf_dict_t* AP = pdf_dict_get_dict(anno_obj->value->val.dict, "/AP");
+                pdf_dict_t* AP = anno_obj->value->val.dict->get_dict("/AP");
                 if (AP != NULL)
                 {
-                    pdf_dict_t* nomal_dict = pdf_dict_get_dict(AP, "/N"); // required
+                    pdf_dict_t* nomal_dict = AP->get_dict("/N"); // required
                     if (nomal_dict == NULL)
                     {
-                        int ref = pdf_dict_get_ref(AP, "/N");
+                        int ref = AP->get_indirect("/N");
                         pdf_obj_t* obj = pdf_file_get_obj(context->page->pdf, ref);
                         if (obj->stream != NULL)
                         {
                             context->current_obj = obj;
                             pdf_stream_open(obj->stream);
                             pdf_token_t* tk = NULL;
-                            while ((tk = pdf_stream_get_next_token(obj->stream)) != NULL)
+                            while ((tk = pdf_parser_next_token(obj->stream->parser)) != NULL)
                             {
                                 if (tk->type() == TOKEN_STREAM_END)
                                     break;
@@ -330,11 +330,11 @@ void pdf_render_do(pdf_render_t* context)
                         }
                     }
                 }
-                pdf_dict_get_name(anno_obj->value->val.dict, "/AS");
-                pdf_dict_get_array(anno_obj->value->val.dict, "/Border");
-                pdf_dict_get_array(anno_obj->value->val.dict, "/C");
-                pdf_dict_get_number(anno_obj->value->val.dict, "/StructParent");
-                pdf_dict_get_dict(anno_obj->value->val.dict, "/OC");
+                anno_obj->value->val.dict->get_name("/AS");
+                anno_obj->value->val.dict->get_array("/Border");
+                anno_obj->value->val.dict->get_array("/C");
+                anno_obj->value->val.dict->get_number("/StructParent");
+                anno_obj->value->val.dict->get_dict("/OC");
             }
         }
     }
@@ -387,7 +387,7 @@ void _do_render_operation(pdf_stream_t* stream, pdf_render_t* context, pdf_token
                 int channels = 3;
                 int bitsPerColor = 8;
                 char filter[64] = {0};
-                while ((t = pdf_stream_get_next_token(stream)) != NULL)
+                while ((t = pdf_parser_next_token(stream->parser)) != NULL)
                 {
                     if (t->type() == TOKEN_OPERATOR_ID)
                     {
@@ -396,7 +396,7 @@ void _do_render_operation(pdf_stream_t* stream, pdf_render_t* context, pdf_token
                     }
                     else if (t->type() == TOKEN_NAME)
                     {
-                        pdf_token_t* t1 = pdf_stream_get_next_token(stream);
+                        pdf_token_t* t1 = pdf_parser_next_token(stream->parser);
                         if (t1 != NULL)
                         {
                             if (!strcmp(t->data(), "/W"))
@@ -430,13 +430,13 @@ void _do_render_operation(pdf_stream_t* stream, pdf_render_t* context, pdf_token
                                 }
                                 else if (t1->type() == TOKEN_ARRAY_BEG)
                                 {
-                                    pdf_token_t* t2 = pdf_stream_get_next_token(stream);
+                                    pdf_token_t* t2 = pdf_parser_next_token(stream->parser);
                                     if (t2 != NULL && t2->type() == TOKEN_NAME)
                                     {
                                         strcpy(filter, t2->data());
                                     }
                                     delete t2;
-                                    pdf_token_t* t3 = pdf_stream_get_next_token(stream);
+                                    pdf_token_t* t3 = pdf_parser_next_token(stream->parser);
                                     if (t3->type() == TOKEN_ARRAY_END)
                                     {
 
@@ -463,7 +463,7 @@ void _do_render_operation(pdf_stream_t* stream, pdf_render_t* context, pdf_token
                         ret += 1;
                         if (ret >= 2 && !memcmp(buffer + ret - 2, "\xFF\xD9", 2))
                         {
-                            pdf_token_t* t1 = pdf_stream_get_next_token(stream);
+                            pdf_token_t* t1 = pdf_parser_next_token(stream->parser);
                             if (t1 != NULL && t1->type() == TOKEN_OPERATOR_EI)
                             {
                                 delete t1;
