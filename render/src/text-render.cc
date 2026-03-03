@@ -1,6 +1,5 @@
 #include "pdf-render.h"
 #include "pdf-render-private.h"
-#include "pdf-private.h"
 #include "plutovg-private.h"
 #include <stdint.h>
 #include <wchar.h>
@@ -11,25 +10,29 @@
 uint32_t _convert_unicode_from_latin_encoding(uint16_t code, pdf_latin_encoding_type_t encoding)
 {
     const pdf_latin_encoding_map_t* map = NULL;
+    int len = 0;
     switch (encoding)
     {
         case PDF_LATIN_ENCODING_STD:
             map = macRomanEncoding;
+            len = 207;
             break;
         case PDF_LATIN_ENCODING_MAC:
             map = macRomanEncoding;
+            len = 207;
             break;
         case PDF_LATIN_ENCODING_WIN:
             map = winAnsiEncoding;
+            len = 217;
             break;
         case PDF_LATIN_ENCODING_PDF:
             map = pdfDocEncoding;
+            len = 229;
             break;
         default:
             return 0;
     }
     if (map == NULL) return 0;
-    int len = ARRAY_COUNT(map);
     const char* name = NULL;
     for (int i = 0; i < len; i++)
     {
@@ -60,11 +63,11 @@ uint32_t _convert_unicode_from_latin_encoding(uint16_t code, pdf_latin_encoding_
     fclose(f);
     return unicode;
 }
-uint32_t _convert_code_from_cmap(pdf_cmap_t* cmap, uint32_t code)
+uint32_t _convert_code_from_cmap(pdf_cmap* cmap, uint32_t code)
 {
     if (cmap != NULL)
     {
-        for (int k = 0; k < cmap->cid_map.size(); k++)
+        for (size_t k = 0; k < cmap->cid_map.size(); k++)
         {
             if (code == cmap->cid_map[k].code)
             {
@@ -72,7 +75,7 @@ uint32_t _convert_code_from_cmap(pdf_cmap_t* cmap, uint32_t code)
             }
         }
  
-        for (int k = 0; k < cmap->cid_range_map.size(); k++)
+        for (size_t k = 0; k < cmap->cid_range_map.size(); k++)
         {
             if (code >= cmap->cid_range_map[k].srcStart &&
                 code <= cmap->cid_range_map[k].srcEnd)
@@ -116,11 +119,11 @@ std::string codepoint_to_utf8(uint32_t cp)
     }
     return result;
 }
-uint32_t _convert_unicode_from_cmap(pdf_cmap_t* cmap, uint32_t code)
+uint32_t _convert_unicode_from_cmap(pdf_cmap* cmap, uint32_t code)
 {
     if (cmap != NULL)
     {
-        for (int k = 0; k < cmap->unicode_map.size(); k++)
+        for (size_t k = 0; k < cmap->unicode_map.size(); k++)
         {
             if (code == cmap->unicode_map[k].code)
             {
@@ -128,7 +131,7 @@ uint32_t _convert_unicode_from_cmap(pdf_cmap_t* cmap, uint32_t code)
             }
         }
  
-        for (int k = 0; k < cmap->unicode_range_map.size(); k++)
+        for (size_t k = 0; k < cmap->unicode_range_map.size(); k++)
         {
             if (code >= cmap->unicode_range_map[k].srcStart &&
                 code <= cmap->unicode_range_map[k].srcEnd)
@@ -141,11 +144,11 @@ uint32_t _convert_unicode_from_cmap(pdf_cmap_t* cmap, uint32_t code)
     return code;
 }
 
-void _cff_do_render_char(pdf_cff_char_render_t* context, pdf_deque_t* deque)
+void _cff_do_render_char(pdf_cff_char_render_t* context, pdf_deque* deque)
 {
     //plutovg_canvas_t* canvas = context->canvas;
-    //pdf_array_t* charstrings_index = context->charstrings;
-    //pdf_array_t* global_subr_index = context->global_subr;
+    //pdf_array* charstrings_index = context->charstrings;
+    //pdf_array* global_subr_index = context->global_subr;
     //uint16_t global_bias = context->global_bias;
 
     unsigned char* end = context->buf + context->len;
@@ -156,9 +159,6 @@ void _cff_do_render_char(pdf_cff_char_render_t* context, pdf_deque_t* deque)
     // }
     // printf("\n");
 
-    pdf_node_t node;
-    char data[16] = {0};
-    node.data = data;
     //static double width = 0;
     while (context->cur < end)
     {
@@ -171,13 +171,13 @@ void _cff_do_render_char(pdf_cff_char_render_t* context, pdf_deque_t* deque)
             uint8_t b2 = context->cur[1];
             context->cur += 2;
             v = b1 << 8 | b2; 
-            pdf_deque_push(deque, &v, sizeof(double));
+            deque->push_front(&v, sizeof(double));
         }
         else if (b0 >= 32 && b0 <= 246)
         { 
             context->cur++;
             v = b0 - 139;
-            pdf_deque_push(deque, &v, sizeof(double));
+            deque->push_front(&v, sizeof(double));
         }
         else if (b0 >= 247 && b0 <= 250)
         {
@@ -185,7 +185,7 @@ void _cff_do_render_char(pdf_cff_char_render_t* context, pdf_deque_t* deque)
             uint8_t b1 = context->cur[0];
             context->cur++;
             v = (b0 - 247) * 256 + b1 + 108;
-            pdf_deque_push(deque, &v, sizeof(double));
+            deque->push_front(&v, sizeof(double));
         }
         else if (b0 >= 251 && b0 <= 254)
         {
@@ -193,7 +193,7 @@ void _cff_do_render_char(pdf_cff_char_render_t* context, pdf_deque_t* deque)
             uint8_t b1 = context->cur[0];
             context->cur++;
             v = -(b0 - 251) * 256 - b1 - 108;
-            pdf_deque_push(deque, &v, sizeof(double));
+            deque->push_front(&v, sizeof(double));
         }
         else if (b0 == 255)
         {
@@ -202,18 +202,18 @@ void _cff_do_render_char(pdf_cff_char_render_t* context, pdf_deque_t* deque)
             int32_t signed_value = (int32_t)raw_value;
             v = (float)signed_value / 65536.0;
             context->cur += 4;
-            pdf_deque_push(deque, &v, sizeof(double));
+            deque->push_front(&v, sizeof(double));
         } 
         else if (b0 == 11) break;
         else if (b0 == 14)
         {
-            if (deque->size > 0 && !context->havewidth)
+            if (deque->size() > 0 && !context->havewidth)
             {
-                pdf_deque_pop_end(deque, &node);
-                context->width = *((double*)data);
+                auto data = deque->pop_back();
+                context->width = *((double*)data->data());
                 context->havewidth = true;
             }
-            pdf_deque_empty(deque);
+            deque->clear();
             // if (context->open)
             //     plutovg_canvas_close_path(context->canvas);
             context->open = false;
@@ -250,7 +250,7 @@ void _cff_do_render_char(pdf_cff_char_render_t* context, pdf_deque_t* deque)
                 if (!context->fisr_stack_clear)
                 {
                     if (operator1 != 10 && operator1 != 29)
-                        pdf_deque_empty(deque);
+                        deque->clear();
                 }
                 else
                 {
@@ -265,7 +265,7 @@ void _cff_do_render_char(pdf_cff_char_render_t* context, pdf_deque_t* deque)
                     || operator1 == 23//vstemhm
                     )
                     {
-                        pdf_deque_empty(deque);
+                        deque->clear();
                         context->fisr_stack_clear = false;
                         break;
                     }
@@ -278,13 +278,13 @@ void _cff_do_render_char(pdf_cff_char_render_t* context, pdf_deque_t* deque)
             }
             case 14://endcar
             {
-                if (deque->size > 0 && !context->havewidth)
+                if (deque->size() > 0 && !context->havewidth)
                 {
-                    pdf_deque_pop_end(deque, &node);
-                    context->width = *((double*)data);
+                    auto data = deque->pop_back();
+                    context->width = *((double*)data->data());
                     context->havewidth = true;
                 }
-                pdf_deque_empty(deque);
+                deque->clear();
                 // if (context->open)
                 //     plutovg_canvas_close_path(context->canvas);
                 context->open = false;
@@ -345,7 +345,7 @@ typedef struct unicode_text
     bool isGid;
 } unicode_text_t;
 
-float plutovg_font_face_traverse_glyph_path1(plutovg_font_face_t* face, 
+float plutovg_font_face_traverse_glyph_path1(pdf_font_face_t* face, 
     float size, 
     float x, float y, 
     plutovg_codepoint_t codepoint, bool isGid,
@@ -439,30 +439,27 @@ static void glyph_traverse_func(void* closure, plutovg_path_command_t command, c
     }
 }
 
-float plutovg_canvas_add_text1(plutovg_canvas_t* canvas, const void* text, int length, plutovg_text_encoding_t encoding, float x, float y, bool isGid)
+float plutovg_canvas_add_text1(pdf_render* context, const void* text, int length, plutovg_text_encoding_t encoding, float x, float y, bool isGid)
 {
-    plutovg_state_t* state = canvas->state;
-    if(state->font_face == NULL || state->font_size <= 0.f)
-        return 0.f;
     plutovg_text_iterator_t it;
     plutovg_text_iterator_init(&it, text, length, encoding);
     float advance_width = 0.f;
     while(plutovg_text_iterator_has_next(&it)) {
         plutovg_codepoint_t codepoint = plutovg_text_iterator_next(&it);
         advance_width += plutovg_font_face_traverse_glyph_path1(
-            state->font_face, 
-            state->font_size, 
+            context->state->textState.fontface,
+            context->state->textState.fontSize,
             x + advance_width, y, 
             codepoint,
             isGid, 
             glyph_traverse_func, 
-            canvas->path);
+            context->canvas->path);
     }
 
     return advance_width;
 }
 
-void _do_text_render(pdf_render_t* context, char* buf, int len)
+void _do_text_render(pdf_render* context, char* buf, int len)
 {
     if (context == NULL || context->state->textState.font == NULL || buf == NULL)
     {
@@ -494,24 +491,32 @@ void _do_text_render(pdf_render_t* context, char* buf, int len)
         {
             return;
         }
-        pdf_cmap_t* to_unicode_map = type3->to_unicode_map;
+        pdf_cmap* to_unicode_map = type3->to_unicode_map;
+        for (size_t i = 0; i < bytes.size(); i++)
+        {
+            uint8_t code = bytes[i];
+            unicode[unicode_cnt].utf8 = code;
+            unicode[unicode_cnt].encoding = PLUTOVG_TEXT_ENCODING_UTF8;
+            unicode[unicode_cnt].isGid = false;
+            unicode_cnt++;
+        }
         if (to_unicode_map != NULL)
         {
-            // for (int i = 0; i < bytes.size(); i++)
-            // {
-            //     uint32_t code = bytes[i];
+            for (size_t i = 0; i < bytes.size(); i++)
+            {
+                uint32_t code = bytes[i];
                 
-            //     for (int i = 0; i < to_unicode_map->code_range_map.size(); i++)
-            //     {
-            //         if (code >= to_unicode_map->code_range_map[i].srcStart && code <= to_unicode_map->code_range_map[i].srcEnd)
-            //         {
-            //             uint32_t tmp = _convert_code_from_cmap(to_unicode_map, code);
-            //             wchar_t wc = tmp;
-            //             printf("code = %d unicdoe = %d (%lc)\n", code, tmp, wc);
-            //             break;
-            //         }
-            //     }
-            // }
+                for (size_t j = 0; j < to_unicode_map->code_range_map.size(); j++)
+                {
+                    if (code >= to_unicode_map->code_range_map[j].srcStart && code <= to_unicode_map->code_range_map[j].srcEnd)
+                    {
+                        uint32_t tmp = _convert_unicode_from_cmap(to_unicode_map, code);
+                        wchar_t wc = tmp;
+                        printf("code = %d unicdoe = %d (%lc)\n", code, tmp, wc);
+                        break;
+                    }
+                }
+            }
         }
     }
     else if (font->subtype == FONT_SUBTYPE_TRUETYPE || font->subtype == FONT_SUBTYPE_TYPE1)
@@ -522,7 +527,7 @@ void _do_text_render(pdf_render_t* context, char* buf, int len)
             return;
         }
         char* encoding = type1_truetype->encoding;
-        pdf_cmap_t* to_unicode_map = type1_truetype->to_unicode_map;
+        pdf_cmap* to_unicode_map = type1_truetype->to_unicode_map;
 
         if (encoding != NULL)
         {
@@ -540,7 +545,7 @@ void _do_text_render(pdf_render_t* context, char* buf, int len)
                 latin_encoding = PDF_LATIN_ENCODING_PDF;
             }
             
-            for (int i = 0; i < bytes.size(); i++)
+            for (size_t i = 0; i < bytes.size(); i++)
             {
                 uint16_t code = bytes[i];
                 uint32_t uni = _convert_unicode_from_latin_encoding(code, latin_encoding);
@@ -587,25 +592,30 @@ void _do_text_render(pdf_render_t* context, char* buf, int len)
         {
             return;
         }
-        pdf_cmap_t* encoding = type0->encoding;
-        pdf_cmap_t* to_unicode_map = type0->to_unicode_map;
-        pdf_cmap_t* cid_to_gid_map = cidfont->cid_to_gid_map;
+        pdf_cmap* encoding = type0->encoding;
+        pdf_cmap* to_unicode_map = type0->to_unicode_map;
+        pdf_cmap* cid_to_gid_map = cidfont->cid_to_gid_map;
         if (descendant->subtype == FONT_SUBTYPE_CIDFONTTPYE0)
         {
-            for (int i = 0; i < bytes.size(); )
+            for (size_t i = 0; i < bytes.size(); )
             {
                 uint32_t code = 0;
                 uint32_t cid = 0;
                 for (int j = 4; j >= 1; j /= 2)
                 {
                     bool found = false;
-                    for (int k = 0; k < encoding->code_range_map.size(); k++)
+                    for (size_t k = 0; k < encoding->code_range_map.size(); k++)
                     {
                         if (encoding->code_range_map[k].byte_len != j)
                             continue;
                         for (int l = j - 1; l >= 0; l--)
                         {
-                            code = code << 8 | bytes[i + (j - 1 - l)];
+                            size_t index = i + (j - 1 - l);
+                            if (index >= bytes.size())
+                            {
+                                break;
+                            }
+                            code = code << 8 | bytes[index];
                         }
                         if (code >= encoding->code_range_map[k].srcStart && code <= encoding->code_range_map[k].srcEnd)
                         {
@@ -631,13 +641,13 @@ void _do_text_render(pdf_render_t* context, char* buf, int len)
                 
                 if (to_unicode_map != NULL)
                 {
-                    for (int j = 0; j < to_unicode_map->code_range_map.size(); j++)
+                    for (size_t j = 0; j < to_unicode_map->code_range_map.size(); j++)
                     {
                         if (code >= to_unicode_map->code_range_map[j].srcStart && code <= to_unicode_map->code_range_map[j].srcEnd)
                         {
                             uint32_t uni = _convert_unicode_from_cmap(to_unicode_map, code);
                             wchar_t wc = uni;
-                            printf("unicode = %5d (%lc)\n", code, uni, wc);
+                            printf("unicode = %5d (%lc)\n", uni, wc);
                             break;
                         }
                     }
@@ -655,20 +665,25 @@ void _do_text_render(pdf_render_t* context, char* buf, int len)
         }
         else
         {
-            for (int i = 0; i < bytes.size(); )
+            for (size_t i = 0; i < bytes.size(); )
             {
                 uint32_t code = 0;
                 uint32_t cid = 0;
                 for (int j = 4; j >= 1; j /= 2)
                 {
                     bool found = false;
-                    for (int k = 0; k < encoding->code_range_map.size(); k++)
+                    for (size_t k = 0; k < encoding->code_range_map.size(); k++)
                     {
                         if (encoding->code_range_map[k].byte_len != j)
                             continue;
                         for (int l = j - 1; l >= 0; l--)
                         {
-                            code = code << 8 | bytes[i + (j - 1 - l)];
+                            size_t index = i + (j - 1 - l);
+                            if (index >= bytes.size())
+                            {
+                                break;
+                            }
+                            code = code << 8 | bytes[index];
                         }
                         if (code >= encoding->code_range_map[k].srcStart && code <= encoding->code_range_map[k].srcEnd)
                         {
@@ -687,7 +702,7 @@ void _do_text_render(pdf_render_t* context, char* buf, int len)
                 }
                 if (cid_to_gid_map != NULL)
                 {
-                    for (int j = 0; j < cid_to_gid_map->code_range_map.size(); j++)
+                    for (size_t j = 0; j < cid_to_gid_map->code_range_map.size(); j++)
                     {
                         if (cid >= cid_to_gid_map->code_range_map[j].srcStart && cid <= cid_to_gid_map->code_range_map[j].srcEnd)
                         {
@@ -705,10 +720,10 @@ void _do_text_render(pdf_render_t* context, char* buf, int len)
                 {
                     char to_unicode_name[64] = {0};
                     sprintf(to_unicode_name, "Adobe-%s-UCS2", cidfont->cid_system_info.ordering);
-                    pdf_cmap_t* c = pdf_file_get_cmap(context->pdf, to_unicode_name);
+                    pdf_cmap* c = pdf_file_get_cmap(context->pdf, to_unicode_name);
                     if (c != NULL)
                     {
-                        for (int j = 0; j < c->code_range_map.size(); j++)
+                        for (size_t j = 0; j < c->code_range_map.size(); j++)
                         {
                             if (cid >= c->code_range_map[j].srcStart && cid <= c->code_range_map[j].srcEnd)
                             {
@@ -727,7 +742,7 @@ void _do_text_render(pdf_render_t* context, char* buf, int len)
                 }
                 if (to_unicode_map != NULL)
                 {
-                    for (int j = 0; j < to_unicode_map->code_range_map.size(); j++)
+                    for (size_t j = 0; j < to_unicode_map->code_range_map.size(); j++)
                     {
                         if (code >= to_unicode_map->code_range_map[j].srcStart && code <= to_unicode_map->code_range_map[j].srcEnd)
                         {
@@ -769,8 +784,6 @@ void _do_text_render(pdf_render_t* context, char* buf, int len)
             // or scale by 1
             plutovg_canvas_transform(context->canvas, &context->state->textState.textMatrix);
             plutovg_canvas_scale(context->canvas, 1, -1);
-            plutovg_canvas_set_font_size(context->canvas, context->state->textState.fontSize);
-            plutovg_canvas_set_font_face(context->canvas, context->state->textState.fontface);
             plutovg_canvas_set_line_width(context->canvas, context->state->lineWidth);
             plutovg_canvas_set_miter_limit(context->canvas, context->state->miterLimit);
             plutovg_canvas_set_line_cap(context->canvas, (plutovg_line_cap_t)context->state->lineCap);
@@ -782,20 +795,18 @@ void _do_text_render(pdf_render_t* context, char* buf, int len)
             {
                 if (unicode[i].encoding == PLUTOVG_TEXT_ENCODING_UTF8)
                 {
-                    advance_width = plutovg_canvas_add_text1(context->canvas, &unicode[i].utf8, 1, unicode[i].encoding, context->state->textState.textLineWidth, 0, unicode[i].isGid);
+                    advance_width = plutovg_canvas_add_text1(context, &unicode[i].utf8, 1, unicode[i].encoding, context->state->textState.textLineWidth, 0, unicode[i].isGid);
                 }
                 else if (unicode[i].encoding == PLUTOVG_TEXT_ENCODING_UTF16)
                 {
-                    advance_width = plutovg_canvas_add_text1(context->canvas, &unicode[i].utf16, 1, unicode[i].encoding, context->state->textState.textLineWidth, 0, unicode[i].isGid);
+                    advance_width = plutovg_canvas_add_text1(context, &unicode[i].utf16, 1, unicode[i].encoding, context->state->textState.textLineWidth, 0, unicode[i].isGid);
                 }
                 else
                 {
-                    advance_width = plutovg_canvas_add_text1(context->canvas, &unicode[i].utf32, 1, unicode[i].encoding, context->state->textState.textLineWidth, 0, unicode[i].isGid);
+                    advance_width = plutovg_canvas_add_text1(context, &unicode[i].utf32, 1, unicode[i].encoding, context->state->textState.textLineWidth, 0, unicode[i].isGid);
                 }
                 context->state->textState.textLineWidth += advance_width;
             }
-
-             
 
             // TODO: text rendering mode support
             switch (context->state->textState.textMode)
@@ -875,16 +886,16 @@ void _do_text_render(pdf_render_t* context, char* buf, int len)
             }
             if (font_descriptor == NULL) 
                 return;
-            pdf_array_t* charstrings_index = font_descriptor->charstrings;
-            pdf_array_t* font_dict_aar = font_descriptor->font_dict_arr;
-            pdf_array_t* font_dict_select = font_descriptor->font_dict_select_arr;
+            pdf_array* charstrings_index = font_descriptor->charstrings;
+            pdf_array* font_dict_aar = font_descriptor->font_dict_arr;
+            pdf_array* font_dict_select = font_descriptor->font_dict_select_arr;
             if (charstrings_index != NULL)
             {
-                pdf_array_t* font_matrix = font_descriptor->font_matrix;
+                pdf_array* font_matrix = font_descriptor->font_matrix;
                 plutovg_matrix_t original_matrix = context->state->textState.textMatrix;
                 for (int i = 0; i < unicode_cnt; i++)
                 {
-                    pdf_deque_t* deque = pdf_deque_init();
+                    pdf_deque* deque = new pdf_deque();
                     plutovg_canvas_save(context->canvas);
                     plutovg_matrix_t font_matrix_plutovg, rm;
                     plutovg_matrix_init(&font_matrix_plutovg, 
@@ -893,9 +904,9 @@ void _do_text_render(pdf_render_t* context, char* buf, int len)
                         font_matrix->get(4)->val.number, font_matrix->get(5)->val.number);
                     plutovg_matrix_multiply(&rm, &font_matrix_plutovg, &context->state->textState.textMatrix);
                     plutovg_matrix_t m = {
-                        context->state->textState.fontSize * context->state->textState.horizontalScaling / 100, 0,
-                        0, context->state->textState.fontSize,
-                        0, context->state->textState.textRise
+                        (float)(context->state->textState.fontSize * context->state->textState.horizontalScaling / 100.0f), 0,
+                        0, (float)context->state->textState.fontSize,
+                        0, (float)context->state->textState.textRise
                     };
                     plutovg_matrix_multiply(&rm, &m, &rm);
                     plutovg_canvas_transform(context->canvas, &rm);
@@ -921,7 +932,7 @@ void _do_text_render(pdf_render_t* context, char* buf, int len)
                     ctx.stemshm = 0;
                     ctx.fisr_stack_clear = true;
                     _cff_do_render_char(&ctx, deque);
-                    pdf_dict_t* font_dict = NULL;
+                    pdf_dict* font_dict = NULL;
                     double defaultWidthX = 0;
                     double nominalWidthX = 0;
                     if ((int)(font_dict_select->get(0)->val.number) == 0)
@@ -931,10 +942,10 @@ void _do_text_render(pdf_render_t* context, char* buf, int len)
                     }
                     else
                     {
-                        for (int j = 1; j < font_dict_select->size(); j += 3)
+                        for (size_t j = 1; j < font_dict_select->size(); j += 3)
                         {
-                            if (unicode[i].utf32 >= (int)(font_dict_select->get(j)->val.number)
-                            && unicode[i].utf32 <= (int)(font_dict_select->get(j + 1)->val.number))
+                            if (unicode[i].utf32 >= (uint32_t)((int)(font_dict_select->get(j)->val.number))
+                            && unicode[i].utf32 <= (uint32_t)((int)(font_dict_select->get(j + 1)->val.number)))
                             {
                                 int fd = (int)(font_dict_select->get(j + 2)->val.number);
                                 font_dict = font_dict_aar->get(fd)->val.dict;
@@ -957,7 +968,7 @@ void _do_text_render(pdf_render_t* context, char* buf, int len)
                     plutovg_matrix_translate(&context->state->textState.textMatrix, advance, 0);
                     plutovg_canvas_fill(context->canvas);
                     plutovg_canvas_restore(context->canvas); 
-                    pdf_deque_free(deque);
+                    delete deque;
                 }
                 context->state->textState.textMatrix = original_matrix;
                 //plutovg_surface_write_to_png(context->surface, "test.png");
@@ -970,12 +981,12 @@ void _do_text_render(pdf_render_t* context, char* buf, int len)
         float x, y;
         plutovg_canvas_get_current_point(context->canvas, &x, &y);
         // render Type3 font
-        pdf_array_t* differences = type3->differences;
+        pdf_array* differences = type3->differences;
         if (differences != NULL)
         {
-            // pdf_array_t* font_bbox = type3->font_bbox;
-            pdf_array_t* font_matrix = type3->font_matrix;
-            pdf_array_t* widths = type3->widths;
+            // pdf_array* font_bbox = type3->font_bbox;
+            pdf_array* font_matrix = type3->font_matrix;
+            pdf_array* widths = type3->widths;
             // plutovg_canvas_scale(context->canvas, 1, -1);
             
             //plutovg_canvas_set_font_size(context->canvas, context->state->textState.fontSize);
@@ -984,7 +995,7 @@ void _do_text_render(pdf_render_t* context, char* buf, int len)
             for (int i = 0; i < unicode_cnt; i++) 
             {
                 uint32_t c = unicode[i].utf32;
-                for (int j = 0; j < differences->size(); j += 2) 
+                for (size_t j = 0; j < differences->size(); j += 2) 
                 {
                     if ((uint32_t)differences->get(j)->val.number == c) 
                     {
@@ -1006,16 +1017,16 @@ void _do_text_render(pdf_render_t* context, char* buf, int len)
                                     font_matrix->get(4)->val.number, font_matrix->get(5)->val.number);
                                 plutovg_matrix_multiply(&rm, &font_matrix_plutovg, &context->state->textState.textMatrix);
                                 plutovg_matrix_t m = {
-                                    context->state->textState.fontSize * context->state->textState.horizontalScaling / 100, 0,
-                                    0, context->state->textState.fontSize,
-                                    0, context->state->textState.textRise
+                                    (float)(context->state->textState.fontSize * context->state->textState.horizontalScaling / 100.0f), 0,
+                                    0, (float)context->state->textState.fontSize,
+                                    0, (float)context->state->textState.textRise
                                 };
                                 plutovg_matrix_multiply(&rm, &m, &rm);
                                 plutovg_canvas_transform(context->canvas, &rm);
                                 if (widths != NULL)
                                 {
                                     float width = 0;
-                                    if (c >= type3->first_char && c <= type3->last_char)
+                                    if (c >= (uint32_t)type3->first_char && c <= (uint32_t)type3->last_char)
                                     {
                                         width = widths->get(c - type3->first_char)->val.number;
                                     }
@@ -1040,7 +1051,7 @@ void _do_text_render(pdf_render_t* context, char* buf, int len)
                                 // }
                                 plutovg_canvas_new_path(context->canvas);
                                 pdf_stream_open(obj->stream);
-                                pdf_token_t* tk = NULL;
+                                pdf_token* tk = NULL;
                                 while ((tk = pdf_parser_next_token(obj->stream->parser)) != NULL) 
                                 {
                                     if (tk->type() == TOKEN_STREAM_END)

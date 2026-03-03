@@ -1,5 +1,6 @@
-#include "pdf-private.h"
 #include "pdf.h"
+#include "pdf-private.h"
+
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
@@ -8,7 +9,8 @@
 const static char* TOKEN_NAMES[] = {
     #define TOKEN_DEF(v, t) v,
     #include "pdf-token.def"
-    };
+    #undef TOKEN_DEF
+};
 const char space_tag[] = {
     // 0 9 10 12 13 32
     '\0', '\t', '\n', '\f', '\r', ' '
@@ -38,11 +40,11 @@ bool _is_space(char c)
 
     return false;
 }
-bool _is_digit(char c)
+inline bool _is_digit(char c)
 {
     return (c >= '0' && c <= '9');
 }
-bool _is_hex(char c)
+inline bool _is_hex(char c)
 {
     return
         _is_digit(c)
@@ -250,7 +252,7 @@ const char* _token_to_string(pdf_token_type_t type)
     return TOKEN_NAMES[type];
 }
 
-pdf_token_t* _parse_number(pdf_parser_t* parser, const unsigned char* start, const unsigned char* end)
+pdf_token* _parse_number(pdf_parser_t* parser, const unsigned char* start, const unsigned char* end)
 {
     int len = 1;
     const unsigned char* p = start;
@@ -289,7 +291,7 @@ pdf_token_t* _parse_number(pdf_parser_t* parser, const unsigned char* start, con
                 break;
             }
         }
-        pdf_token_t* tk = new pdf_token_t((char*)start, len, TOKEN_NUMBER);
+        pdf_token* tk = new pdf_token((char*)start, len, TOKEN_NUMBER);
 
         return tk;
     }
@@ -527,11 +529,11 @@ void pdf_token::decode_string()
     delete[] out;
 }
 
-pdf_token_t* _pdf_parser_next_one_token(pdf_parser_t* parser, const unsigned char* start, const unsigned char* end)
+pdf_token* _pdf_parser_next_one_token(pdf_parser_t* parser, const unsigned char* start, const unsigned char* end)
 {
     if (start == NULL)
         return NULL;
-    pdf_token_t* tk = NULL;
+    pdf_token* tk = NULL;
     unsigned char c = *start;
     do
     {
@@ -594,7 +596,7 @@ pdf_token_t* _pdf_parser_next_one_token(pdf_parser_t* parser, const unsigned cha
                 str = (char*)start;
             }
             
-            tk = new pdf_token_t(str, len, to_compare[mid]);
+            tk = new pdf_token(str, len, to_compare[mid]);
             start += len;
             return tk;
         }
@@ -620,7 +622,7 @@ NOT_OPERATOR:
             }
         }
 
-        tk = new pdf_token_t((char*)start, len, TOKEN_NAME);
+        tk = new pdf_token((char*)start, len, TOKEN_NAME);
         start += len;
     }
     else if (c == '(') // parse string
@@ -655,19 +657,19 @@ NOT_OPERATOR:
         {
             return NULL;
         }
-        tk = new pdf_token_t((char*)start, len, TOKEN_STRING);
+        tk = new pdf_token((char*)start, len, TOKEN_STRING);
         start += len;
     }
     else if (c == '[')
     {
         int len = 1;
-        tk = new pdf_token_t((char*)start, len, TOKEN_ARRAY_BEG);
+        tk = new pdf_token((char*)start, len, TOKEN_ARRAY_BEG);
         start += len;
     }
     else if (c == ']')
     {
         int len = 1;
-        tk = new pdf_token_t((char*)start, len, TOKEN_ARRAY_END);
+        tk = new pdf_token((char*)start, len, TOKEN_ARRAY_END);
         start += len;
 
     }
@@ -676,7 +678,7 @@ NOT_OPERATOR:
         if (memcmp(start, "<<", 2) == 0) // dict
         {
             int len = 2;
-            tk = new pdf_token_t((char*)start, len, TOKEN_DICT_BEG);
+            tk = new pdf_token((char*)start, len, TOKEN_DICT_BEG);
             start += len;
         }
         else
@@ -693,7 +695,7 @@ NOT_OPERATOR:
                 }
             }
 
-            tk = new pdf_token_t((char*)start, len, TOKEN_HEX_STRING);
+            tk = new pdf_token((char*)start, len, TOKEN_HEX_STRING);
             start += len;
         }
     }
@@ -702,7 +704,7 @@ NOT_OPERATOR:
         if (memcmp(start, ">>", 2) == 0) // dict
         {
             int len = 2;
-            tk = new pdf_token_t((char*)start, len, TOKEN_DICT_END);
+            tk = new pdf_token((char*)start, len, TOKEN_DICT_END);
             start += len;
         }
         else
@@ -724,7 +726,7 @@ NOT_OPERATOR:
                 break;
             }
         }
-        tk = new pdf_token_t((char*)start, len, TOKEN_COMMENT);
+        tk = new pdf_token((char*)start, len, TOKEN_COMMENT);
         start += len;
     }
     else if (c == '-' || c == '+' || c == '.' || _is_digit(c))
@@ -739,12 +741,12 @@ NOT_OPERATOR:
     PARSE_SPACE:
         if (memcmp(start, "\r\n", 2) == 0)
         {
-            tk = new pdf_token_t((char*)start, 2, TOKEN_NEWLINE);
+            tk = new pdf_token((char*)start, 2, TOKEN_NEWLINE);
             start += 2;
         }
         else
         {
-            tk = new pdf_token_t((char*)start, 1, TOKEN_SPACE);
+            tk = new pdf_token((char*)start, 1, TOKEN_SPACE);
             start += 1;
         }
     }
@@ -839,7 +841,7 @@ void _pdf_parser_read_input(pdf_parser_t* parser)
     parser->pause_read = false;
 }
 
-pdf_token_t* pdf_parser_next_token(pdf_parser_t* parser)
+pdf_token* pdf_parser_next_token(pdf_parser_t* parser)
 {
     if (parser == NULL)
         return NULL;
@@ -851,7 +853,7 @@ pdf_token_t* pdf_parser_next_token(pdf_parser_t* parser)
     unsigned char* end = parser->splite_pos;
     while (!parser->pause_read && *start < end && parser->num_cached_tokens < 3)
     {
-        pdf_token_t* tk = _pdf_parser_next_one_token(parser, *start, end);
+        pdf_token* tk = _pdf_parser_next_one_token(parser, *start, end);
         if (tk == NULL)
         {
             if (parser->input->type == INPUT_TYPE_STREAM)
@@ -882,7 +884,7 @@ pdf_token_t* pdf_parser_next_token(pdf_parser_t* parser)
     }
     if (parser->num_cached_tokens == 0)
         return NULL;
-    pdf_token_t* tk = parser->cached_tokens[0];
+    pdf_token* tk = parser->cached_tokens[0];
     parser->cached_tokens[0] = parser->cached_tokens[1];
     parser->cached_tokens[1] = parser->cached_tokens[2];
     parser->cached_tokens[2] = NULL;
@@ -909,7 +911,7 @@ pdf_token_t* pdf_parser_next_token(pdf_parser_t* parser)
         if (parser->cached_tokens[1]->type() == TOKEN_OBJ_BEG
             || parser->cached_tokens[1]->type() == TOKEN_INDIRECT)
         {
-            pdf_token_t* token = new pdf_token_t(parser->cached_tokens[1]->type());
+            pdf_token* token = new pdf_token(parser->cached_tokens[1]->type());
             
             int off = 0;
             token->append(tk);
@@ -932,13 +934,13 @@ pdf_token_t* pdf_parser_next_token(pdf_parser_t* parser)
     return tk;
 }
 
-pdf_cmap_t* pdf_parser_build_cmap(pdf_parser_t* parser)
+pdf_cmap* pdf_parser_build_cmap(pdf_parser_t* parser)
 {
     if (parser == NULL)
         return NULL;
-    pdf_cmap_t* cmap = new pdf_cmap_t;
-    pdf_token_t* last_token = NULL;
-    pdf_token_t* current_token = NULL;
+    pdf_cmap* cmap = new pdf_cmap();
+    pdf_token* last_token = NULL;
+    pdf_token* current_token = NULL;
 
     while ((current_token = pdf_parser_next_token(parser)) != NULL)
     {
@@ -1006,9 +1008,9 @@ pdf_cmap_t* pdf_parser_build_cmap(pdf_parser_t* parser)
             current_token = NULL;
             for (int i = 0; i < len; i++)
             {
-                pdf_token_t* tk1 = pdf_parser_next_token(parser);
-                pdf_token_t* tk2 = pdf_parser_next_token(parser);
-                pdf_token_t* tk3 = pdf_parser_next_token(parser);
+                pdf_token* tk1 = pdf_parser_next_token(parser);
+                pdf_token* tk2 = pdf_parser_next_token(parser);
+                pdf_token* tk3 = pdf_parser_next_token(parser);
                 pdf_cmap_char_range range;
                 range.srcStart = _hex_str_to_32bit(tk1->data() + 1, tk1->size() - 1);
                 range.srcEnd = _hex_str_to_32bit(tk2->data()  + 1, tk2->size() - 1);
@@ -1031,9 +1033,9 @@ pdf_cmap_t* pdf_parser_build_cmap(pdf_parser_t* parser)
             current_token = NULL;
             for (int i = 0; i < len; i++)
             {
-                pdf_token_t* tk1 = pdf_parser_next_token(parser);
-                pdf_token_t* tk2 = pdf_parser_next_token(parser);
-                pdf_token_t* tk3 = pdf_parser_next_token(parser);
+                pdf_token* tk1 = pdf_parser_next_token(parser);
+                pdf_token* tk2 = pdf_parser_next_token(parser);
+                pdf_token* tk3 = pdf_parser_next_token(parser);
                 pdf_cmap_char_range range;
                 range.srcStart = _hex_str_to_32bit(tk1->data() + 1, tk1->size() - 1);
                 range.srcEnd = _hex_str_to_32bit(tk2->data()  + 1, tk2->size() - 1);
@@ -1046,9 +1048,9 @@ pdf_cmap_t* pdf_parser_build_cmap(pdf_parser_t* parser)
                     }
                     else
                     {
-                        pdf_array_t* arr = pdf_parser_build_array(parser);
+                        pdf_array* arr = pdf_parser_build_array(parser);
                         uint32_t start = _hex_str_to_32bit(tk1->data() + 1, tk1->size() - 1);
-                        for (int j = 0; j < arr->size(); j++)
+                        for (size_t j = 0; j < arr->size(); j++)
                         {
                             pdf_cmap_char_range range1;
                             range1.srcStart = start;
@@ -1081,9 +1083,9 @@ pdf_cmap_t* pdf_parser_build_cmap(pdf_parser_t* parser)
             for (int i = 0; i < char_range_map_len; i++)
             {
                 pdf_cmap_char_range range;
-                pdf_token_t* tk1 = pdf_parser_next_token(parser);
-                pdf_token_t* tk2 = pdf_parser_next_token(parser);
-                pdf_token_t* tk3 = pdf_parser_next_token(parser);
+                pdf_token* tk1 = pdf_parser_next_token(parser);
+                pdf_token* tk2 = pdf_parser_next_token(parser);
+                pdf_token* tk3 = pdf_parser_next_token(parser);
                 range.srcStart = _hex_str_to_32bit(tk1->data() + 1, tk1->size() - 1);
                 range.srcEnd = _hex_str_to_32bit(tk2->data() + 1, tk2->size() - 1);
                 range.dstStart = (uint32_t)strtol(tk3->data(), NULL, 10);
@@ -1105,8 +1107,8 @@ pdf_cmap_t* pdf_parser_build_cmap(pdf_parser_t* parser)
             for (int i = 0; i < code_range_map_len; i++)
             {
                 pdf_cmap_code_range range;
-                pdf_token_t* tk1 = pdf_parser_next_token(parser);
-                pdf_token_t* tk2 = pdf_parser_next_token(parser);
+                pdf_token* tk1 = pdf_parser_next_token(parser);
+                pdf_token* tk2 = pdf_parser_next_token(parser);
                 range.srcStart = _hex_str_to_32bit(tk1->data() + 1, tk1->size() - 1);
                 range.srcEnd = _hex_str_to_32bit(tk2->data() + 1, tk2->size() - 1);
                 range.byte_len = (tk1->size() - 1) / 2;
@@ -1125,7 +1127,7 @@ pdf_cmap_t* pdf_parser_build_cmap(pdf_parser_t* parser)
     }
     return cmap;
 }
-bool _set_common_value(pdf_parser_t* parser, pdf_token_t* tk, struct pdf_value* p)
+bool _set_common_value(pdf_parser_t* parser, pdf_token* tk, struct pdf_value* p)
 {
     if (tk->type() == TOKEN_NULL)
     {
@@ -1133,14 +1135,14 @@ bool _set_common_value(pdf_parser_t* parser, pdf_token_t* tk, struct pdf_value* 
     }
     else if (tk->type() == TOKEN_ARRAY_BEG)
     {
-        pdf_array_t* arr = pdf_parser_build_array(parser);
+        pdf_array* arr = pdf_parser_build_array(parser);
         if (arr == NULL) return false;
         p->type = PDF_VALUE_ARRAY;
         p->val.array = arr;
     }
     else if (tk->type() == TOKEN_DICT_BEG)
     {
-        pdf_dict_t* dict = pdf_parser_build_dict(parser);
+        pdf_dict* dict = pdf_parser_build_dict(parser);
         if (dict == NULL) return false;
         p->type = PDF_VALUE_DICT;
         p->val.dict = dict;
@@ -1195,7 +1197,7 @@ pdf_obj_t* pdf_parser_build_obj(pdf_parser_t* parser)
     if (parser == NULL)
         return NULL;
 
-    pdf_token_t* tk;
+    pdf_token* tk;
     pdf_obj_t* obj = pdf_obj_init();
     obj->value = (pdf_obj_value_t*)malloc(sizeof(pdf_obj_value_t));
 
@@ -1281,13 +1283,13 @@ pdf_obj_t* pdf_parser_build_obj(pdf_parser_t* parser)
 
     return obj;
 }
-pdf_dict_t* pdf_parser_build_dict(pdf_parser_t* parser)
+pdf_dict* pdf_parser_build_dict(pdf_parser_t* parser)
 {
     if (parser == NULL)
         return NULL;
 
-    pdf_token_t* tk, * tk1;
-    pdf_dict_t* dict = new pdf_dict_t();
+    pdf_token* tk, * tk1;
+    pdf_dict* dict = new pdf_dict();
     while ((tk = pdf_parser_next_token(parser)) != NULL)
     {
         if (tk->type() == TOKEN_DICT_END)
@@ -1325,14 +1327,14 @@ pdf_dict_t* pdf_parser_build_dict(pdf_parser_t* parser)
 
     return dict;
 }
-pdf_array_t* pdf_parser_build_array(pdf_parser_t* parser)
+pdf_array* pdf_parser_build_array(pdf_parser_t* parser)
 {
     if (parser == NULL)
         return NULL;
 
-    pdf_array_t* array = new pdf_array_t;
+    pdf_array* array = new pdf_array;
 
-    pdf_token_t* tk;
+    pdf_token* tk;
 
     while ((tk = pdf_parser_next_token(parser)) != NULL)
     {

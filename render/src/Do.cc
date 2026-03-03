@@ -1,26 +1,22 @@
 #include "pdf-render.h"
 #include "pdf-render-private.h"
-#include "pdf-private.h"
 #include "plutovg-stb-image-write.h"
 #include "plutovg-stb-image.h"
-void handle_Do(pdf_render_t* context)
+void handle_Do(pdf_render* context)
 {
     // paint a specified XObject
     // name
-    unsigned char buf[1024] = { 0 };
-    pdf_node_t node;
-    node.data = buf;
-    pdf_deque_pop_front(context->deque, &node);
+    auto data = context->deque->pop_front();
 
     //pdf_obj_t* tmp_obj = NULL;
     pdf_xobject_t* xobj = NULL;
     if (context->current_obj != NULL)
     {
-        // pdf_dict_t* tmp_dict = pdf_dict_get_dict(context->current_obj->value->val.dict, "/Resources");
+        // pdf_dict* tmp_dict = pdf_dict_get_dict(context->current_obj->value->val.dict, "/Resources");
         // tmp_dict = pdf_dict_get_dict(tmp_dict, "/XObject");
         // int ref = pdf_dict_get_ref(tmp_dict, buf);
         // tmp_obj = pdf_file_get_obj(context->page->pdf, ref);
-        xobj = pdf_obj_get_xobject(context->current_obj, (char*)buf);
+        xobj = pdf_obj_get_xobject(context->current_obj, (char*)data->data());
     }
     else
     {
@@ -53,7 +49,7 @@ void handle_Do(pdf_render_t* context)
             pdf_obj_t* save_obj = context->current_obj;
             context->current_obj = xobj->obj;
             pdf_stream_open(xobj->obj->stream);
-            pdf_token_t* tk = NULL;
+            pdf_token* tk = NULL;
             while ((tk = pdf_parser_next_token(xobj->obj->stream->parser)) != NULL)
             {
                 if (tk->type() == TOKEN_STREAM_END)
@@ -172,7 +168,7 @@ void handle_Do(pdf_render_t* context)
             return;
         }
 
-        sprintf(filename, "%s.png", buf + 1);
+        sprintf(filename, "%s.png", data->data() + 1);
         // plutovg_surface_write_to_png(s, filename);
 
         // Scale factors to normalize image dimensions to unit space

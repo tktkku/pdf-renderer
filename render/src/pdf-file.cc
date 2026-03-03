@@ -1,5 +1,6 @@
-#include "pdf-private.h"
 #include "pdf.h"
+#include "pdf-private.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -118,7 +119,7 @@ bool _read_xref_and_trailer(pdf_file_t* pdf)
     input_t* input = NULL;
     input_buffer(&input, buffer, ret);
     pdf_parser_t* parser = pdf_parser_init(pdf, input);
-    pdf_token_t* tk = pdf_parser_next_token(parser);
+    pdf_token* tk = pdf_parser_next_token(parser);
     if (tk == NULL)
     {
         findXref = false;
@@ -193,7 +194,7 @@ bool _read_xref_and_trailer(pdf_file_t* pdf)
                             {
                                 if (j - 3 < 0)
                                 {
-                                    long cur = input_tell(pdf->input);
+                                    long unsigned int cur = input_tell(pdf->input);
                                     if (cur - j >= 0)
                                     {
                                         cur = cur - total + j;
@@ -283,7 +284,7 @@ FIND_xref:
         }
         // read trailer
         pdf_parser_t* parser = pdf_parser_init(pdf, pdf->input);
-        pdf_token_t* tk = pdf_parser_next_token(parser);
+        pdf_token* tk = pdf_parser_next_token(parser);
         if (tk == NULL || tk->type() != TOKEN_DICT_BEG)
         {
             delete tk;
@@ -293,7 +294,7 @@ FIND_xref:
         }
         delete tk;
         tk = NULL;
-        pdf_dict_t* trailer = pdf_parser_build_dict(parser);
+        pdf_dict* trailer = pdf_parser_build_dict(parser);
         if (trailer == NULL)
         {
             pdf_parser_free(parser);
@@ -329,17 +330,17 @@ FIND_XRef:
         {
             return false;
         }
-        pdf_dict_t* xref_dict = xref_obj->value->val.dict;
+        pdf_dict* xref_dict = xref_obj->value->val.dict;
         pdf->info_obj_ref = xref_dict->get_indirect("/Info");
         pdf->root_obj_ref = xref_dict->get_indirect("/Root");
 
         int size = xref_dict->get_number("/Size");
-        pdf_array_t* index_arr = NULL;
+        pdf_array* index_arr = NULL;
         if (xref_dict->has("/Index"))
             index_arr = xref_dict->get_array("/Index");
         else
         {
-            index_arr = (pdf_array_t*)malloc(sizeof(pdf_array_t));
+            index_arr = new pdf_array();
 
             pdf_value_t* value0 = (pdf_value_t*)malloc(sizeof(pdf_value_t));
             value0->type = PDF_VALUE_NUMBER;
@@ -357,7 +358,7 @@ FIND_XRef:
         {
             return false;
         }
-        pdf_array_t* w_aar = xref_dict->get_array("/W");
+        pdf_array* w_aar = xref_dict->get_array("/W");
 
         int w0 = w_aar->get(0)->val.number;
         int w1 = w_aar->get(1)->val.number;
@@ -369,7 +370,7 @@ FIND_XRef:
         if (start != NULL)
         {
             unsigned char* origin = start;
-            for (int i = 0; i < index_arr->size(); i += 2)
+            for (size_t i = 0; i < index_arr->size(); i += 2)
             {
                 int start_index = index_arr->get(i)->val.number;
                 int num = index_arr->get(i + 1)->val.number;
@@ -445,16 +446,16 @@ void _read_pages(pdf_file_t* pdf, pdf_obj_t* pages_obj);
 void _read_pages(pdf_file_t* pdf, pdf_obj_t* pages_obj)
 {
     if (pdf == NULL || pages_obj == NULL || pages_obj->value->type != PDF_VALUE_DICT) return;
-    pdf_dict_t* dict = pages_obj->value->val.dict;
+    pdf_dict* dict = pages_obj->value->val.dict;
     const char* type = dict->get_name("/Type");
     int count = dict->get_number("/Count");
     if (!dict->has("/Kids"))
     {
         return;
     }
-    pdf_array_t* kids_arr = dict->get_array("/Kids");
+    pdf_array* kids_arr = dict->get_array("/Kids");
     if (kids_arr == NULL) return;
-    for (int i = 0; i < kids_arr->size(); i++)
+    for (size_t i = 0; i < kids_arr->size(); i++)
     {
         int ref = kids_arr->get(i)->val.indirect;
         pdf_obj_t* obj = pdf_file_get_obj(pdf, ref);
@@ -506,7 +507,7 @@ pdf_file_t* _fill_pdf_file(pdf_file_t* pdf)
         // /IDS
         // /URLS
         // /EmbeddedFiles
-        pdf_dict_t* names_dict = root_obj->value->val.dict->get_dict("/Names");
+        pdf_dict* names_dict = root_obj->value->val.dict->get_dict("/Names");
         if (names_dict->has("/EmbeddedFiles"))
         {
             int embedded_ref = names_dict->get_indirect("/EmbeddedFiles"); 
@@ -515,15 +516,15 @@ pdf_file_t* _fill_pdf_file(pdf_file_t* pdf)
             { 
                 if (embedded_obj1->value->val.dict->has("/Names"))
                 {
-                    pdf_array_t* names_aar = embedded_obj1->value->val.dict->get_array("/Names");
-                    for (int i = 0; i < names_aar->size(); i++)
+                    pdf_array* names_aar = embedded_obj1->value->val.dict->get_array("/Names");
+                    for (size_t i = 0; i < names_aar->size(); i++)
                     {
                         if (names_aar->get(i)->type == PDF_VALUE_INDIRECT)
                         {
                             pdf_obj_t* embedded_obj2 = pdf_file_get_obj(pdf, names_aar->get(i)->val.indirect);
                             if (embedded_obj2 != NULL)
                             {
-                                pdf_dict_t* ef_dict = embedded_obj2->value->val.dict->get_dict("/EF");
+                                pdf_dict* ef_dict = embedded_obj2->value->val.dict->get_dict("/EF");
                                 int ref = ef_dict->get_indirect("/UF");
                                 pdf_obj_t* embedded_obj = pdf_file_get_obj(pdf, ref);
                                 unsigned char* embedded_file = NULL;
@@ -544,7 +545,7 @@ pdf_file_t* _fill_pdf_file(pdf_file_t* pdf)
       
     if (root_obj->value->val.dict->has("/AcroForm"))
     {
-        pdf_dict_t* acroform_dict = root_obj->value->val.dict->get_dict("/AcroForm");
+        pdf_dict* acroform_dict = root_obj->value->val.dict->get_dict("/AcroForm");
     }
 
     int ref = root_obj->value->val.dict->get_indirect("/Pages");
@@ -569,7 +570,6 @@ pdf_file_t* pdf_file_read_buffer(const char* data, size_t size)
     pdf_file_t* pdf_file = new pdf_file_t;
     if (pdf_file == NULL)
         return NULL;
-    memset(pdf_file, 0, sizeof(pdf_file_t));
     
     pdf_file->input = input;
     pdf_file->data_len = size;
@@ -591,7 +591,6 @@ pdf_file_t* pdf_file_read_file(const char* file_name)
     pdf_file_t* pdf_file = new pdf_file_t;
     if (pdf_file == NULL)
         return NULL;
-    memset(pdf_file, 0, sizeof(pdf_file_t));
     
     pdf_file->input = input;
     input_seek(pdf_file->input, 0, SEEK_END);
@@ -614,7 +613,7 @@ pdf_page_t* pdf_file_get_page(pdf_file_t* pdf, int pageNo)
     }
 
     pdf_obj_t* page_obj = pdf->pages[pageNo];
-    pdf_dict_t* page_obj_dict = page_obj->value->val.dict;
+    pdf_dict* page_obj_dict = page_obj->value->val.dict;
     const char* type = page_obj_dict->get_name("/Type");
     if (strcmp(type, "/Page") != 0)
     {
@@ -623,16 +622,16 @@ pdf_page_t* pdf_file_get_page(pdf_file_t* pdf, int pageNo)
 
     int rotate = page_obj_dict->get_number("/Rotate");
 
-    pdf_array_t* annots_aar = page_obj_dict->get_array("/Annots");
-    pdf_array_t* crop_arr = page_obj_dict->get_array("/CropBox");
-    pdf_array_t* media_arr = page_obj_dict->get_array("/MediaBox");
+    pdf_array* annots_aar = page_obj_dict->get_array("/Annots");
+    pdf_array* crop_arr = page_obj_dict->get_array("/CropBox");
+    pdf_array* media_arr = page_obj_dict->get_array("/MediaBox");
 
     pdf_page_t* page = pdf_page_init();
     page->annots = annots_aar;
     page->pageNo = pageNo;
     page->obj = page_obj;
 
-    pdf_array_t* contents_arr = NULL;
+    pdf_array* contents_arr = NULL;
     if (page_obj_dict->has("/Contents"))
     {
         if (page_obj_dict->is_indirect("/Contents"))
@@ -653,7 +652,7 @@ pdf_page_t* pdf_file_get_page(pdf_file_t* pdf, int pageNo)
             contents_arr = page_obj_dict->get_array("/Contents");
             page->contents = (pdf_obj_t**)malloc(sizeof(pdf_obj_t*) * contents_arr->size());
             page->num_contents = contents_arr->size();
-            for (int i = 0; i < contents_arr->size(); i++)
+            for (size_t i = 0; i < contents_arr->size(); i++)
             {
                 int contents_ref = contents_arr->get(i)->val.indirect;
                 pdf_obj_t* content_obj = pdf_file_get_obj(pdf, contents_ref);
@@ -718,7 +717,7 @@ void _fill_resources(pdf_obj_t* obj)
 {
     if (obj->value == NULL || obj->value->type != PDF_VALUE_DICT) return;
   
-    pdf_dict_t* resources = NULL;
+    pdf_dict* resources = NULL;
     if (obj->value->val.dict->has("/Resources"))
     {
         if (obj->value->val.dict->is_indirect("/Resources"))
@@ -935,7 +934,7 @@ pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, int ref)
                 }
                 input_seek(pdf->input, offset, SEEK_SET);
                 pdf_parser_t* parser = pdf_parser_init(pdf, pdf->input);
-                pdf_token_t* tk = pdf_parser_next_token(parser);
+                pdf_token* tk = pdf_parser_next_token(parser);
                 if (tk == NULL || tk->type() != TOKEN_OBJ_BEG)
                 {
                     delete tk;
@@ -977,7 +976,7 @@ pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, int ref)
                 input_buffer(&input, (char*)start, size);
                 unsigned char* origin = start;
                 pdf_parser_t* parser = pdf_parser_init(pdf, input);
-                pdf_token_t* tk = NULL;
+                pdf_token* tk = NULL;
                 for (int j = 0; j < num_pairs; j++)
                 {
                     tk = pdf_parser_next_token(parser);
@@ -995,7 +994,7 @@ pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, int ref)
                     input_buffer(&input2, (char*)p1, size - first_offset - offset);
                     pdf_parser_t* val_parser = pdf_parser_init(pdf, input2);
 
-                    pdf_token_t* tk1 = pdf_parser_next_token(val_parser);
+                    pdf_token* tk1 = pdf_parser_next_token(val_parser);
                     if (tk1 == NULL)
                     {
                         pdf_parser_free(val_parser);
@@ -1006,7 +1005,7 @@ pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, int ref)
                     obj->value = (pdf_obj_value_t*)malloc(sizeof(pdf_obj_value_t));
                     if (tk1->type() == TOKEN_DICT_BEG)
                     {
-                        pdf_dict_t* obj_dict = pdf_parser_build_dict(val_parser);
+                        pdf_dict* obj_dict = pdf_parser_build_dict(val_parser);
                         if (obj_dict == NULL)
                         {
                             pdf_parser_free(val_parser);
@@ -1019,7 +1018,7 @@ pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, int ref)
                     }
                     else if (tk1->type() == TOKEN_ARRAY_BEG)
                     {
-                        pdf_array_t* array = pdf_parser_build_array(val_parser);
+                        pdf_array* array = pdf_parser_build_array(val_parser);
                         if (array == NULL)
                         {
                             pdf_parser_free(val_parser);
@@ -1066,13 +1065,13 @@ void pdf_file_load_font(pdf_file_t* file, const char* name, const char* data, lo
     
     file->external_fonts.push_back(font);
 }
-pdf_cmap_t* pdf_file_get_cmap(pdf_file_t* pdf, char* name)
+pdf_cmap* pdf_file_get_cmap(pdf_file_t* pdf, const char* name)
 {
     if (pdf == NULL || name == NULL)
     {
         return NULL;
     }
-    for (int i = 0 ; i < pdf->cmaps.size(); i++)
+    for (size_t i = 0 ; i < pdf->cmaps.size(); i++)
     {
         if (!strcmp(pdf->cmaps[i]->name, name))
         {
@@ -1101,7 +1100,8 @@ pdf_cmap_t* pdf_file_get_cmap(pdf_file_t* pdf, char* name)
     input_t* input = NULL;
     input_buffer(&input, (char*)filedata, filesize);
     pdf_parser_t* parser = pdf_parser_init(pdf, input);
-    pdf_cmap_t* cmap = pdf_parser_build_cmap(parser);
+    pdf_cmap* cmap = pdf_parser_build_cmap(parser);
+    cmap->isGlobal = true;
     pdf_parser_free(parser);
     input_close(input);
     free(filedata);
@@ -1149,7 +1149,7 @@ void pdf_file_free(pdf_file_t* file)
 
     file->external_fonts.clear();
 
-    for (int i = 0; i < file->cmaps.size(); i++)
+    for (size_t i = 0; i < file->cmaps.size(); i++)
     {
         delete file->cmaps[i];
     }

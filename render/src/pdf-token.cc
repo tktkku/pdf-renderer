@@ -1,6 +1,7 @@
 #include "pdf.h"
 #include "pdf-private.h"
 
+
 pdf_token::pdf_token(pdf_token_type_t type)
 {
     _type = type;

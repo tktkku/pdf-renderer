@@ -1,6 +1,7 @@
 #pragma once
 #include "pdf.h"
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -8,6 +9,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <memory>
 #define ARRAY_COUNT(a) (sizeof(a) / sizeof(a[0]))
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
@@ -15,6 +17,7 @@ typedef enum pdf_token_type
 {
 #define TOKEN_DEF(v, t) t,
 #include "pdf-token.def"
+#undef TOKEN_DEF
 } pdf_token_type_t;
 
 class pdf_token
@@ -61,8 +64,8 @@ struct pdf_value
         char* string;
         int indirect;
         double number;
-        pdf_dict_t* dict;
-        pdf_array_t* array;
+        pdf_dict* dict;
+        pdf_array* array;
     } val;
     int value_len;
     pdf_value_type_t type;
@@ -76,14 +79,14 @@ struct pdf_obj
     pdf_stream_t* stream;
     struct
     {
-        pdf_dict_t* extgstate_dict;
-        pdf_dict_t* colorspace_dict;
-        pdf_dict_t* pattern_dict;
-        pdf_dict_t* shading_dict;
-        pdf_dict_t* xobject_dict;
-        pdf_dict_t* font_dict;
-        pdf_array_t* procset_arr;
-        pdf_dict_t* properties_dict;
+        pdf_dict* extgstate_dict;
+        pdf_dict* colorspace_dict;
+        pdf_dict* pattern_dict;
+        pdf_dict* shading_dict;
+        pdf_dict* xobject_dict;
+        pdf_dict* font_dict;
+        pdf_array* procset_arr;
+        pdf_dict* properties_dict;
     } resources;
     pdf_xobject_t* xobject;
     pdf_font_t* font;
@@ -103,9 +106,9 @@ public:
     pdf_value_t* operator[](const char* key);
     bool has(const char* key);
     bool is_array(const char* key);
-    pdf_array_t* get_array(const char* key);
+    pdf_array* get_array(const char* key);
     bool is_dict(const char* key);
-    pdf_dict_t* get_dict(const char* key);
+    pdf_dict* get_dict(const char* key);
     bool is_name(const char* key);
     char* get_name(const char* key);
     bool is_string(const char* key);
@@ -199,6 +202,7 @@ struct pdf_cmap_code_range
 struct pdf_cmap
 {
     char name[256];
+    bool isGlobal;
     std::vector<pdf_cmap_cid_map> cid_map;
     std::vector<pdf_cmap_char_range> cid_range_map;
     std::vector<pdf_cmap_unicode_map> unicode_map;
@@ -247,20 +251,20 @@ struct pdf_file
     std::vector<xref_t*> xref_table;
     std::vector<pdf_obj_t*> pages;
 
-    std::vector<pdf_cmap_t*> cmaps;
+    std::vector<pdf_cmap*> cmaps;
     std::vector<pdf_external_font_t*> external_fonts;
 };
 
 // struct pdf_resources
 // {
-//     pdf_dict_t* ext_gstate;
-//     pdf_dict_t* color_space;
-//     pdf_dict_t* pattern;
-//     pdf_dict_t* shading;
-//     pdf_dict_t* xobject_dict;
-//     pdf_dict_t* font_dict;
-//     pdf_array_t* proc_set;
-//     pdf_dict_t* properties;
+//     pdf_dict* ext_gstate;
+//     pdf_dict* color_space;
+//     pdf_dict* pattern;
+//     pdf_dict* shading;
+//     pdf_dict* xobject_dict;
+//     pdf_dict* font_dict;
+//     pdf_array* proc_set;
+//     pdf_dict* properties;
 // };
 
 struct pdf_page
@@ -275,7 +279,7 @@ struct pdf_page
     int cur_content_index;
     int rotate;
     //pdf_resources_t* resources;
-    pdf_array_t* annots;
+    pdf_array* annots;
 };
 
 typedef enum
@@ -302,7 +306,7 @@ struct pdf_font_descriptor
     char* fontStretch;
     double fontWeight;
     uint32_t flags;
-    pdf_array_t* fontBBox;
+    pdf_array* fontBBox;
     double italicAngle;
     double ascent;
     double descent;
@@ -318,62 +322,62 @@ struct pdf_font_descriptor
     int fontfile_len;
     char* charSet;
     // cff
-    pdf_array_t* charstrings;
-    pdf_array_t* font_dict_arr;
-    pdf_array_t* font_dict_select_arr;
-    pdf_array_t* global_subr;
+    pdf_array* charstrings;
+    pdf_array* font_dict_arr;
+    pdf_array* font_dict_select_arr;
+    pdf_array* global_subr;
     uint16_t global_subr_bias;
-    pdf_array_t* font_matrix;
+    pdf_array* font_matrix;
 
     //fot cidfonts
-    pdf_dict_t* style;
+    pdf_dict* style;
     char* lang;
-    pdf_dict_t* fd;
-    pdf_dict_t* cidSet;
+    pdf_dict* fd;
+    pdf_dict* cidSet;
 };
 
 typedef struct
 {
-    pdf_cmap_t* encoding;
+    pdf_cmap* encoding;
     pdf_font_t *descendant;
-    pdf_cmap_t* to_unicode_map;
+    pdf_cmap* to_unicode_map;
 } pdf_font_type0_t;
 typedef struct
 {
     char* name;
     int first_char;
     int last_char;
-    pdf_array_t* widths;
+    pdf_array* widths;
     pdf_font_descriptor_t* font_descriptor;
     char* encoding;
-    pdf_dict_t* encoding_dict;
-    pdf_cmap_t* to_unicode_map;
-    pdf_array_t* differences;
+    pdf_dict* encoding_dict;
+    pdf_cmap* to_unicode_map;
+    pdf_array* differences;
 } pdf_font_type1_t;
 typedef struct
 {
     char* name;
     char* encoding;
-    pdf_dict_t* encoding_dict;
-    pdf_array_t* font_matrix;
-    pdf_array_t* font_bbox;
-    pdf_dict_t* charProcs;
+    pdf_dict* encoding_dict;
+    pdf_array* font_matrix;
+    pdf_array* font_bbox;
+    pdf_dict* charProcs;
     int first_char;
     int last_char;
-    pdf_array_t* widths;
+    pdf_array* widths;
     pdf_font_descriptor_t* font_descriptor;
-    pdf_dict_t* resources;
-    pdf_cmap_t* to_unicode_map;
-    pdf_array_t* differences;
+    pdf_dict* resources;
+    pdf_cmap* to_unicode_map;
+    pdf_array* differences;
 } pdf_font_type3_t;
 typedef struct 
 {
     cid_system_info_t cid_system_info;
-    pdf_cmap_t* cid_to_gid_map; // default: Identity
+    pdf_cmap* cid_to_gid_map; // default: Identity
     int dw; // default: 1000
-    pdf_array_t* w_aar;
-    pdf_array_t* dw2_aar;
-    pdf_array_t* w2_aar;
+    pdf_array* w_aar;
+    pdf_array* dw2_aar;
+    pdf_array* w2_aar;
     pdf_font_descriptor_t* font_descriptor;
 } pdf_font_cidfont_t;
 
@@ -381,6 +385,7 @@ struct pdf_font
 {
     // Type = /Font
     // Subtype
+    char name[256];
     pdf_font_subtype_t subtype;
     char* basefont;
 
@@ -400,17 +405,17 @@ struct pdf_font
 //     char* subtype;
 //     char* basefont;
 //     char* encoding;
-//     pdf_dict_t* encoding_dict;
-//     pdf_array_t* differences;
-//     pdf_dict_t* charProcs;
-//     pdf_cmap_t* to_unicode_map;
-//     pdf_dict_t* descendant_font_dict;
-//     pdf_dict_t* font_descriptor;
+//     pdf_dict* encoding_dict;
+//     pdf_array* differences;
+//     pdf_dict* charProcs;
+//     pdf_cmap* to_unicode_map;
+//     pdf_dict* descendant_font_dict;
+//     pdf_dict* font_descriptor;
 //     int font_weight;
 //     uint32_t flags;
 //     int italic_angle;
-//     pdf_array_t* font_matrix;
-//     pdf_array_t* font_bbox;
+//     pdf_array* font_matrix;
+//     pdf_array* font_bbox;
 //     int ascent;
 //     int descent;
 //     int cap_height;
@@ -422,18 +427,18 @@ struct pdf_font
 //     int cid_system_info_ref;
 //     cid_system_info_t cid_system_info;
 //     int dw;
-//     pdf_array_t* w_aar;
+//     pdf_array* w_aar;
 //     unsigned char* cid_to_gid_map;
 //     int cid_to_gid_map_ref;
 //     unsigned char* font_data;
 //     int font_data_length;
-//     pdf_cmap_t* cmap;
+//     pdf_cmap* cmap;
 //     int first_char;
 //     int last_char;
-//     pdf_array_t* widths;
+//     pdf_array* widths;
 
-//     pdf_array_t* charstrings;
-//     pdf_array_t* font_dict_arr;
+//     pdf_array* charstrings;
+//     pdf_array* font_dict_arr;
 //     /*
 //         the first element specifies format
 //         if == 0 : 
@@ -443,8 +448,8 @@ struct pdf_font
 //                 if font_dict_select_arr[i] <= gid <= font_dict_select_arr[i + 1]:
 //                     fd = font_dict_select_arr[i + 2]
 //     */
-//     pdf_array_t* font_dict_select_arr;
-//     pdf_array_t* global_subr;
+//     pdf_array* font_dict_select_arr;
+//     pdf_array* global_subr;
 //     uint16_t global_subr_bias;
 //     int references;
 // };
@@ -481,11 +486,6 @@ struct pdf_xobject
     pdf_obj_t* obj;
 };
 
-typedef enum pdf_parser_reader_type {
-    INPUT_READER,
-    STREAM_READER
-}pdf_parser_reader_type_t;
-typedef void (*pdf_parser_read_func)(pdf_parser_t* parser, void* source);
 struct pdf_parser
 {
     pdf_file_t* pdf;
@@ -500,7 +500,7 @@ struct pdf_parser
         unsigned char* rem;
         int len;
     } remain;
-    pdf_token_t* cached_tokens[3];
+    pdf_token* cached_tokens[3];
     int num_cached_tokens;
     bool pause_read;
     bool eof;
@@ -532,6 +532,7 @@ struct pdf_stream
     } decomp;
     int processed;
     int readin_len;
+    input_t* input;
     pdf_parser_t* parser;
     struct pdf_value* filter;
     int predictor;
@@ -551,19 +552,42 @@ uint32_t _hex_str_to_32bit(const char* hexStr, int len);
 uint16_t _hex_str_to_16bit(char hexStr[4]);
 uint8_t _hex_str_to_8bit(char hexStr[2]);
 const char* _token_to_string(pdf_token_type_t type);
-struct pdf_node
+class pdf_node
 {
-    void* data;
-    size_t size;
-    struct pdf_node* prev;
-    struct pdf_node* next;
+private:
+    std::vector<char> _data;
+    pdf_node* prev;
+    pdf_node* next;
+public:
+    explicit pdf_node(const void* data, size_t size);
+    explicit pdf_node(pdf_node* other);
+    ~pdf_node();
+    char* data();
+    size_t size();
+    pdf_node* get_next();
+    pdf_node* get_prev();
+    void set_next(pdf_node* next);
+    void set_prev(pdf_node* prev);
+    const char operator[](size_t index) const;
 };
 
-struct pdf_deque
+class pdf_deque
 {
-    pdf_node_t* front;
-    pdf_node_t* rear;
-    size_t size;
+private:
+    pdf_node* front;
+    pdf_node* rear;
+    size_t _size;
+public:
+    explicit pdf_deque();
+    ~pdf_deque();
+    bool empty();
+    void clear();
+    void push_back(const void* data, size_t size);
+    void push_front(const void* data, size_t size);
+    std::unique_ptr<pdf_node> pop_back();
+    std::unique_ptr<pdf_node> pop_front();
+    pdf_node& get(int index);
+    size_t size();
 };
 
 int input_file(input_t** input, const char* filename);
@@ -583,8 +607,22 @@ int input_stream(input_t** input, pdf_stream_t* stream);
 pdf_parser_t* pdf_parser_init(pdf_file_t* pdf, input_t* input);
 void pdf_parser_free(pdf_parser_t* parser);
 size_t pdf_parser_read_data(pdf_parser_t* parser, void* ptr, size_t size);
-pdf_token_t* pdf_parser_next_token(pdf_parser_t* parser);
+pdf_token* pdf_parser_next_token(pdf_parser_t* parser);
 pdf_obj_t* pdf_parser_build_obj(pdf_parser_t* parser);
-pdf_dict_t* pdf_parser_build_dict(pdf_parser_t* parser);
-pdf_array_t* pdf_parser_build_array(pdf_parser_t* parser);
-pdf_cmap_t* pdf_parser_build_cmap(pdf_parser_t* parser);
+pdf_dict* pdf_parser_build_dict(pdf_parser_t* parser);
+pdf_array* pdf_parser_build_array(pdf_parser_t* parser);
+pdf_cmap* pdf_parser_build_cmap(pdf_parser_t* parser);
+pdf_cmap* pdf_file_get_cmap(pdf_file_t* pdf, const char* name);
+
+pdf_font_t* pdf_font_init(void);
+void pdf_font_free(pdf_font_t* font);
+pdf_font_t* pdf_font_reference(pdf_font_t* font);
+void pdf_cff_parse(pdf_font_descriptor_t* font_descriptor);
+
+pdf_obj_t* pdf_obj_init(void);
+void pdf_obj_free(pdf_obj_t* obj);
+pdf_font_t* pdf_obj_get_font(pdf_obj_t* obj, const char* name);
+void pdf_obj_get_colorspace(pdf_obj_t* obj, const char* name, char* value);
+pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj, const char* name);
+
+void pdf_value_free(struct pdf_value* value);

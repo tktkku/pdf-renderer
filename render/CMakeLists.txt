@@ -1,17 +1,38 @@
-project(render LANGUAGES CXX)
+project(pdf-render LANGUAGES CXX)
 
-set(RENDER_SOURCES
-    Do.cc
-    Tf.cc
-    color.cc
-    handle_cff.cc
-    text.cc
-    text-render.cc
-    path.cc
-    pdf-render-by-plutovg.cc
-    pdf-render.h
+set(PARSER_SOURCES
+    include/pdf.h
+    src/pdf-common.cc
+    src/pdf-cff.cc
+    src/pdf-deque.cc
+    src/pdf-array.cc
+    src/pdf-dict.cc
+    src/pdf-token.cc
+    src/pdf-file.cc
+    src/pdf-font.cc
+    src/pdf-obj.cc
+    src/pdf-page.cc
+    src/pdf-parser.cc
+    src/pdf-stream.cc
+    src/pdf-input.cc
+    include/pdf-render.h
+    src/Do.cc
+    src/Tf.cc
+    src/color.cc
+    src/handle_cff.cc
+    src/text.cc
+    src/text-render.cc
+    src/path.cc
+    src/pdf-render-by-plutovg.cc
 )
-set(RENDER_DEP pdf-parser plutovg)
-add_library(${PROJECT_NAME} ${RENDER_SOURCES})
-target_link_libraries(${PROJECT_NAME} ${RENDER_DEP})
-target_include_directories(${PROJECT_NAME} PRIVATE ../plutovg/include ../plutovg/source ../parser ../zlib)
+set(PARSER_DEP zlibstatic)
+if(NOT WIN32)
+    set(PARSER_DEP ${PARSER_DEP} m)
+endif()
+add_library(${PROJECT_NAME} ${PARSER_SOURCES})
+target_link_libraries(${PROJECT_NAME} PRIVATE ${PARSER_DEP})
+target_include_directories(${PROJECT_NAME} PRIVATE ../include ../plutovg/include ../plutovg/source ../zlib ./CMap)
+target_include_directories(${PROJECT_NAME} PUBLIC 
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/pdf-render>
+)

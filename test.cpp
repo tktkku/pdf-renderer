@@ -1,4 +1,3 @@
-#include "pdf.h"
 #include "pdf-render.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -80,7 +79,7 @@ int main(int argc, char* argv[])
             int height = (int)(pdf_page_get_media_height(page) * PIXELS_PER_POINT + 0.5);
             int width = (int)(pdf_page_get_media_width(page) * PIXELS_PER_POINT + 0.5);
             int stride = width * 4;
-            pdf_render_t* r = pdf_render_init_with_size(page, width, height, stride, 203);
+            pdf_render* r = pdf_render_init_with_size(page, width, height, stride, 203);
             pdf_render_do(r);
             unsigned char* pixels = (unsigned char*)malloc(static_cast<size_t>(stride) * height);
             if (pixels == nullptr)
@@ -132,10 +131,10 @@ int main(int argc, char* argv[])
                     continue;
                 char filename[256] = { 0 };
                 sprintf(filename, "page%d.png", i);
-                pdf_render_t* r = pdf_render_init(page, 203);
+                pdf_render* r = pdf_render_init(page, 203);
                 pdf_render_do(r);
                 pdf_render_save_to_png(r, filename);
-
+                pdf_render_free(r);
                 pdf_page_free(page);
             }
         }
@@ -147,7 +146,7 @@ int main(int argc, char* argv[])
     free(filebuffer);
 
     wall_end = get_wall_time();
-    printf("Elapsed %lld ms.\n", wall_end - wall_start);
+    printf("Elapsed %ld ms.\n", wall_end - wall_start);
 
     return 0;
 }

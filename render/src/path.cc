@@ -1,8 +1,7 @@
 #include "pdf-render.h"
 #include "pdf-render-private.h"
-#include "pdf-private.h"
 #include "plutovg-private.h"
-void stroke(pdf_render_t* context)
+void stroke(pdf_render* context)
 {
     //double r, g, b, a;
     plutovg_color_t color;
@@ -21,7 +20,7 @@ void stroke(pdf_render_t* context)
 }
 
 
-void handle_b_star(pdf_render_t* context)
+void handle_b_star(pdf_render* context)
 {
     // close fill and then stroke the path using the even-odd rule
     // same as the sequence
@@ -40,7 +39,7 @@ void handle_b_star(pdf_render_t* context)
     stroke(context);
 }
 
-void handle_B_star(pdf_render_t* context)
+void handle_B_star(pdf_render* context)
 {
     // fill and then stroke the path, using the even-odd rule
     plutovg_color_t c;
@@ -56,7 +55,7 @@ void handle_B_star(pdf_render_t* context)
     stroke(context);
 }
 
-void handle_b(pdf_render_t* context)
+void handle_b(pdf_render* context)
 {
     // close fill and then stroke the path, using nonzero winding number rule
     // same as the sequence
@@ -75,7 +74,7 @@ void handle_b(pdf_render_t* context)
     stroke(context);
 }
 
-void handle_B(pdf_render_t* context)
+void handle_B(pdf_render* context)
 {
     // fill and then stroke the path, using the nonzero winding number rule
     plutovg_color_t c;
@@ -91,32 +90,29 @@ void handle_B(pdf_render_t* context)
     stroke(context);
 }
 
-void handle_c(pdf_render_t* context)
+void handle_c(pdf_render* context)
 {
     // append a cubic Bezier curve to the current point
     // the curve shall extend from the current point to (x3, y3)
     // using (x1, y1) and (x2 ,y2) as the Bezier control points
     // x1 y1 x2 y2 x3 y3
-    char buf[1024] = { 0 };
-    pdf_node_t node;
-    node.data = buf;
-    pdf_deque_pop_front(context->deque, &node);
-    float y3 = strtof(buf, NULL);
-    pdf_deque_pop_front(context->deque, &node);
-    float x3 = strtof(buf, NULL);
-    pdf_deque_pop_front(context->deque, &node);
-    float y2 = strtof(buf, NULL);
-    pdf_deque_pop_front(context->deque, &node);
-    float x2 = strtof(buf, NULL);
-    pdf_deque_pop_front(context->deque, &node);
-    float y1 = strtof(buf, NULL);
-    pdf_deque_pop_front(context->deque, &node);
-    float x1 = strtof(buf, NULL);
+    auto data = context->deque->pop_front();
+    float y3 = strtof(data->data(), NULL);
+    auto data2 = context->deque->pop_front();
+    float x3 = strtof(data2->data(), NULL);
+    auto data3 = context->deque->pop_front();
+    float y2 = strtof(data3->data(), NULL);
+    auto data4 = context->deque->pop_front();
+    float x2 = strtof(data4->data(), NULL);
+    auto data5 = context->deque->pop_front();
+    float y1 = strtof(data5->data(), NULL);
+    auto data6 = context->deque->pop_front();
+    float x1 = strtof(data6->data(), NULL);
 
     plutovg_canvas_cubic_to(context->canvas, x1, y1, x2, y2, x3, y3);
 }
 
-void handle_F_f(pdf_render_t* context)
+void handle_F_f(pdf_render* context)
 {
     // fill the path, using the nonzero winding number rule
     // to determine the region to fill
@@ -131,7 +127,7 @@ void handle_F_f(pdf_render_t* context)
     plutovg_canvas_set_color(context->canvas, &c);
 }
 
-void handle_f_star(pdf_render_t* context)
+void handle_f_star(pdf_render* context)
 {
     // fill the path, using the even-odd rule
     // to determine the region to fill
@@ -146,7 +142,7 @@ void handle_f_star(pdf_render_t* context)
     plutovg_canvas_set_color(context->canvas, &c);
 }
 
-void handle_h(pdf_render_t* context)
+void handle_h(pdf_render* context)
 {
     // close the current subpath by appending a straight line segment
     // from the current point to the starting point of the subpath
@@ -155,42 +151,36 @@ void handle_h(pdf_render_t* context)
     plutovg_canvas_close_path(context->canvas);
 }
 
-void handle_l(pdf_render_t* context)
+void handle_l(pdf_render* context)
 {
     // append a straight line segment from the current point to (x, y)
     // x y
-    char buf[1024] = { 0 };
-    pdf_node_t node;
-    node.data = buf;
-    pdf_deque_pop_front(context->deque, &node);
-    float y = strtof(buf, NULL);
-    pdf_deque_pop_front(context->deque, &node);
-    float x = strtof(buf, NULL);
+    auto data = context->deque->pop_front();
+    float y = strtof(data->data(), NULL);
+    auto data2 = context->deque->pop_front();
+    float x = strtof(data2->data(), NULL);
     plutovg_canvas_line_to(context->canvas, x, y);
 }
 
-void handle_m(pdf_render_t* context)
+void handle_m(pdf_render* context)
 {
     // begin a new subpath by moving the current point to (x,y)
     // x y
-    char buf[1024] = { 0 };
-    pdf_node_t node;
-    node.data = buf;
-    pdf_deque_pop_front(context->deque, &node);
-    float y = strtof(buf, NULL);
-    pdf_deque_pop_front(context->deque, &node);
-    float x = strtof(buf, NULL);
+    auto data = context->deque->pop_front();
+    float y = strtof(data->data(), NULL);
+    auto data2 = context->deque->pop_front();
+    float x = strtof(data2->data(), NULL);
     plutovg_canvas_move_to(context->canvas, x, y);
 }
 
-void handle_n(pdf_render_t* context)
+void handle_n(pdf_render* context)
 {
     // end the path object without filling or stroking it
     // plutovg_canvas_close_path(context->canvas);
     plutovg_canvas_new_path(context->canvas);
 }
 
-void handle_re(pdf_render_t* context)
+void handle_re(pdf_render* context)
 {
     // append a rectangle to the current path as a complete subpath
     // lower-left corner (x, y)
@@ -207,22 +197,19 @@ void handle_re(pdf_render_t* context)
     h
     */
 
-    char buf[1024] = { 0 };
-    pdf_node_t node;
-    node.data = buf;
-    pdf_deque_pop_front(context->deque, &node);
-    float height = strtof(buf, NULL);
-    pdf_deque_pop_front(context->deque, &node);
-    float width = strtof(buf, NULL);
-    pdf_deque_pop_front(context->deque, &node);
-    float y = strtof(buf, NULL);
-    pdf_deque_pop_front(context->deque, &node);
-    float x = strtof(buf, NULL);
+    auto data = context->deque->pop_front();
+    float height = strtof(data->data(), NULL);
+    auto data2 = context->deque->pop_front();
+    float width = strtof(data2->data(), NULL);
+    auto data3 = context->deque->pop_front();
+    float y = strtof(data3->data(), NULL);
+    auto data4 = context->deque->pop_front();
+    float x = strtof(data4->data(), NULL);
 
     plutovg_canvas_rect(context->canvas, x, y, width, height);
 }
 
-void handle_s(pdf_render_t* context)
+void handle_s(pdf_render* context)
 {
     // close and stroke the path
     // same as the sequence h S
@@ -232,37 +219,34 @@ void handle_s(pdf_render_t* context)
     stroke(context);
 }
 
-void handle_S(pdf_render_t* context)
+void handle_S(pdf_render* context)
 {
     // stroke the path
     // plutovg_canvas_stroke(context->canvas);
     stroke(context);
 }
 
-void handle_v(pdf_render_t* context)
+void handle_v(pdf_render* context)
 {
     // append a cubic Bezier curve to the current point
     // the curve shall extend from the current point to (x3 ,y3)
     // using the current point and (x2, y2) as the Bezier control points
     // x1 y1 same as current point
     // x2 y2 x3 y3
-    char buf[1024] = { 0 };
-    pdf_node_t node;
-    node.data = buf;
     float x1, y1, x2, y2, x3, y3;
-    pdf_deque_pop_front(context->deque, &node);
-    y3 = strtof(buf, NULL);
-    pdf_deque_pop_front(context->deque, &node);
-    x3 = strtof(buf, NULL);
-    pdf_deque_pop_front(context->deque, &node);
-    y2 = strtof(buf, NULL);
-    pdf_deque_pop_front(context->deque, &node);
-    x2 = strtof(buf, NULL);
+    auto data = context->deque->pop_front();
+    y3 = strtof(data->data(), NULL);
+    auto data2 = context->deque->pop_front();
+    x3 = strtof(data2->data(), NULL);
+    auto data3 = context->deque->pop_front();
+    y2 = strtof(data3->data(), NULL);
+    auto data4 = context->deque->pop_front();
+    x2 = strtof(data4->data(), NULL);
 
     plutovg_canvas_get_current_point(context->canvas, &x1, &y1);
     plutovg_canvas_cubic_to(context->canvas, x1, y1, x2, y2, x3, y3);
 }
-void handle_W_star(pdf_render_t* context)
+void handle_W_star(pdf_render* context)
 {
     // modify the current clipping path by intersecting it with the curerent path
     // using the even-odd rule
@@ -270,20 +254,17 @@ void handle_W_star(pdf_render_t* context)
     plutovg_canvas_clip(context->canvas);
 }
 
-void handle_w(pdf_render_t* context)
+void handle_w(pdf_render* context)
 {
     // set line width
     // lineWidth
-    char buf[1024] = { 0 };
-    pdf_node_t node;
-    node.data = buf;
-    pdf_deque_pop_front(context->deque, &node);
-    float w = strtof(buf, NULL);
+    auto data = context->deque->pop_front();
+    float w = strtof(data->data(), NULL);
     plutovg_canvas_set_line_width(context->canvas, w);
     context->state->lineWidth = w;
 }
 
-void handle_W(pdf_render_t* context)
+void handle_W(pdf_render* context)
 {
     // modify the current clipping path by intersecting it with the current path
     // using nonzero winding number rule
@@ -291,24 +272,21 @@ void handle_W(pdf_render_t* context)
     plutovg_canvas_clip(context->canvas);
 }
 
-void handle_y(pdf_render_t* context)
+void handle_y(pdf_render* context)
 {
     // append a cubic Bezier curve to the current path
     // the curve shall extend from the current point to (x3, y3)
     // using (x1, y1) and (x3, y3) as the Bezier control points
     // x2 y2 same as x3 y3
     // x1 y1 x3 y3
-    char buf[1024] = { 0 };
-    pdf_node_t node;
-    node.data = buf;
-    pdf_deque_pop_front(context->deque, &node);
-    float y3 = strtof(buf, NULL);
-    pdf_deque_pop_front(context->deque, &node);
-    float x3 = strtof(buf, NULL);
-    pdf_deque_pop_front(context->deque, &node);
-    float y1 = strtof(buf, NULL);
-    pdf_deque_pop_front(context->deque, &node);
-    float x1 = strtof(buf, NULL);
+    auto data = context->deque->pop_front();
+    float y3 = strtof(data->data(), NULL);
+    auto data2 = context->deque->pop_front();
+    float x3 = strtof(data2->data(), NULL);
+    auto data3 = context->deque->pop_front();
+    float y1 = strtof(data3->data(), NULL);
+    auto data4 = context->deque->pop_front();
+    float x1 = strtof(data4->data(), NULL);
 
     plutovg_canvas_cubic_to(context->canvas, x1, y1, x3, y3, x3, y3);
 }

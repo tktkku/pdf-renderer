@@ -1,3 +1,4 @@
+#include "pdf.h"
 #include "pdf-private.h"
 #include <stdlib.h>
 

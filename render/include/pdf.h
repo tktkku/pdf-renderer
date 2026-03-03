@@ -44,7 +44,7 @@ extern "C" {
     struct pdf_cmap;
     typedef struct pdf_cmap pdf_cmap_t;
 
-    void pdf_value_free(struct pdf_value* value);
+    
     /**
      * buf: start position
      * size: size of the buffer
@@ -58,7 +58,6 @@ extern "C" {
     int pdf_page_get_media_height(pdf_page_t* page);
     pdf_font_t* pdf_page_get_font(pdf_page_t* page, const char* name);
 
-    pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj, const char* name);
 
     int pdf_page_get_streams(pdf_page_t* page);
     pdf_stream_t* pdf_page_get_stream(pdf_page_t* page, int index);
@@ -70,10 +69,6 @@ extern "C" {
     void pdf_stream_open(pdf_stream_t* stream);
     void pdf_stream_get_all(pdf_stream_t* stream, unsigned char** buffer, int* size);
 
-    pdf_obj_t* pdf_obj_init(void);
-    void pdf_obj_free(pdf_obj_t* obj);
-    pdf_font_t* pdf_obj_get_font(pdf_obj_t* obj, const char* name);
-    void pdf_obj_get_colorspace(pdf_obj_t* obj, const char* name, char* value);
 
     pdf_file_t* pdf_file_read_file(const char* file_name);
     pdf_file_t* pdf_file_read_buffer(const char* data, size_t size);
@@ -81,22 +76,7 @@ extern "C" {
     pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, int ref);
     int pdf_file_get_pages(pdf_file_t* pdf);
     pdf_page_t* pdf_file_get_page(pdf_file_t* pdf, int pageNo);
-    pdf_cmap_t* pdf_file_get_cmap(pdf_file_t* pdf, char* name);
     void pdf_file_load_font(pdf_file_t* page, const char* name, const char* data, long len);
-
-    pdf_font_t* pdf_font_init(void);
-    void pdf_font_free(pdf_font_t* font);
-    pdf_font_t* pdf_font_reference(pdf_font_t* font);
-    void pdf_cff_parse(pdf_font_descriptor_t* font_descriptor);
-
-    pdf_deque_t* pdf_deque_init();
-    void pdf_deque_free(pdf_deque_t* deque);
-    void pdf_deque_push(pdf_deque_t* q, const void* data, size_t size);
-    void pdf_deque_pop_front(pdf_deque_t* q, pdf_node_t* data);
-    void pdf_deque_pop_end(pdf_deque_t* q, pdf_node_t* data);
-    void pdf_deque_empty(pdf_deque_t* deque);
-    void pdf_deque_get(pdf_deque_t* q, pdf_node_t* data, int index);
-
 
 #define DPI (203)
 #ifdef DPI

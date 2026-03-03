@@ -1,7 +1,5 @@
 #include "pdf-render.h"
 #include "pdf-render-private.h"
-#include "pdf-private.h"
-#include "plutovg-private.h"
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "plutovg-stb-truetype.h"
 
@@ -120,9 +118,9 @@ static int stbtt_InitFont_internal1(stbtt_fontinfo *info, unsigned char *data, i
    return 1;
 }
 
-plutovg_font_face_t* plutovg_font_face_load_from_data1(const void* data, 
+pdf_font_face_t* pdf_font_face_load_from_data(const void* data, 
     unsigned int length, int ttcindex, 
-    plutovg_destroy_func_t destroy_func, void* closure)
+    pdf_destroy_func_t destroy_func, void* closure)
 {
     stbtt_fontinfo info;
     int offset = stbtt_GetFontOffsetForIndex((unsigned char*)data, ttcindex);
@@ -131,7 +129,7 @@ plutovg_font_face_t* plutovg_font_face_load_from_data1(const void* data,
             destroy_func(closure);
         return NULL;
     }
-    plutovg_font_face_t* face = (plutovg_font_face_t*)malloc(sizeof(plutovg_font_face_t));
+    pdf_font_face_t* face = (pdf_font_face_t*)malloc(sizeof(pdf_font_face_t));
     face->ref_count = 1;
     face->info = info;
     stbtt_GetFontVMetrics(&face->info, &face->ascent, &face->descent, &face->line_gap);
@@ -141,7 +139,38 @@ plutovg_font_face_t* plutovg_font_face_load_from_data1(const void* data,
     face->closure = closure;
     return face;
 }
-void load_font_from_external(pdf_render_t* context, pdf_font_descriptor_t* font_descriptor)
+pdf_font_face_t* pdf_font_face_reference(pdf_font_face_t* face)
+{
+    if (face)
+        face->ref_count++;
+    return face;
+}
+void pdf_font_face_destroy(pdf_font_face_t* face)
+{
+    if(face == NULL)
+        return;
+    if(--face->ref_count == 0) {
+        for(int i = 0; i < GLYPH_CACHE_SIZE; i++) {
+            if(face->glyphs[i] == NULL)
+                continue;
+            for(int j = 0; j < GLYPH_CACHE_SIZE; j++) {
+                glyph_t* glyph = face->glyphs[i][j];
+                if(glyph == NULL)
+                    continue;
+                stbtt_FreeShape(&face->info, glyph->vertices);
+                free(glyph);
+            }
+
+            free(face->glyphs[i]);
+        }
+
+        if(face->destroy_func)
+            face->destroy_func(face->closure);
+        free(face);
+    }
+}
+
+void load_font_from_external(pdf_render* context, pdf_font_descriptor_t* font_descriptor)
 {
     //TODO
     char fontname[256] = { 0 };
@@ -197,28 +226,26 @@ void load_font_from_external(pdf_render_t* context, pdf_font_descriptor_t* font_
         unsigned char* data = (unsigned char*)malloc(len);
         fread(data, 1, len, f);
         fclose(f);
-        context->state->textState.fontface = plutovg_font_face_load_from_data1(
+        context->state->textState.fontface = pdf_font_face_load_from_data(
             data, len, 0, free, data);
     }
     context->state->textState.font_face_loaded = true;
 }
-void handle_Tf(pdf_render_t* context)
+void handle_Tf(pdf_render* context)
 {
     // set font and font size to use
     // fontname fontsize
-    char buf[1024] = { 0 };
-    pdf_node_t node;
-    node.data = buf;
-    pdf_deque_pop_front(context->deque, &node);
-    float fontsize = strtof(buf, NULL);
-    pdf_deque_pop_front(context->deque, &node);
-    printf("font name = %s fontsize = %f\n", (char*)node.data, fontsize);
-    pdf_font_t* font = pdf_obj_get_font(context->current_obj, buf);
+    auto data = context->deque->pop_front();
+    float fontsize = strtof(data->data(), NULL);
+    auto data2 = context->deque->pop_front();
+    printf("font name = %s fontsize = %f\n", data2->data(), fontsize);
+    pdf_font_t* font = pdf_obj_get_font(context->current_obj, data2->data());
+    strcpy(font->name, data2->data() + 1);
     context->state->textState.fontSize = fontsize;
     if (font == NULL)
         return;
     
-    for (int i = 0; i < context->fontcache.size(); i++)
+    for (size_t i = 0; i < context->fontcache.size(); i++)
     {
         pdf_font_cache_t* cache = context->fontcache[i];
         if (cache->font == font)
@@ -277,7 +304,7 @@ void handle_Tf(pdf_render_t* context)
         pdf_font_cidfont_t* cidfont = font->type0->descendant->cidfont;
         if (cidfont->font_descriptor->fontfile != NULL)
         {
-            if ((context->state->textState.fontface = plutovg_font_face_load_from_data1(
+            if ((context->state->textState.fontface = pdf_font_face_load_from_data(
                 cidfont->font_descriptor->fontfile, cidfont->font_descriptor->fontfile_len, 0, NULL, NULL)) == NULL)
             {
 
@@ -297,7 +324,7 @@ void handle_Tf(pdf_render_t* context)
         pdf_font_type1_t* type1_truetype = font->type1_truetype;
         if (type1_truetype->font_descriptor->fontfile != NULL)
         {
-            if ((context->state->textState.fontface = plutovg_font_face_load_from_data1(
+            if ((context->state->textState.fontface = pdf_font_face_load_from_data(
                 type1_truetype->font_descriptor->fontfile, type1_truetype->font_descriptor->fontfile_len, 0, NULL, NULL)) == NULL)
             {
 
@@ -312,7 +339,7 @@ void handle_Tf(pdf_render_t* context)
             load_font_from_external(context, type1_truetype->font_descriptor);
         }
     }
-    pdf_font_cache_t* cache = (pdf_font_cache_t*)malloc(sizeof(pdf_font_cache_t));
+    pdf_font_cache_t* cache = new pdf_font_cache_t();
     cache->font = pdf_font_reference(font);
     cache->fontface = context->state->textState.fontface;
     cache->loaded = context->state->textState.font_face_loaded;

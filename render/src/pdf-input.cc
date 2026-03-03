@@ -1,5 +1,6 @@
 #include "pdf.h"
 #include "pdf-private.h"
+
 #include <string.h>
 int input_file(input_t** input, const char* filename)
 {
@@ -31,6 +32,7 @@ int input_stream(input_t** input, pdf_stream_t* stream)
     *input = (input_t*)malloc(sizeof(input_t));
     (*input)->type = INPUT_TYPE_STREAM;
     (*input)->stream = stream;
+    return 0;
 }
 
 size_t input_read(input_t* input, void* ptr, size_t size)
@@ -55,7 +57,7 @@ size_t input_read(input_t* input, void* ptr, size_t size)
         case INPUT_TYPE_STREAM:
         {
             int ret = 0;
-            input->stream->parser->current_pos;
+            // input->stream->parser->current_pos;
             if ((input->stream->decomp.cur_pos >= input->stream->decomp.len && input->stream->readin_len < input->stream->stream_len)
                 || input->stream->processed < input->stream->stream_len)
             {

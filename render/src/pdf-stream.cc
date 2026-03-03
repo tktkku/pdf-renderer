@@ -1,5 +1,6 @@
 #include "pdf.h"
 #include "pdf-private.h"
+
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -12,6 +13,11 @@ void pdf_stream_close(pdf_stream_t* stream)
     {
         pdf_parser_free(stream->parser);
         stream->parser = NULL;
+    }
+    if (stream->input)
+    {
+        input_close(stream->input);
+        stream->input = NULL;
     }
 }
 
@@ -41,9 +47,9 @@ pdf_stream_t* pdf_stream_init(pdf_file_t* pdf, pdf_obj_t* obj, int len, int offs
     {
         return NULL;
     }
-    pdf_dict_t* content_dict = obj->value->val.dict;
+    pdf_dict* content_dict = obj->value->val.dict;
     const char* filter = NULL;
-    pdf_array_t* filter_arr = NULL;
+    pdf_array* filter_arr = NULL;
     if (content_dict->has("/Filter"))
     {
         if (content_dict->is_name("/Filter"))
@@ -60,7 +66,7 @@ pdf_stream_t* pdf_stream_init(pdf_file_t* pdf, pdf_obj_t* obj, int len, int offs
         }
     }
 
-    pdf_dict_t* parms_dict = content_dict->get_dict("/DecodeParms");
+    pdf_dict* parms_dict = content_dict->get_dict("/DecodeParms");
     /**
      * 1 no prediction
      * 2 TIFF predictor 2
@@ -128,6 +134,7 @@ void pdf_stream_open(pdf_stream_t* stream)
         return;
     input_t* input = NULL;
     input_stream(&input, stream);
+    stream->input = input;
     stream->parser = pdf_parser_init(stream->pdf, input);
     stream->processed = 0;
     stream->readin_len = 0;

@@ -1,9 +1,12 @@
-#include "pdf-private.h"
 #include "pdf.h"
+#include "pdf-private.h"
+
 #include <stdlib.h>
 #include <string.h>
 #include <zlib.h>
 #include <stdio.h>
+#define STB_IMAGE_IMPLEMENTATION
+#include "plutovg-stb-image.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "plutovg-stb-image-write.h"
 pdf_obj_t* pdf_obj_init()
@@ -86,9 +89,9 @@ void pdf_obj_get_extgstate(pdf_obj_t* obj, const char* name)
 {
 
 }
-pdf_font_descriptor_t* _load_font_descriptor(pdf_obj_t* obj, pdf_dict_t* font_dict)
+pdf_font_descriptor_t* _load_font_descriptor(pdf_obj_t* obj, pdf_dict* font_dict)
 {
-    pdf_dict_t* font_descriptor_dict = NULL;
+    pdf_dict* font_descriptor_dict = NULL;
     if (font_dict->has("/FontDescriptor"))
     {
         if (font_dict->is_indirect("/FontDescriptor"))
@@ -152,7 +155,7 @@ pdf_font_descriptor_t* _load_font_descriptor(pdf_obj_t* obj, pdf_dict_t* font_di
         pdf_obj_t* fontfile_obj = pdf_file_get_obj(obj->pdf, fontfile_ref);
         if (fontfile_obj != NULL && fontfile_obj->stream != NULL)
         {
-            pdf_dict_t* fontfile_dict = fontfile_obj->value->val.dict;
+            pdf_dict* fontfile_dict = fontfile_obj->value->val.dict;
             char* subtype = (char*)fontfile_dict->get_name("/Subtype");
             if (fontfile_obj->font_data != NULL && fontfile_obj->font_data_len != 0)
             {
@@ -172,7 +175,7 @@ pdf_font_descriptor_t* _load_font_descriptor(pdf_obj_t* obj, pdf_dict_t* font_di
 
     return font_descriptor;
 }
-pdf_font_t* _load_cid_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
+pdf_font_t* _load_cid_font(pdf_obj_t* obj, pdf_dict* font_dict)
 {
     pdf_font_t* font = pdf_font_init();
     if (font == NULL)
@@ -198,7 +201,7 @@ pdf_font_t* _load_cid_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
     font->basefont = (char*)font_dict->get_name("/BaseFont");
     if (font_dict->has("/CIDSystemInfo"))
     {
-        pdf_dict_t* cidsysteminfo_dict = NULL;
+        pdf_dict* cidsysteminfo_dict = NULL;
         if (font_dict->is_dict("/CIDSystemInfo"))
         {
             cidsysteminfo_dict = font_dict->get_dict("/CIDSystemInfo");
@@ -279,6 +282,18 @@ pdf_font_t* _load_cid_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
                     int size = 0;
                     unsigned char* map = NULL;
                     pdf_stream_get_all(cid_to_gid_obj->stream, &map, &size);
+                    if (map != NULL && size > 0)
+                    {
+                        input_t* input = NULL;
+                        input_buffer(&input, (char*)map, size);
+                        pdf_parser_t* parser = pdf_parser_init(obj->pdf, input);
+                        pdf_cmap* cmap = pdf_parser_build_cmap(parser);
+                        cmap->isGlobal = false;
+                        font->cidfont->cid_to_gid_map = cmap;
+                        pdf_parser_free(parser);
+                        input_close(input);
+                        free(map);
+                    }
                 }
             }
         }
@@ -287,7 +302,7 @@ pdf_font_t* _load_cid_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
     return font;
 }
 
-pdf_font_t* _load_type0_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
+pdf_font_t* _load_type0_font(pdf_obj_t* obj, pdf_dict* font_dict)
 {
     pdf_font_t* font = pdf_font_init();
     if (font == NULL)
@@ -327,7 +342,8 @@ pdf_font_t* _load_type0_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
             unsigned char* origin = data;
             pdf_parser_t* parser = pdf_parser_init(obj->pdf, input);
 
-            pdf_cmap_t* cmap = pdf_parser_build_cmap(parser);
+            pdf_cmap* cmap = pdf_parser_build_cmap(parser);
+            cmap->isGlobal = false;
             font->type0->to_unicode_map = cmap;
             pdf_parser_free(parser);
             input_close(input);
@@ -337,10 +353,10 @@ pdf_font_t* _load_type0_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
     // CIDFonts
     if (font_dict->has("/DescendantFonts"))
     {
-        pdf_dict_t* descendant_font_dict = NULL;
+        pdf_dict* descendant_font_dict = NULL;
         if (font_dict->is_array("/DescendantFonts"))
         {
-            pdf_array_t* descendant_fonts_aar = font_dict->get_array("/DescendantFonts");
+            pdf_array* descendant_fonts_aar = font_dict->get_array("/DescendantFonts");
             if (descendant_fonts_aar != NULL && descendant_fonts_aar->get(0)->type == PDF_VALUE_DICT)
             {
                 descendant_font_dict = descendant_fonts_aar->get(0)->val.dict;
@@ -370,7 +386,7 @@ pdf_font_t* _load_type0_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
                 }
                 else if (descendant_font_obj != NULL && descendant_font_obj->value->type == PDF_VALUE_ARRAY)
                 {
-                    pdf_array_t* descendant_fonts_aar = descendant_font_obj->value->val.array;
+                    pdf_array* descendant_fonts_aar = descendant_font_obj->value->val.array;
                     if (descendant_fonts_aar->get(0)->type == PDF_VALUE_DICT)
                     {
                         descendant_font_dict = descendant_fonts_aar->get(0)->val.dict;
@@ -392,18 +408,18 @@ pdf_font_t* _load_type0_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
     
     return font;
 }
-pdf_array_t* _load_differences(pdf_dict_t* font_dict)
+pdf_array* _load_differences(pdf_dict* font_dict)
 {
-    pdf_dict_t* encoding_dict = font_dict->get_dict("/Encoding");
-    pdf_array_t* differences = NULL;
+    pdf_dict* encoding_dict = font_dict->get_dict("/Encoding");
+    pdf_array* differences = NULL;
     if (encoding_dict != NULL)
     {
-        pdf_array_t* arr = encoding_dict->get_array("/Differences");
+        pdf_array* arr = encoding_dict->get_array("/Differences");
         if (arr != NULL)
         {
-            differences = new pdf_array_t;
+            differences = new pdf_array;
             int cnt = 0;
-            for (int i = 0; i < arr->size(); i++)
+            for (size_t i = 0; i < arr->size(); i++)
             {
                 if (arr->get(i)->type == PDF_VALUE_NUMBER)
                 {
@@ -434,7 +450,7 @@ pdf_array_t* _load_differences(pdf_dict_t* font_dict)
     }
     return differences;
 }
-pdf_font_t* _load_type1_truetype_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
+pdf_font_t* _load_type1_truetype_font(pdf_obj_t* obj, pdf_dict* font_dict)
 {
     pdf_font_t* font = pdf_font_init();
     if (font == NULL)
@@ -478,7 +494,8 @@ pdf_font_t* _load_type1_truetype_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
             unsigned char* origin = data;
             pdf_parser_t* parser = pdf_parser_init(obj->pdf, input);
 
-            pdf_cmap_t* cmap = pdf_parser_build_cmap(parser);
+            pdf_cmap* cmap = pdf_parser_build_cmap(parser);
+            cmap->isGlobal = false;
             font->type1_truetype->to_unicode_map = cmap;
             input_close(input);
             free(origin);
@@ -488,7 +505,7 @@ pdf_font_t* _load_type1_truetype_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
     
     return font;
 }
-pdf_font_t* _load_type3_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
+pdf_font_t* _load_type3_font(pdf_obj_t* obj, pdf_dict* font_dict)
 {
     pdf_font_t* font = pdf_font_init();
     if (font == NULL)
@@ -560,7 +577,8 @@ pdf_font_t* _load_type3_font(pdf_obj_t* obj, pdf_dict_t* font_dict)
             unsigned char* origin = data;
             pdf_parser_t* parser = pdf_parser_init(obj->pdf, input);
     
-            pdf_cmap_t* cmap = pdf_parser_build_cmap(parser);
+            pdf_cmap* cmap = pdf_parser_build_cmap(parser);
+            cmap->isGlobal = false;
             font->type3->to_unicode_map = cmap;
             input_close(input);
             free(origin);
@@ -653,7 +671,7 @@ pdf_font_t* pdf_obj_get_font(pdf_obj_t* obj, const char* name)
         return font_obj->font;
     }
     if (font_obj->value->type != PDF_VALUE_DICT) return NULL;
-    pdf_dict_t* font_dict = font_obj->value->val.dict;
+    pdf_dict* font_dict = font_obj->value->val.dict;
     if (!font_dict->has("/Type"))
     {
         return NULL;
@@ -682,7 +700,89 @@ pdf_font_t* pdf_obj_get_font(pdf_obj_t* obj, const char* name)
     }
     return font_obj->font;
 }
+void _get_smask(pdf_obj_t* smask_obj, pdf_image_t* img, int width, int height, pdf_array* color_space_aar)
+{
+    if (smask_obj == NULL || img == NULL)
+        return;
+    unsigned char* smask = NULL;
+    int smask_len = 0;
+    pdf_stream_get_all(smask_obj->stream, &smask, &smask_len);
+    if (smask != NULL)
+    {
+        int tmp_len = sizeof(unsigned char) * width * 4 * height;
+        unsigned char* tmp = (unsigned char*)malloc(tmp_len);
+        int stride = img->data_len / height;
+        if (color_space_aar != NULL && !strcmp(color_space_aar->get(0)->val.name, "/Indexed"))
+        {
+            int lookup_cnt = color_space_aar->get(2)->val.number;
+            unsigned char* lookup = NULL;
+            if (color_space_aar->get(3)->type == PDF_VALUE_INDIRECT)
+            {
+                int ref = color_space_aar->get(3)->val.indirect;
+                pdf_obj_t* lookup_obj = pdf_file_get_obj(smask_obj->pdf, ref);
+                pdf_stream_get_all(lookup_obj->stream, &lookup, &lookup_cnt);
+            }
+            else
+            {
+                lookup = (unsigned char*)(color_space_aar->get(3)->val.string + 1);
+            }
+            for (int i = 0; i < height; i++)
+            {
+                for (int j = 0; j < width; j++)
+                {
+                    int index = (i * width + j);
+                    int index1 = img->data[i * stride + j] * 3;
+                    int index2 = index * 4;
 
+                    tmp[index2] = lookup[index1];
+                    tmp[index2 + 1] = lookup[index1 + 1];
+                    tmp[index2 + 2] = lookup[index1 + 2];
+                    tmp[index2 + 3] = smask[index];
+                }
+            }
+            if (color_space_aar->get(3)->type == PDF_VALUE_INDIRECT)
+            {
+                free(lookup);
+            }
+        }
+        else
+        {
+            for (int i = 0; i < height; i++)
+            {
+                for (int j = 0; j < width; j++)
+                {
+                    int index = (i * width + j);
+                    int index1 = index * 3;
+                    int index2 = index * 4;
+                    tmp[index2] = img->data[index1];
+                    tmp[index2 + 1] = img->data[index1 + 1];
+                    tmp[index2 + 2] = img->data[index1 + 2];
+                    tmp[index2 + 3] = smask[index];
+                }
+            }
+        }
+
+        pdf_image_t t = {
+            .data = NULL,
+            .data_len = 0
+        };
+        int success = stbi_write_png_to_func(_write_png_callback, &t,
+            width, height, 4, tmp, width * 4);
+        if (!success || t.data == NULL)
+        {
+            free(t.data);
+        }
+        else
+        {
+            free(img->data);
+            img->data = t.data;
+            img->data_len = t.data_len;
+        }
+        free(smask);
+        free(tmp);
+    }
+    
+}
 pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj, const char* name)
 {
     if (obj == NULL || obj->resources.xobject_dict == NULL || name == NULL)
@@ -691,7 +791,7 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj, const char* name)
     //     return obj->xobject;
     // unsigned char* input = img_obj->stream;
     pdf_obj_t* xobject = NULL;
-    pdf_dict_t* xobject_dict = NULL;
+    pdf_dict* xobject_dict = NULL;
     if (obj->resources.xobject_dict->has(name))
     {
         if (obj->resources.xobject_dict->is_indirect(name))
@@ -742,7 +842,7 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj, const char* name)
             }
             else if (xobject_dict->is_array("/Filter"))
             {
-                pdf_array_t* filter_arr = xobject_dict->get_array("/Filter");
+                pdf_array* filter_arr = xobject_dict->get_array("/Filter");
                 if (filter_arr == NULL || filter_arr->size() == 0)
                 {
                     return NULL;
@@ -785,15 +885,15 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj, const char* name)
         if (length <= 0) return NULL;
         const char* color_space = xobject_dict->get_name("/ColorSpace");
         //const char* name = xobject_dict->get_name("/Intent");
-        //pdf_array_t* mask_arr = xobject_dict->get_array("/Mask");
-        //pdf_array_t* decode_aar = xobject_dict->get_array("/Decode");
+        //pdf_array* mask_arr = xobject_dict->get_array("/Mask");
+        //pdf_array* decode_aar = xobject_dict->get_array("/Decode");
         //int interpolate = xobject_dict->get_bool("/Interpolate");
-        //pdf_array_t* alter_aar = xobject_dict->get_array("/Alternates");
+        //pdf_array* alter_aar = xobject_dict->get_array("/Alternates");
         int smask_ref = xobject_dict->get_indirect("/SMask");
         //int smask_in_data = xobject_dict->get_number("/SMaskInData");
         //const char* metadata = xobject_dict->get_name("/Metadata");
-        //pdf_dict_t* oc_dict = xobject_dict->get_dict("/OC");
-        pdf_array_t* color_space_aar = NULL;
+        //pdf_dict* oc_dict = xobject_dict->get_dict("/OC");
+        pdf_array* color_space_aar = NULL;
         if (color_space == NULL)
         {
             color_space_aar = xobject_dict->get_array("/ColorSpace");
@@ -823,86 +923,10 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj, const char* name)
                 pdf_obj_t* smask_obj = pdf_file_get_obj(obj->pdf, smask_ref);
                 if (smask_obj != NULL)
                 {
-                    unsigned char* smask = NULL;
-                    int smask_len = 0;
-                    pdf_stream_get_all(smask_obj->stream, &smask, &smask_len);
-                    if (smask != NULL)
-                    {
-                        int tmp_len = sizeof(unsigned char) * width * 4 * height;
-                        unsigned char* tmp = (unsigned char*)malloc(tmp_len);
-                        int stride = img->data_len / height;
-                        if (color_space_aar != NULL && !strcmp(color_space_aar->get(0)->val.name, "/Indexed"))
-                        {
-                            int lookup_cnt = color_space_aar->get(2)->val.number;
-                            unsigned char* lookup = NULL;
-                            if (color_space_aar->get(3)->type == PDF_VALUE_INDIRECT)
-                            {
-                                int ref = color_space_aar->get(3)->val.indirect;
-                                pdf_obj_t* lookup_obj = pdf_file_get_obj(obj->pdf, ref);
-                                pdf_stream_get_all(lookup_obj->stream, &lookup, &lookup_cnt);
-                            }
-                            else
-                            {
-                                lookup = (unsigned char*)(color_space_aar->get(3)->val.string + 1);
-                            }
-                            for (int i = 0; i < height; i++)
-                            {
-                                for (int j = 0; j < width; j++)
-                                {
-                                    int index = (i * width + j);
-                                    int index1 = img->data[i * stride + j] * 3;
-                                    int index2 = index * 4;
-
-                                    tmp[index2] = lookup[index1];
-                                    tmp[index2 + 1] = lookup[index1 + 1];
-                                    tmp[index2 + 2] = lookup[index1 + 2];
-                                    tmp[index2 + 3] = smask[index];
-                                }
-                            }
-                            if (color_space_aar->get(3)->type == PDF_VALUE_INDIRECT)
-                            {
-                                free(lookup);
-                            }
-                        }
-                        else
-                        {
-                            for (int i = 0; i < height; i++)
-                            {
-                                for (int j = 0; j < width; j++)
-                                {
-                                    int index = (i * width + j);
-                                    int index1 = index * 3;
-                                    int index2 = index * 4;
-                                    tmp[index2] = img->data[index1];
-                                    tmp[index2 + 1] = img->data[index1 + 1];
-                                    tmp[index2 + 2] = img->data[index1 + 2];
-                                    tmp[index2 + 3] = smask[index];
-                                }
-                            }
-                        }
-
-                        pdf_image_t t = {
-                            .data = NULL,
-                            .data_len = 0
-                        };
-                        int success = stbi_write_png_to_func(_write_png_callback, &t,
-                            width, height, 4, tmp, width * 4);
-                        if (!success || t.data == NULL)
-                        {
-                            free(t.data);
-                        }
-                        else
-                        {
-                            free(img->data);
-                            img->data = t.data;
-                            img->data_len = t.data_len;
-                        }
-                        free(smask);
-                        free(tmp);
-                    }
+                    _get_smask(smask_obj, img, width, height, color_space_aar);
                 }
             }
-            else if (color_space_aar != NULL && !strcmp(color_space_aar->get(0)->val.name, "/Indexed"))
+            if (color_space_aar != NULL && !strcmp(color_space_aar->get(0)->val.name, "/Indexed"))
             {
                 int stride = img->data_len / height;
                 int tmp_len = sizeof(unsigned char) * width * 3 * height;
@@ -988,7 +1012,31 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj, const char* name)
                 return NULL;
             }
             img->data_len = length;
-
+            if (smask_ref != -1)
+            {
+                pdf_obj_t* smask_obj = pdf_file_get_obj(obj->pdf, smask_ref);
+                if (smask_obj != NULL)
+                {
+                    int channels = 3;
+                    uint8_t* idata =  stbi_load_from_memory(img->data, img->data_len, &img->width, &img->height, &channels, 0);
+                    if (idata != NULL)
+                    {
+                        pdf_image_t timg;
+                        timg.data = idata;
+                        timg.data_len = img->width * img->height * channels;
+                        timg.width = img->width;
+                        timg.height = img->height;
+                        timg.bits_per_color = 8;
+                        _get_smask(smask_obj, &timg, width, height, color_space_aar);
+                        // stbi_image_free(idata);
+                        img->data = timg.data;
+                        img->data_len = timg.data_len;
+                        img->width = timg.width;
+                        img->height = timg.height;
+                        img->bits_per_color = timg.bits_per_color;
+                    }
+                }
+            }
             pdf_xobject_t* xobj = (pdf_xobject_t*)malloc(sizeof(pdf_xobject_t));
             xobj->obj = xobject;
             xobj->type = XOBJ_IMAGE;
@@ -1019,13 +1067,13 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj, const char* name)
         xobj->form->bbox[1] = 0;
         xobj->form->bbox[2] = 0;
         xobj->form->bbox[3] = 0;
-        pdf_array_t* ctm_aar = xobject_dict->get_array("/Matrix");
-        for (int i = 0; ctm_aar && i < ctm_aar->size(); i++)
+        pdf_array* ctm_aar = xobject_dict->get_array("/Matrix");
+        for (size_t i = 0; ctm_aar && i < ctm_aar->size(); i++)
         {
             xobj->form->matrix[i] = ctm_aar->get(i)->val.number;
         }
-        pdf_array_t* bbox_aar = xobject_dict->get_array("/BBox");
-        for (int i = 0; bbox_aar && i < bbox_aar->size(); i++)
+        pdf_array* bbox_aar = xobject_dict->get_array("/BBox");
+        for (size_t i = 0; bbox_aar && i < bbox_aar->size(); i++)
         {
             xobj->form->bbox[i] = bbox_aar->get(i)->val.number;
         }

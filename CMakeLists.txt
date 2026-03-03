@@ -23,9 +23,8 @@ set(BUILD_SHARED_LIBS OFF)
 
 add_subdirectory(plutovg)
 add_subdirectory(zlib)
-add_subdirectory(parser)
 add_subdirectory(render)
 
 add_executable(test test.cpp)
-target_link_libraries(test render)
-target_include_directories(test PRIVATE ./parser ./render)
+target_link_libraries(test pdf-render plutovg)
+target_include_directories(test PRIVATE ./render/include ./plutovg/include)

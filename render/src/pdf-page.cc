@@ -1,5 +1,6 @@
-#include "pdf-private.h"
 #include "pdf.h"
+#include "pdf-private.h"
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -35,7 +36,7 @@ int pdf_page_get_streams(pdf_page_t* page)
 //         return;
 //     if (page->resources->ext_gstate == NULL)
 //         return;
-//     pdf_dict_t* ext_gstate = pdf_dict_get_dict(page->resources->ext_gstate, name);
+//     pdf_dict* ext_gstate = pdf_dict_get_dict(page->resources->ext_gstate, name);
 //     if (ext_gstate == NULL)
 //     {
 //         int ref = pdf_dict_get_ref(page->resources->ext_gstate, name);
@@ -55,12 +56,12 @@ int pdf_page_get_streams(pdf_page_t* page)
 //     //int LC = pdf_dict_get_number(ext_gstate, "/LC"); // line cap
 //     //int LJ = pdf_dict_get_number(ext_gstate, "/LJ"); // line join
 //     //double ML = pdf_dict_get_number(ext_gstate, "/ML"); // miter limit
-//     //pdf_array_t* D = pdf_dict_get_array(ext_gstate, "/D"); // dash pattern
+//     //pdf_array* D = pdf_dict_get_array(ext_gstate, "/D"); // dash pattern
 //     //const char* RI = pdf_dict_get_name(ext_gstate, "/RI");
 //     //int OP = pdf_dict_get_bool(ext_gstate, "/OP"); // whether to apply overprint
 //     //int op = pdf_dict_get_bool(ext_gstate, "/op");
 //     //int OPM = pdf_dict_get_number(ext_gstate, "/OPM");
-//     //pdf_array_t* Font = pdf_dict_get_array(ext_gstate, "/Font");
+//     //pdf_array* Font = pdf_dict_get_array(ext_gstate, "/Font");
 //     // void* BG;
 //     // void* BG2;
 //     // void* UCR;

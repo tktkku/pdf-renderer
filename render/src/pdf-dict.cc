@@ -1,6 +1,7 @@
 #include "pdf.h"
 #include "pdf-private.h"
 
+
 pdf_dict::pdf_dict()
 {
 }
@@ -115,7 +116,7 @@ bool pdf_dict::is_name(const char* key)
     return false;
 }
 
-pdf_dict_t* pdf_dict::get_dict(const char* key)
+pdf_dict* pdf_dict::get_dict(const char* key)
 {
     auto it = pairs.find(key);
     if (it != pairs.end() && it->second->type == PDF_VALUE_DICT)
@@ -134,7 +135,7 @@ bool pdf_dict::is_dict(const char* key)
     return false;
 }
 
-pdf_array_t* pdf_dict::get_array(const char* key)
+pdf_array* pdf_dict::get_array(const char* key)
 {
     auto it = pairs.find(key);
     if (it != pairs.end() && it->second->type == PDF_VALUE_ARRAY)
@@ -198,10 +199,10 @@ void pdf_dict::add(const char* key, pdf_value_type_t type, void* data)
             value->val.number = *((double*)data);
             break;
         case PDF_VALUE_ARRAY:
-            value->val.array = (pdf_array_t*)data;
+            value->val.array = (pdf_array*)data;
             break;
         case PDF_VALUE_DICT:
-            value->val.dict = (pdf_dict_t*)data;
+            value->val.dict = (pdf_dict*)data;
             break;
         case PDF_VALUE_STRING:
             {

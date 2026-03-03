@@ -1,7 +1,6 @@
 #include "pdf-render.h"
 #include "pdf-render-private.h"
-#include "pdf-private.h"
-void handle_cs(pdf_render_t* context)
+void handle_cs(pdf_render* context)
 {
     // for nonstroking
     // char buf[1024] = { 0 };
@@ -9,21 +8,18 @@ void handle_cs(pdf_render_t* context)
     // node.data = buf;
     // deque_pop(context->deque, &node);
 
-    char buf[1024] = { 0 };
-    pdf_node_t node;
-    node.data = buf;
-    pdf_deque_pop_front(context->deque, &node);
-    if (!strcmp(buf, "/DeviceGray") || !strcmp(buf, "/DeviceRGB") || !strcmp(buf, "/DeviceCMYK"))
+    auto data = context->deque->pop_front();
+    if (!strcmp(data->data(), "/DeviceGray") || !strcmp(data->data(), "/DeviceRGB") || !strcmp(data->data(), "/DeviceCMYK"))
     {
-        strcpy(context->state->fill.currentColorSpace, buf);
+        strcpy(context->state->fill.currentColorSpace, data->data());
     }
     else
     {
-        pdf_obj_get_colorspace(context->current_obj, buf, context->state->fill.currentColorSpace);
+        pdf_obj_get_colorspace(context->current_obj, data->data(), context->state->fill.currentColorSpace);
     }
 }
 
-void handle_CS(pdf_render_t* context)
+void handle_CS(pdf_render* context)
 {
     // set color space
     // /DeviceGray
@@ -33,28 +29,22 @@ void handle_CS(pdf_render_t* context)
     // /DeviceCMYK
     // initialize the corresponding current color of cyan magenta yellow to 0.0
     // and the black to 1.0
-    char buf[1024] = { 0 };
-    pdf_node_t node;
-    node.data = buf;
-    pdf_deque_pop_front(context->deque, &node);
-    if (!strcmp(buf, "/DeviceGray") || !strcmp(buf, "/DeviceRGB") || !strcmp(buf, "/DeviceCMYK"))
+    auto data = context->deque->pop_front();
+    if (!strcmp(data->data(), "/DeviceGray") || !strcmp(data->data(), "/DeviceRGB") || !strcmp(data->data(), "/DeviceCMYK"))
     {
-        strcpy(context->state->stroke.currentColorSpace, buf);
+        strcpy(context->state->stroke.currentColorSpace, data->data());
     }
     else
     {
-        pdf_obj_get_colorspace(context->current_obj, buf, context->state->stroke.currentColorSpace);
+        pdf_obj_get_colorspace(context->current_obj, data->data(), context->state->stroke.currentColorSpace);
     }
 }
 
-void handle_g(pdf_render_t* context)
+void handle_g(pdf_render* context)
 {
     // for nonstroking
-    char buf[1024] = { 0 };
-    pdf_node_t node;
-    node.data = buf;
-    pdf_deque_pop_front(context->deque, &node);
-    float g = strtof(buf, NULL);
+    auto data = context->deque->pop_front();
+    float g = strtof(data->data(), NULL);
     // handle_G(context);
     //plutovg_canvas_set_rgb(context->canvas, g, g, g);
     context->state->fill.color[0] = g;
@@ -63,35 +53,29 @@ void handle_g(pdf_render_t* context)
     strcpy(context->state->fill.currentColorSpace, "/DeviceGray");
 }
 
-void handle_G(pdf_render_t* context)
+void handle_G(pdf_render* context)
 {
     // set both in one operation
     // gray
-    char buf[1024] = { 0 };
-    pdf_node_t node;
-    node.data = buf;
-    pdf_deque_pop_front(context->deque, &node);
-    float g = strtof(buf, NULL);
+    auto data = context->deque->pop_front();
+    float g = strtof(data->data(), NULL);
     context->state->stroke.color[0] = g;
     context->state->stroke.color[1] = g;
     context->state->stroke.color[2] = g;
     strcpy(context->state->stroke.currentColorSpace, "/DeviceGray");
 }
 
-void handle_k(pdf_render_t* context)
+void handle_k(pdf_render* context)
 {
     // for nonstroking
-    char buf[1024] = { 0 };
-    pdf_node_t node;
-    node.data = buf;
-    pdf_deque_pop_front(context->deque, &node);
-    float k = strtof(buf, NULL);
-    pdf_deque_pop_front(context->deque, &node);
-    float y = strtof(buf, NULL);
-    pdf_deque_pop_front(context->deque, &node);
-    float m = strtof(buf, NULL);
-    pdf_deque_pop_front(context->deque, &node);
-    float c = strtof(buf, NULL);
+    auto data = context->deque->pop_front();
+    float k = strtof(data->data(), NULL);
+    auto data2 = context->deque->pop_front();
+    float y = strtof(data2->data(), NULL);
+    auto data3 = context->deque->pop_front();
+    float m = strtof(data3->data(), NULL);
+    auto data4 = context->deque->pop_front();
+    float c = strtof(data4->data(), NULL);
     // handle_K(context);
     float r = (1.0 - c) * (1.0 - k);
     float g = (1.0 - m) * (1.0 - k);
@@ -103,38 +87,32 @@ void handle_k(pdf_render_t* context)
     strcpy(context->state->fill.currentColorSpace, "/DeviceCMYK");
 }
 
-void handle_K(pdf_render_t* context)
+void handle_K(pdf_render* context)
 {
     // combine CS and SC for DeviceCMYK
-    char buf[1024] = { 0 };
-    pdf_node_t node;
-    node.data = buf;
-    pdf_deque_pop_front(context->deque, &node);
-    float k = strtof(buf, NULL);
-    pdf_deque_pop_front(context->deque, &node);
-    float y = strtof(buf, NULL);
-    pdf_deque_pop_front(context->deque, &node);
-    float m = strtof(buf, NULL);
-    pdf_deque_pop_front(context->deque, &node);
-    float c = strtof(buf, NULL);
+    auto data = context->deque->pop_front();
+    float k = strtof(data->data(), NULL);
+    auto data2 = context->deque->pop_front();
+    float y = strtof(data2->data(), NULL);
+    auto data3 = context->deque->pop_front();
+    float m = strtof(data3->data(), NULL);
+    auto data4 = context->deque->pop_front();
+    float c = strtof(data4->data(), NULL);
     context->state->stroke.color[0] = (1.0 - c) * (1.0 - k);
     context->state->stroke.color[1] = (1.0 - m) * (1.0 - k);
     context->state->stroke.color[2] = (1.0 - y) * (1.0 - k);
     strcpy(context->state->stroke.currentColorSpace, "/DeviceCMYK");
 }
 
-void handle_rg(pdf_render_t* context)
+void handle_rg(pdf_render* context)
 {
     // for nonstroking
-    char buf[1024] = { 0 };
-    pdf_node_t node;
-    node.data = buf;
-    pdf_deque_pop_front(context->deque, &node);
-    float b = strtof(buf, NULL);
-    pdf_deque_pop_front(context->deque, &node);
-    float g = strtof(buf, NULL);
-    pdf_deque_pop_front(context->deque, &node);
-    float r = strtof(buf, NULL);
+    auto data = context->deque->pop_front();
+    float b = strtof(data->data(), NULL);
+    auto data2 = context->deque->pop_front();
+    float g = strtof(data2->data(), NULL);
+    auto data3 = context->deque->pop_front();
+    float r = strtof(data3->data(), NULL);
     //plutovg_canvas_set_rgb(context->canvas, r, g, b);
     context->state->fill.color[0] = r;
     context->state->fill.color[1] = g;
@@ -144,18 +122,15 @@ void handle_rg(pdf_render_t* context)
 }
 
 
-void handle_RG(pdf_render_t* context)
+void handle_RG(pdf_render* context)
 {
     // combine CS and SC for DeviceRGB
-    char buf[1024] = { 0 };
-    pdf_node_t node;
-    node.data = buf;
-    pdf_deque_pop_front(context->deque, &node);
-    float b = strtof(buf, NULL);
-    pdf_deque_pop_front(context->deque, &node);
-    float g = strtof(buf, NULL);
-    pdf_deque_pop_front(context->deque, &node);
-    float r = strtof(buf, NULL);
+    auto data = context->deque->pop_front();
+    float b = strtof(data->data(), NULL);
+    auto data2 = context->deque->pop_front();
+    float g = strtof(data2->data(), NULL);
+    auto data3 = context->deque->pop_front();
+    float r = strtof(data3->data(), NULL);
     context->state->stroke.color[0] = r;
     context->state->stroke.color[1] = g;
     context->state->stroke.color[2] = b;
@@ -163,22 +138,19 @@ void handle_RG(pdf_render_t* context)
     strcpy(context->state->stroke.currentColorSpace, "/DeviceRGB");
 }
 
-void handle_sc(pdf_render_t* context)
+void handle_sc(pdf_render* context)
 {
     // for nonstroking
     // char buf[1024] = { 0 };
     // deque_node_t node;
     // node.data = buf;
     // deque_pop(context->deque, &node);
-    char buf[1024] = { 0 };
-    pdf_node_t node;
-    node.data = buf;
 
     if (!strcmp(context->state->fill.currentColorSpace, "/DeviceGray"))
     {
         // gray
-        pdf_deque_pop_front(context->deque, &node);
-        float g = strtof(buf, NULL);
+        auto data = context->deque->pop_front();
+        float g = strtof(data->data(), NULL);
         // plutovg_canvas_set_rgb(context->canvas, g, g, g);
         context->state->fill.color[0] = g;
         context->state->fill.color[1] = g;
@@ -189,12 +161,12 @@ void handle_sc(pdf_render_t* context)
     {
         // red green blue
 
-        pdf_deque_pop_front(context->deque, &node);
-        float b = strtof(buf, NULL);
-        pdf_deque_pop_front(context->deque, &node);
-        float g = strtof(buf, NULL);
-        pdf_deque_pop_front(context->deque, &node);
-        float r = strtof(buf, NULL);
+        auto data = context->deque->pop_front();
+        float b = strtof(data->data(), NULL);
+        auto data2 = context->deque->pop_front();
+        float g = strtof(data2->data(), NULL);
+        auto data3 = context->deque->pop_front();
+        float r = strtof(data3->data(), NULL);
         // plutovg_canvas_set_rgb(context->canvas, r, g, b);
         context->state->fill.color[0] = r;
         context->state->fill.color[1] = g;
@@ -204,14 +176,14 @@ void handle_sc(pdf_render_t* context)
         "/DeviceCMYK"))
     {
         // cyan magenta yellow black
-        pdf_deque_pop_front(context->deque, &node);
-        float k = strtof(buf, NULL);
-        pdf_deque_pop_front(context->deque, &node);
-        float y = strtof(buf, NULL);
-        pdf_deque_pop_front(context->deque, &node);
-        float m = strtof(buf, NULL);
-        pdf_deque_pop_front(context->deque, &node);
-        float c = strtof(buf, NULL);
+        auto data = context->deque->pop_front();
+        float k = strtof(data->data(), NULL);
+        auto data2 = context->deque->pop_front();
+        float y = strtof(data2->data(), NULL);
+        auto data3 = context->deque->pop_front();
+        float m = strtof(data3->data(), NULL);
+        auto data4 = context->deque->pop_front();
+        float c = strtof(data4->data(), NULL);
 
         float r = (1.0 - c) * (1.0 - k);
         float g = (1.0 - m) * (1.0 - k);
@@ -224,19 +196,14 @@ void handle_sc(pdf_render_t* context)
 }
 
 
-void handle_SC(pdf_render_t* context)
+void handle_SC(pdf_render* context)
 {
     // set gray level, 0.0 to balck 1.0 to white
-
-    char buf[1024] = { 0 };
-    pdf_node_t node;
-    node.data = buf;
-
     if (!strcmp(context->state->stroke.currentColorSpace, "/DeviceGray"))
     {
         // gray
-        pdf_deque_pop_front(context->deque, &node);
-        float g = strtof(buf, NULL);
+        auto data = context->deque->pop_front();
+        float g = strtof(data->data(), NULL);
         // plutovg_canvas_set_rgb(context->canvas, g, g, g);
         context->state->stroke.color[0] = g;
         context->state->stroke.color[1] = g;
@@ -247,12 +214,12 @@ void handle_SC(pdf_render_t* context)
     {
         // red green blue
 
-        pdf_deque_pop_front(context->deque, &node);
-        float b = strtof(buf, NULL);
-        pdf_deque_pop_front(context->deque, &node);
-        float g = strtof(buf, NULL);
-        pdf_deque_pop_front(context->deque, &node);
-        float r = strtof(buf, NULL);
+        auto data = context->deque->pop_front();
+        float b = strtof(data->data(), NULL);
+        auto data2 = context->deque->pop_front();
+        float g = strtof(data2->data(), NULL);
+        auto data3 = context->deque->pop_front();
+        float r = strtof(data3->data(), NULL);
         // plutovg_canvas_set_rgb(context->canvas, r, g, b);
         context->state->stroke.color[0] = r;
         context->state->stroke.color[1] = g;
@@ -262,14 +229,14 @@ void handle_SC(pdf_render_t* context)
         "/DeviceCMYK"))
     {
         // cyan magenta yellow black
-        pdf_deque_pop_front(context->deque, &node);
-        float k = strtof(buf, NULL);
-        pdf_deque_pop_front(context->deque, &node);
-        float y = strtof(buf, NULL);
-        pdf_deque_pop_front(context->deque, &node);
-        float m = strtof(buf, NULL);
-        pdf_deque_pop_front(context->deque, &node);
-        float c = strtof(buf, NULL);
+        auto data = context->deque->pop_front();
+        float k = strtof(data->data(), NULL);
+        auto data2 = context->deque->pop_front();
+        float y = strtof(data2->data(), NULL);
+        auto data3 = context->deque->pop_front();
+        float m = strtof(data3->data(), NULL);
+        auto data4 = context->deque->pop_front();
+        float c = strtof(data4->data(), NULL);
 
         float r = (1.0 - c) * (1.0 - k);
         float g = (1.0 - m) * (1.0 - k);
@@ -281,7 +248,7 @@ void handle_SC(pdf_render_t* context)
     }
 }
 
-void handle_scn(pdf_render_t* context)
+void handle_scn(pdf_render* context)
 {
     // char buf[1024] = { 0 };
     // pdf_node_t node;
@@ -295,15 +262,12 @@ void handle_scn(pdf_render_t* context)
     {
         return handle_sc(context);
     }
-    char buf[1024] = { 0 };
-    pdf_node_t node;
-    node.data = buf;
-    pdf_deque_pop_front(context->deque, &node);
-    pdf_deque_pop_front(context->deque, &node);
-    pdf_deque_pop_front(context->deque, &node);
+    auto data = context->deque->pop_front();
+    auto data2 = context->deque->pop_front();
+    auto data3 = context->deque->pop_front();
 }
 
-void handle_SCN(pdf_render_t* context)
+void handle_SCN(pdf_render* context)
 {
     if (!strcmp(context->state->stroke.currentColorSpace, "/DeviceGray") 
     || !strcmp(context->state->stroke.currentColorSpace, "/DeviceRGB") 
@@ -312,10 +276,7 @@ void handle_SCN(pdf_render_t* context)
         return handle_SC(context);
     }
   
-    char buf[1024] = { 0 };
-    pdf_node_t node;
-    node.data = buf;
-    pdf_deque_pop_front(context->deque, &node);
-    pdf_deque_pop_front(context->deque, &node);
-    pdf_deque_pop_front(context->deque, &node);
+    auto data = context->deque->pop_front();
+    auto data2 = context->deque->pop_front();
+    auto data3 = context->deque->pop_front();
 }
