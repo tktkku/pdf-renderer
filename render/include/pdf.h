@@ -5,10 +5,10 @@ extern "C" {
 #include <stdbool.h>
 #include <stddef.h>
 
-    typedef class pdf_token pdf_token_t;
+    class pdf_token;
 
-    typedef struct pdf_node pdf_node_t;
-    typedef struct pdf_deque pdf_deque_t;
+    class pdf_node;
+    class pdf_deque;
 
     struct pdf_value;
     typedef struct pdf_value pdf_value_t;
@@ -20,11 +20,8 @@ extern "C" {
     struct pdf_stream;
     typedef struct pdf_stream pdf_stream_t;
 
-    struct pdf_dict;
-    typedef struct pdf_dict pdf_dict_t;
-
-    struct pdf_array;
-    typedef struct pdf_array pdf_array_t;
+    class pdf_dict;
+    class pdf_array;
 
     typedef struct pdf_file pdf_file_t;
     //typedef struct pdf_resources pdf_resources_t;

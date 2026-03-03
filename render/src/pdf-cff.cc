@@ -558,6 +558,15 @@ void pdf_cff_parse(pdf_font_descriptor_t* font_descriptor)
     int offFDSelect = top_dict->get_number("FDSelect");
     p = font_descriptor->fontfile + offFDSelect;
     pdf_array* font_select = new pdf_array();
+    /*
+        the first element specifies format
+        if == 0 : 
+            fd = font_dict_select_arr[gid + 1];
+        if == 3 :
+            for i in ranges where i > 0:
+                if font_dict_select_arr[i] <= gid <= font_dict_select_arr[i + 1]:
+                    fd = font_dict_select_arr[i + 2]
+    */
     if (p[0] == 0)
     {
         p++;
