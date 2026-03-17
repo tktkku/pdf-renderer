@@ -25,7 +25,7 @@ set(PARSER_SOURCES
     src/path.cc
     src/pdf-render-by-plutovg.cc
 )
-set(PARSER_DEP zlibstatic)
+set(PARSER_DEP zlibstatic plutovg)
 if(NOT WIN32)
     set(PARSER_DEP ${PARSER_DEP} m)
 endif()

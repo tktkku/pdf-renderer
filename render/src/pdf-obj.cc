@@ -762,10 +762,9 @@ void _get_smask(pdf_obj_t* smask_obj, pdf_image_t* img, int width, int height, p
             }
         }
 
-        pdf_image_t t = {
-            .data = NULL,
-            .data_len = 0
-        };
+        pdf_image_t t;
+        t.data = NULL;
+        t.data_len = 0;
         int success = stbi_write_png_to_func(_write_png_callback, &t,
             width, height, 4, tmp, width * 4);
         if (!success || t.data == NULL)

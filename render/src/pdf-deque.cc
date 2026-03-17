@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stddef.h>
-#include <exception>
+#include <stdexcept>
 // just reference the data pointer, do not copy the data
 pdf_node::pdf_node(const void* data, size_t size)
 {
