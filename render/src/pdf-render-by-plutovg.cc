@@ -102,7 +102,7 @@ pdf_render* pdf_render_init_for_paper(pdf_page_t* page,
     int renderHeight = paperHeight;
     int renderStride = paperStride;
 
-    pdf_render* r = (pdf_render*)calloc(1, sizeof(pdf_render));
+    pdf_render* r = new pdf_render();
     r->page = page;
     r->pdf = page->pdf;
     r->current_obj = page->obj;
@@ -342,17 +342,17 @@ void pdf_render_do(pdf_render* context)
 
 void _do_render_operation(pdf_stream_t* stream, pdf_render* context, pdf_token* tk)
 {
-    if (tk != NULL)
-    {
-        if (tk->size() > 0)
-        {
-            printf("%s\n", tk->data());
-        }
-        else
-        {
-            printf("%s\n", _token_to_string(tk->type()));
-        }
-    }
+    // if (tk != NULL)
+    // {
+    //     if (tk->size() > 0)
+    //     {
+    //         printf("%s\n", tk->data());
+    //     }
+    //     else
+    //     {
+    //         printf("%s\n", _token_to_string(tk->type()));
+    //     }
+    // }
 
     if (tk->type() < TOKEN_OPERATOR && !tk->empty())
     {

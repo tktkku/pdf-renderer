@@ -238,7 +238,7 @@ void handle_Tf(pdf_render* context)
     auto data = context->deque->pop_front();
     float fontsize = strtof(data->data(), NULL);
     auto data2 = context->deque->pop_front();
-    printf("font name = %s fontsize = %f\n", data2->data(), fontsize);
+    // printf("font name = %s fontsize = %f\n", data2->data(), fontsize);
     pdf_font_t* font = pdf_obj_get_font(context->current_obj, data2->data());
     strcpy(font->name, data2->data() + 1);
     context->state->textState.fontSize = fontsize;

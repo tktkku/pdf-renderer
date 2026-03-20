@@ -75,19 +75,11 @@ extern "C" {
     pdf_page_t* pdf_file_get_page(pdf_file_t* pdf, int pageNo);
     void pdf_file_load_font(pdf_file_t* page, const char* name, const char* data, long len);
 
-#define DPI (203)
-#ifdef DPI
-#define PIXELS_PER_POINT                                                       \
-    (DPI / 72.0) // 1point=1/72inch->72point/1inch dots/inch / point/inch
-#define POINTS_PER_PIXEL (72.0 / DPI) // point/inch / pixels/inch
-#define MM_PER_PIXEL (25.4 / DPI)     // 1inch=25.4mm  mm/inch / dots/inch
-#define PIXELS_PER_MM (DPI / 25.4)    // dots/inch / mm/inch
-#else
-#define PIXELS_PER_POINT(dpi) ((dpi) / 72.0)
-#define POINTS_PER_PIXEL(dpi) (72.0 / (dpi))
-#define MM_PER_PIXEL(dpi) (25.4 / (dpi))
-#define PIXELS_PER_MM(dpi) ((dpi) / 25.4)
-#endif
+constexpr double DPI = 203;
+constexpr double PIXELS_PER_POINT = (DPI / 72.0); // 1point=1/72inch->72point/1inch dots/inch / point/inch
+constexpr double POINTS_PER_PIXEL = (72.0 / DPI); // point/inch / pixels/inch
+constexpr double MM_PER_PIXEL = (25.4 / DPI);     // 1inch=25.4mm  mm/inch / dots/inch
+constexpr double PIXELS_PER_MM = (DPI / 25.4);    // dots/inch / mm/inch
 
 #ifdef __cplusplus
 }

@@ -16,3 +16,6 @@
 [submodule "agl-aglfn"]
 	path = agl-aglfn
 	url = https://github.com/adobe-type-tools/agl-aglfn.git
+[submodule "minifb"]
+	path = minifb
+	url = https://github.com/emoon/minifb
