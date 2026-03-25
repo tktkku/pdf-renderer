@@ -236,131 +236,98 @@ void load_font_from_external(pdf_render* context, pdf_font_descriptor_t* font_de
     }
     context->state->textState.font_face_loaded = true;
 }
-std::function<void()> handle_Tf(pdf_render* context)
+void handle_Tf(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
     // set font and font size to use
     // fontname fontsize
-    auto data = context->deque->pop_front();
-    float fontsize = strtof(data->data(), NULL);
-    auto data2 = context->deque->pop_front();
-    // printf("font name = %s fontsize = %f\n", data2->data(), fontsize);
-    pdf_font_t* font = pdf_obj_get_font(context->current_obj, data2->data());
-    strcpy(font->name, data2->data() + 1);
     
-    if (font == NULL)
-        return [] {};
-
-    for (size_t i = 0; i < context->fontcache.size(); i++)
+    if (dry_run)
     {
-        pdf_font_cache_t* cache = context->fontcache[i];
-        if (cache->font == font)
+        auto data = context->deque->pop_front();
+        float fontsize = strtof(data->data(), NULL);
+        auto data2 = context->deque->pop_front();
+        // printf("font name = %s fontsize = %f\n", data2->data(), fontsize);
+        pdf_font_t* font = pdf_obj_get_font(context->current_obj, data2->data());
+        strcpy(font->name, data2->data() + 1);
+        int index = -1;
+        for (size_t i = 0; i < context->fontcache.size(); i++)
         {
-            context->state->textState.fontface = cache->fontface;
-            context->state->textState.font_face_loaded = cache->loaded;
-            context->state->textState.font = font;
-            return [context, cache, fontsize] {
-                context->state->textState.fontSize = fontsize;
-                context->state->textState.font = cache->font;
-                context->state->textState.fontface = cache->fontface;
-            };
-            //plutovg_canvas_set_font(context->canvas, context->state->textState.fontface, fontsize);
-        }
-    }
-    
-    // plutovg_font_face_destroy(context->state->textState.fontface);
-    // plutovg_canvas_set_font_face(context->canvas, NULL);
-    // context->state->textState.fontface = NULL;
-    
-    
-
-    // repair font
-    // repair_cmap(context->font);
-    // set font face
-    // context->fontface = plutovg_font_face_load_from_file("fonts/SimSun.ttf",
-    // 0); FT_Face face;
-    // context->state->textState.font_face_loaded = false;
-    // if (font->subtype && strcmp(font->subtype, "/TrueType") == 0)
-    // {
-    //     if (font->font_data == NULL)
-    //     {
-    //         context->state->textState.fontface = NULL;
-    //         for (int i = 0; i < cvector_size(context->page->pdf->external_fonts); i++)
-    //         {
-    //             pdf_external_font_t* f = context->page->pdf->external_fonts[i];
-    //             if (strcmp(f->name, font->basefont + 1) == 0)
-    //             {
-    //                 font->font_data_length = f->data_len;
-    //                 font->font_data = f->data;
-                    
-    //                 context->state->textState.fontface = plutovg_font_face_load_from_data(
-    //                     font->font_data, font->font_data_length, 0, NULL, NULL);
-    //                 context->state->textState.font_face_loaded = true;
-    //                 break;
-    //             }
-    //         }
-    //         context->state->textState.font_face_loaded = true;
-    //     }
-    //     else
-    //     {
-    //         context->state->textState.fontface = plutovg_font_face_load_from_data(
-    //             font->font_data, font->font_data_length, 0, NULL, NULL);
-    //         context->state->textState.font_face_loaded = true;
-    //     }
-    // }
-    // else
-    if (font->subtype == FONT_SUBTYPE_TYPE0)
-    {
-        pdf_font_cidfont_t* cidfont = font->type0->descendant->cidfont;
-        if (cidfont && cidfont->font_descriptor && cidfont->font_descriptor->fontfile != NULL)
-        {
-            if ((context->state->textState.fontface = pdf_font_face_load_from_data(
-                cidfont->font_descriptor->fontfile, cidfont->font_descriptor->fontfile_len, 0, NULL, NULL)) == NULL)
+            pdf_font_cache_t* cache = context->fontcache[i];
+            if (cache->font == font)
             {
-
-            }
-            else
-            {
-                context->state->textState.font_face_loaded = true;
+                index = i;
             }
         }
-        else if (cidfont)
+        if (index == -1)
         {
-            load_font_from_external(context, cidfont->font_descriptor);
-        }
-    }
-    else if (font->subtype == FONT_SUBTYPE_TRUETYPE || font->subtype == FONT_SUBTYPE_TYPE1)
-    {
-        pdf_font_type1_t* type1_truetype = font->type1_truetype;
-        if (type1_truetype && type1_truetype->font_descriptor && type1_truetype->font_descriptor->fontfile != NULL)
-        {
-            if ((context->state->textState.fontface = pdf_font_face_load_from_data(
-                type1_truetype->font_descriptor->fontfile, type1_truetype->font_descriptor->fontfile_len, 0, NULL, NULL)) == NULL)
+            if (font->subtype == FONT_SUBTYPE_TYPE0)
             {
+                pdf_font_cidfont_t* cidfont = font->type0->descendant->cidfont;
+                if (cidfont && cidfont->font_descriptor && cidfont->font_descriptor->fontfile != NULL)
+                {
+                    if ((context->state->textState.fontface = pdf_font_face_load_from_data(
+                        cidfont->font_descriptor->fontfile, cidfont->font_descriptor->fontfile_len, 0, NULL, NULL)) == NULL)
+                    {
 
+                    }
+                    else
+                    {
+                        context->state->textState.font_face_loaded = true;
+                    }
+                }
+                else if (cidfont)
+                {
+                    load_font_from_external(context, cidfont->font_descriptor);
+                }
             }
-            else
+            else if (font->subtype == FONT_SUBTYPE_TRUETYPE || font->subtype == FONT_SUBTYPE_TYPE1)
             {
-                context->state->textState.font_face_loaded = true;
-            }
-        }
-        else if (type1_truetype)
-        {
-            load_font_from_external(context, type1_truetype->font_descriptor);
-        }
-    }
-    if (context->state->textState.fontface == NULL)
-    {
-        return [] {};
-    }
-    pdf_font_cache_t* cache = new pdf_font_cache_t();
-    cache->font = pdf_font_reference(font);
-    cache->fontface = context->state->textState.fontface;
-    cache->loaded = context->state->textState.font_face_loaded;
-    context->fontcache.push_back(cache);
+                pdf_font_type1_t* type1_truetype = font->type1_truetype;
+                if (type1_truetype && type1_truetype->font_descriptor && type1_truetype->font_descriptor->fontfile != NULL)
+                {
+                    if ((context->state->textState.fontface = pdf_font_face_load_from_data(
+                        type1_truetype->font_descriptor->fontfile, type1_truetype->font_descriptor->fontfile_len, 0, NULL, NULL)) == NULL)
+                    {
 
-    return [context, cache, fontsize] {
-        context->state->textState.fontSize = fontsize;
-        context->state->textState.font = cache->font;
-        context->state->textState.fontface = cache->fontface;
-    };
+                    }
+                    else
+                    {
+                        context->state->textState.font_face_loaded = true;
+                    }
+                }
+                else if (type1_truetype)
+                {
+                    load_font_from_external(context, type1_truetype->font_descriptor);
+                }
+            }
+            if (context->state->textState.fontface == NULL)
+            {
+                return;
+            }
+            pdf_font_cache_t* cache = new pdf_font_cache_t();
+            cache->font = pdf_font_reference(font);
+            cache->fontface = context->state->textState.fontface;
+            cache->loaded = context->state->textState.font_face_loaded;
+            context->fontcache.push_back(cache);
+
+            cmd->type = TOKEN_OPERATOR_Tf;
+            cmd->Tf.size = fontsize;
+            cmd->Tf.font = cache->font;
+            cmd->Tf.fontface = cache->fontface;
+        }
+        else
+        {
+            pdf_font_cache_t* cache = context->fontcache[index];
+            cmd->type = TOKEN_OPERATOR_Tf;
+            cmd->Tf.size = fontsize;
+            cmd->Tf.font = cache->font;
+            cmd->Tf.fontface = cache->fontface;
+        }
+    }
+    else
+    {
+        context->state->textState.fontSize = cmd->Tf.size;
+        context->state->textState.font = cmd->Tf.font;
+        context->state->textState.fontface = cmd->Tf.fontface;
+    }
 }

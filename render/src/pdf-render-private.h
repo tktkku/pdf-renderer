@@ -1,6 +1,7 @@
 #pragma once
 #include "pdf-private.h"
 #include "pdf-render.h"
+#include <cmath>
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -104,6 +105,67 @@ typedef struct
     pdf_font_face_t* fontface;
     bool loaded;
 } pdf_font_cache_t;
+struct pdf_render_command
+{
+    pdf_token_type_t type;
+    union 
+    {
+        struct {
+            char color[64];
+        } cs, CS;
+        struct {
+            float g;
+        } g, G;
+        struct {
+            float r, g, b;
+        } k, K, rg, RG, sc, SC;
+        struct {
+            float x1, y1, x2, y2, x3, y3;
+        } c, v, y, Tm, cm;
+        struct {
+            float x, y;
+        } l, m, Td, TD;
+        struct {
+            float x, y, width, height;
+        } re;
+        struct {
+            float f;
+        } w, Tc, TL,Ts, Tw, Tz, M;
+        struct {
+            int i;
+        } Tr, j, J;
+        struct {
+            std::unique_ptr<pdf_node> data;
+        } apostrophe, Tj;
+        struct {
+            std::shared_ptr<pdf_deque> tmp_deque;
+        } TJ;
+        struct {
+            pdf_font_t* font;
+            pdf_font_face_t* fontface;
+            float size;
+        } Tf;
+        struct {
+            float offset;
+            float dashs[2];
+        } d;
+        struct {
+            xobject_type_t type;
+            pdf_xobject_t* xobj;
+            int width, height;
+            plutovg_surface_t* surface;
+            std::vector<std::unique_ptr<pdf_render_command>> opts;
+        } Do;
+    };
+    pdf_render_command()
+    {
+
+    }
+    ~pdf_render_command() 
+    {
+        
+    }
+};
 struct pdf_render
 {
     unsigned char* pixels;
@@ -118,84 +180,84 @@ struct pdf_render
     pdf_obj_t* current_obj;
     pdf_graphics_state_t* state;
     std::vector<pdf_font_cache_t*> fontcache;
-    std::vector<std::function<void()>> operations;
+    std::vector<std::unique_ptr<pdf_render_command>> operations;
 };
-typedef std::function<void()> (*OPERATION_HANDLER)(pdf_render* context);
+typedef void (*OPERATION_HANDLER)(pdf_render* context, pdf_render_command* cmd, bool dry_run);
 
-std::function<void()> handle_q(pdf_render* context);
-std::function<void()> handle_Q(pdf_render* context);
-std::function<void()> handle_cm(pdf_render* context);
-std::function<void()> handle_w(pdf_render* context);
-std::function<void()> handle_J(pdf_render* context);
-std::function<void()> handle_j(pdf_render* context);
-std::function<void()> handle_M(pdf_render* context);
-std::function<void()> handle_d(pdf_render* context);
-std::function<void()> handle_ri(pdf_render* context);
-std::function<void()> handle_i(pdf_render* context);
-std::function<void()> handle_gs(pdf_render* context);
-std::function<void()> handle_m(pdf_render* context);
-std::function<void()> handle_l(pdf_render* context);
-std::function<void()> handle_c(pdf_render* context);
-std::function<void()> handle_v(pdf_render* context);
-std::function<void()> handle_y(pdf_render* context);
-std::function<void()> handle_h(pdf_render* context);
-std::function<void()> handle_re(pdf_render* context);
-std::function<void()> handle_S(pdf_render* context);
-std::function<void()> handle_s(pdf_render* context);
-std::function<void()> handle_F_f(pdf_render* context);
-std::function<void()> handle_f_star(pdf_render* context);
-std::function<void()> handle_B(pdf_render* context);
-std::function<void()> handle_B_star(pdf_render* context);
-std::function<void()> handle_b(pdf_render* context);
-std::function<void()> handle_b_star(pdf_render* context);
-std::function<void()> handle_n(pdf_render* context);
-std::function<void()> handle_W(pdf_render* context);
-std::function<void()> handle_W_star(pdf_render* context);
-std::function<void()> handle_CS(pdf_render* context);
-std::function<void()> handle_SC(pdf_render* context);
-std::function<void()> handle_G(pdf_render* context);
-std::function<void()> handle_cs(pdf_render* context);
-std::function<void()> handle_sc(pdf_render* context);
-std::function<void()> handle_g(pdf_render* context);
-std::function<void()> handle_RG(pdf_render* context);
-std::function<void()> handle_rg(pdf_render* context);
-std::function<void()> handle_K(pdf_render* context);
-std::function<void()> handle_k(pdf_render* context);
-std::function<void()> handle_SCN(pdf_render* context);
-std::function<void()> handle_scn(pdf_render* context);
-std::function<void()> handle_sh(pdf_render* context);
-std::function<void()> handle_Do(pdf_render* context);
-//std::function<void()> handle_BI(pdf_render* context);
-//std::function<void()> handle_ID(pdf_render* context);
-//std::function<void()> handle_EI(pdf_render* context);
-std::function<void()> handle_BT(pdf_render* context);
-std::function<void()> handle_ET(pdf_render* context);
-std::function<void()> handle_Tf(pdf_render* context);
-std::function<void()> handle_Tc(pdf_render* context);
-std::function<void()> handle_Tw(pdf_render* context);
-std::function<void()> handle_Tz(pdf_render* context);
-std::function<void()> handle_TL(pdf_render* context);
-std::function<void()> handle_Tr(pdf_render* context);
-std::function<void()> handle_Ts(pdf_render* context);
-std::function<void()> handle_Td(pdf_render* context);
-std::function<void()> handle_TD(pdf_render* context);
-std::function<void()> handle_Tm(pdf_render* context);
-std::function<void()> handle_T_star(pdf_render* context);
-std::function<void()> handle_Tj(pdf_render* context);
-std::function<void()> handle_apostrophe(pdf_render* context);
-std::function<void()> handle_quotation(pdf_render* context);
-std::function<void()> handle_TJ(pdf_render* context);
-std::function<void()> handle_d0(pdf_render* context);
-std::function<void()> handle_d1(pdf_render* context);
-std::function<void()> handle_BDC(pdf_render* context);
-std::function<void()> handle_BMC(pdf_render* context);
-std::function<void()> handle_DP(pdf_render* context);
-std::function<void()> handle_EMC(pdf_render* context);
-std::function<void()> handle_MP(pdf_render* context);
+void handle_q(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_Q(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_cm(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_w(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_J(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_j(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_M(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_d(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_ri(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_i(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_gs(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_m(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_l(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_c(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_v(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_y(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_h(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_re(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_S(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_s(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_F_f(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_f_star(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_B(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_B_star(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_b(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_b_star(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_n(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_W(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_W_star(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_CS(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_SC(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_G(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_cs(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_sc(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_g(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_RG(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_rg(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_K(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_k(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_SCN(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_scn(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_sh(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_Do(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_BI(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+//void handle_ID(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+//void handle_EI(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_BT(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_ET(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_Tf(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_Tc(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_Tw(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_Tz(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_TL(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_Tr(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_Ts(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_Td(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_TD(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_Tm(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_T_star(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_Tj(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_apostrophe(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_quotation(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_TJ(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_d0(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_d1(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_BDC(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_BMC(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_DP(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_EMC(pdf_render* context, pdf_render_command* cmd, bool dry_run);
+void handle_MP(pdf_render* context, pdf_render_command* cmd, bool dry_run);
 
 const static OPERATION_HANDLER handlers[] = {
     NULL, handle_quotation, handle_apostrophe, handle_B, 
-    handle_B_star, handle_BDC, handle_BMC, NULL, 
+    handle_B_star, handle_BDC, handle_BMC, handle_BI, 
     handle_BT, handle_CS, handle_DP, handle_Do, NULL,
     handle_EMC, handle_ET, handle_F_f, handle_G, NULL, 
     handle_J, handle_K, handle_M, handle_MP, handle_Q, handle_RG, 
@@ -208,7 +270,7 @@ const static OPERATION_HANDLER handlers[] = {
     handle_m, handle_n, handle_q, handle_re, handle_rg, handle_ri, handle_s, 
     handle_sc, handle_scn, handle_sh, handle_v, handle_w, handle_y
 };
-std::function<void()> _do_render_operation(pdf_stream_t* stream, pdf_render* context, pdf_token* tk);
+pdf_render_command* _do_render_operation(pdf_stream_t* stream, pdf_render* context, pdf_token* tk);
 void stroke(pdf_render* context);
 void _do_text_render(pdf_render* context, char* buf, int len);
 void _init_state(pdf_render* context);

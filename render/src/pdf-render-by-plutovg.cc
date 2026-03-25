@@ -107,7 +107,13 @@ void _pdf_process_stream(pdf_render* context, pdf_stream_t* stream)
         {
             break;
         }
-        context->operations.push_back(_do_render_operation(stream, context, tk));
+        pdf_render_command* cmd = _do_render_operation(stream, context, tk);
+        if (cmd)
+        {
+            std::unique_ptr<pdf_render_command> u(cmd);
+            context->operations.push_back(std::move(u));
+        }
+        
         delete tk;
     }
 
@@ -164,9 +170,12 @@ void pdf_render_build(pdf_render* context)
                 {
                     float tx = rect_aar->get(0)->val.number;
                     float ty = rect_aar->get(1)->val.number;
-                    context->operations.push_back([context, tx, ty] {
-                        plutovg_canvas_translate(context->canvas, tx, ty);
-                    });
+                    pdf_render_command* cmd = new pdf_render_command;
+                    cmd->type = TOKEN_OPERATOR_Td;
+                    cmd->Td.x = tx;
+                    cmd->Td.y = ty;
+                    std::unique_ptr<pdf_render_command> u(cmd);
+                    context->operations.push_back(std::move(u));
                 }
                 anno_obj->value->val.dict->get_string("/Contents");
                 anno_obj->value->val.dict->get_dict("/P");
@@ -213,7 +222,13 @@ void pdf_render_build(pdf_render* context)
                             {
                                 if (tk->type() == TOKEN_STREAM_END)
                                     break;
-                                context->operations.push_back(_do_render_operation(obj->stream, context, tk));
+                                pdf_render_command* cmd = _do_render_operation(obj->stream, context, tk);
+                                if (cmd)
+                                {
+                                    std::unique_ptr<pdf_render_command> u(cmd);
+                                    context->operations.push_back(std::move(u));
+                                }
+                                
                                 delete tk;
                             }
                             pdf_stream_close(obj->stream);
@@ -230,7 +245,7 @@ void pdf_render_build(pdf_render* context)
     }
 }
 
-std::function<void()> _do_render_operation(pdf_stream_t* stream, pdf_render* context, pdf_token* tk)
+pdf_render_command* _do_render_operation(pdf_stream_t* stream, pdf_render* context, pdf_token* tk)
 {
     // if (tk != NULL)
     // {
@@ -351,105 +366,11 @@ std::function<void()> _do_render_operation(pdf_stream_t* stream, pdf_render* con
                 {
                     ret = pdf_parser_read_data(stream->parser, buffer, size);
                 }
-                
-                plutovg_surface_t* s = NULL;
-                if (memcmp(buffer, "\xFF\xD8", 2) == 0) // jpeg
-                {
-                    s = plutovg_surface_load_from_image_data(buffer,
-                        size);
-                    // unsigned char* pixels = stbi_load_from_memory(xobj->image->data,
-                    // xobj->image->data_len, &width, &height, &channels, channels);
-                    // //convert_to_gray(pixels, width, height, width * channels, channels);
-                    // //average_gray(pixels, width, height, width * channels, channels);
-                    // //dither_by_threshold(pixels, width, height, width * channels,
-                    // channels, 220); free(xobj->image->data); xobj->image->data = pixels;
-                    // xobj->image->data_len = width * channels * height;
-                    // dither_by_threshold(pixels, width, height, width * channels, 220);
-                    // stbi_image_free(pixels);
-                }
-                else if (memcmp(buffer, "\x89\x50\x4E\x47\x0D\x0A\x1A\x0A",
-                    8) == 0) // png
-                {
-                    s = plutovg_surface_load_from_image_data(buffer,
-                        size);
-                }
-                else if (memcmp(buffer, "P6", 2) == 0) // ppm
-                {
-                    s = plutovg_surface_load_from_image_data(buffer,
-                        size);
-                }
-                else
-                {
-                    // tje_encode_to_file("tje.jpg", width, height, channels,
-                    // xobj->image->data);
-                    //  add header
-                    char header[128] = { 0 };
-                    if (channels == 3)
-                    {
-                        sprintf(header, "P6 %d %d 255\n", width, height);
-                    }
-                    else if (channels == 1)
-                    {
-                        sprintf(header, "P5 %d %d 255\n", width, height);
-                    }
-
-                    int header_len = strlen(header);
-                    int actual_line_bytes = size / height;
-                    int actual_data_len = size;
-                    int real_line_bytes = channels * width;
-                    int real_data_len = real_line_bytes * height;
-                    if (channels == 3 && real_data_len != actual_data_len)
-                    {
-                        unsigned char* tmp =
-                            (unsigned char*)malloc(real_data_len + header_len);
-                        int off = 0;
-                        memcpy(tmp, header, header_len);
-                        off += header_len;
-                        for (int i = 0; i < height; i++)
-                        {
-                            memcpy(tmp + off, buffer + i * actual_line_bytes,
-                                real_line_bytes);
-                            off += real_line_bytes;
-                        }
-                        free(buffer);
-                        buffer = (char*)tmp;
-                        size = off;
-                    }
-                    else
-                    {
-                        unsigned char* tmp =
-                            (unsigned char*)malloc(size + header_len);
-                        int off = 0;
-                        memcpy(tmp, header, header_len);
-                        off += header_len;
-                        memcpy(tmp + off, buffer, size);
-                        off += size;
-                        free(buffer);
-                        buffer = (char*)tmp;
-                        size = off;
-                    }
-
-                    s = plutovg_surface_load_from_image_data(buffer,
-                        size);
-                }
-                if (s == NULL)
-                {
-                    printf("process BI-ID failed\n");
-                    return [] {};
-                }
-                std::shared_ptr<char> shared_buffer(buffer);
-                return [context, width, height, s, shared_buffer] {
-                    plutovg_canvas_save(context->canvas);
-                    float scale_x = 1.f / width;
-                    float scale_y = 1.f / height;
-                    plutovg_matrix_t m = { scale_x,  0,
-                                            0, -scale_y,
-                                            0, height * scale_y };
-                    plutovg_canvas_set_texture(context->canvas, s, PLUTOVG_TEXTURE_TYPE_PLAIN,
-                        1.0f, &m);
-                    plutovg_canvas_paint(context->canvas);
-                    plutovg_canvas_restore(context->canvas);
-                };
+                context->deque->push_front(&size, sizeof(size));
+                context->deque->push_front(&channels, sizeof(channels));
+                context->deque->push_front(&height, sizeof(height));
+                context->deque->push_front(&width, sizeof(width));
+                context->deque->push_front(&buffer, sizeof(char*));
                 break;
             }
             default:
@@ -457,14 +378,16 @@ std::function<void()> _do_render_operation(pdf_stream_t* stream, pdf_render* con
         }
         if (handlers[tk->type() - TOKEN_OPERATOR])
         {
-            return handlers[tk->type() - TOKEN_OPERATOR](context);
+            pdf_render_command* cmd = new pdf_render_command;
+            handlers[tk->type() - TOKEN_OPERATOR](context, cmd, true);
+            return cmd;
         }
     }
     else
     {
         printf("unknow token %d\n", tk->type());
     }
-    return [] {};
+    return NULL;
 }
 void pdf_render_with_size(pdf_render* context, int width, int height, int stride, int dpi)
 {
@@ -494,9 +417,10 @@ void pdf_render_with_size(pdf_render* context, int width, int height, int stride
     context->canvas = canvas;
     context->surface = surface;
 
-    std::for_each(context->operations.begin(), context->operations.end(), [] (auto& opt) {
-        opt();
-    });
+    for (auto& c : context->operations)
+    {
+        handlers[c->type - TOKEN_OPERATOR](context, c.get(), false);
+    }
 }
 void pdf_render_for_paper(pdf_render* context, 
     int paperWidth, int paperHeight, int paperStride, 
@@ -570,249 +494,411 @@ void pdf_render_for_paper(pdf_render* context,
     context->canvas = canvas;
     context->surface = surface;
 
-    std::for_each(context->operations.begin(), context->operations.end(), [] (auto& opt) {
-        opt();
-    });
+    for (auto& c : context->operations)
+    {
+        handlers[c->type - TOKEN_OPERATOR](context, c.get(), false);
+    }
 }
-std::function<void()> handle_BDC(pdf_render* context)
+void handle_BDC(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
     // tag properties
-    auto data = context->deque->pop_front();
-    if (!strcmp(data->data(), ">>"))
+    if (dry_run)
     {
-        context->deque->pop_front(); // str
-        context->deque->pop_front(); // name
-        context->deque->pop_front(); // <<
-    }
-    else
-    {
-        context->deque->pop_front(); // name
-    }
-    context->deque->pop_front(); // tag
-    return [context] {
-
-    };
-}
-// std::function<void()> handle_BI(pdf_render* context)
-// {
-//     // begin an inline image object
-// }
-
-std::function<void()> handle_BMC(pdf_render* context)
-{
-    // tag
-    context->deque->pop_front();
-    return [context] {};
-}
-
-
-std::function<void()> handle_cm(pdf_render* context)
-{
-    // change matrix CTM
-    // a b c d e f
-    char buf[1024] = { 0 };
-    auto data = context->deque->pop_front();
-    float f = strtof(data->data(), NULL);
-    auto data2 = context->deque->pop_front();
-    float e = strtof(data2->data(), NULL);
-    auto data3 = context->deque->pop_front();
-    float d = strtof(data3->data(), NULL);
-    auto data4 = context->deque->pop_front();
-    float c = strtof(data4->data(), NULL);
-    auto data5 = context->deque->pop_front();
-    float b = strtof(data5->data(), NULL);
-    auto data6 = context->deque->pop_front();
-    float a = strtof(data6->data(), NULL);
-
-    return [context, a, b, c, d, e, f] {
-        plutovg_matrix_t ctm;
-        plutovg_matrix_init(&ctm, a, b, c, d, e, f);
-        plutovg_canvas_transform(context->canvas, &ctm);
-    };
-}
-
-
-
-std::function<void()> handle_d(pdf_render* context)
-{
-    // set line dash pattern
-    // dashArray dashPhase
-    auto data = context->deque->pop_front();
-    float offset = strtof(data->data(), NULL);
-
-    int index = 2;
-    float dashs[2] = { 0 };
-    while (true)
-    {
-        auto data2 = context->deque->pop_front();
-        if (!strcmp(data2->data(), "]"))
+        auto data = context->deque->pop_front();
+        if (!strcmp(data->data(), ">>"))
         {
-            // ignore
-        }
-        else if (!strcmp(data2->data(), "["))
-        {
-            break;
+            context->deque->pop_front(); // str
+            context->deque->pop_front(); // name
+            context->deque->pop_front(); // <<
         }
         else
         {
-            float dash = strtof(data2->data(), NULL);
-            if (index > 0)
-                dashs[--index] = dash;
+            context->deque->pop_front(); // name
         }
+        context->deque->pop_front(); // tag
+        cmd->type = TOKEN_OPERATOR_BDC;
     }
-    return [context, offset, dashs] {
-        plutovg_canvas_set_dash_offset(context->canvas, offset);
-        plutovg_canvas_set_dash_array(context->canvas, dashs, 2);
-    };
+}
+void handle_BI(pdf_render* context, pdf_render_command* cmd, bool dry_run)
+{
+    // begin an inline image object
+    if (dry_run)
+    {
+        auto data = context->deque->pop_front();
+        char** pptr = ((char**)(void*)data->data());
+        char* buffer = *pptr;
+
+        auto data1 = context->deque->pop_front();
+        int* ptr1 = ((int*)(void*)data1->data());
+        int width = *ptr1;
+        
+        auto data2 = context->deque->pop_front();
+        int* ptr2 = ((int*)(void*)data2->data());
+        int height = *ptr2;
+
+        auto data3 = context->deque->pop_front();
+        int* ptr3 = ((int*)(void*)data3->data());
+        int channels = *ptr3;
+
+        auto data4 = context->deque->pop_front();
+        int* ptr4 = ((int*)(void*)data4->data());
+        int size = *ptr4;
+  
+        plutovg_surface_t* s = NULL;
+        if (memcmp(buffer, "\xFF\xD8", 2) == 0) // jpeg
+        {
+            s = plutovg_surface_load_from_image_data(buffer,
+                size);
+            // unsigned char* pixels = stbi_load_from_memory(xobj->image->data,
+            // xobj->image->data_len, &width, &height, &channels, channels);
+            // //convert_to_gray(pixels, width, height, width * channels, channels);
+            // //average_gray(pixels, width, height, width * channels, channels);
+            // //dither_by_threshold(pixels, width, height, width * channels,
+            // channels, 220); free(xobj->image->data); xobj->image->data = pixels;
+            // xobj->image->data_len = width * channels * height;
+            // dither_by_threshold(pixels, width, height, width * channels, 220);
+            // stbi_image_free(pixels);
+        }
+        else if (memcmp(buffer, "\x89\x50\x4E\x47\x0D\x0A\x1A\x0A",
+            8) == 0) // png
+        {
+            s = plutovg_surface_load_from_image_data(buffer,
+                size);
+        }
+        else if (memcmp(buffer, "P6", 2) == 0) // ppm
+        {
+            s = plutovg_surface_load_from_image_data(buffer,
+                size);
+        }
+        else
+        {
+            // tje_encode_to_file("tje.jpg", width, height, channels,
+            // xobj->image->data);
+            //  add header
+            char header[128] = { 0 };
+            if (channels == 3)
+            {
+                sprintf(header, "P6 %d %d 255\n", width, height);
+            }
+            else if (channels == 1)
+            {
+                sprintf(header, "P5 %d %d 255\n", width, height);
+            }
+
+            int header_len = strlen(header);
+            int actual_line_bytes = size / height;
+            int actual_data_len = size;
+            int real_line_bytes = channels * width;
+            int real_data_len = real_line_bytes * height;
+            if (channels == 3 && real_data_len != actual_data_len)
+            {
+                unsigned char* tmp =
+                    (unsigned char*)malloc(real_data_len + header_len);
+                int off = 0;
+                memcpy(tmp, header, header_len);
+                off += header_len;
+                for (int i = 0; i < height; i++)
+                {
+                    memcpy(tmp + off, buffer + i * actual_line_bytes,
+                        real_line_bytes);
+                    off += real_line_bytes;
+                }
+                free(buffer);
+                buffer = (char*)tmp;
+                size = off;
+            }
+            else
+            {
+                unsigned char* tmp =
+                    (unsigned char*)malloc(size + header_len);
+                int off = 0;
+                memcpy(tmp, header, header_len);
+                off += header_len;
+                memcpy(tmp + off, buffer, size);
+                off += size;
+                free(buffer);
+                buffer = (char*)tmp;
+                size = off;
+            }
+
+            s = plutovg_surface_load_from_image_data(buffer,
+                size);
+        }
+        cmd->type = TOKEN_OPERATOR_Do;
+        cmd->Do.type = XOBJ_IMAGE;
+        cmd->Do.width = width;
+        cmd->Do.height = height;
+        cmd->Do.surface = s;
+    }
 }
 
-std::function<void()> handle_d0(pdf_render* context)
+void handle_BMC(pdf_render* context, pdf_render_command* cmd, bool dry_run)
+{
+    // tag
+    if (dry_run)
+    {
+        context->deque->pop_front();
+        cmd->type = TOKEN_OPERATOR_BMC;
+    }
+}
+
+
+void handle_cm(pdf_render* context, pdf_render_command* cmd, bool dry_run)
+{
+    // change matrix CTM
+    // a b c d e f
+    if (dry_run)
+    {
+        char buf[1024] = { 0 };
+        auto data = context->deque->pop_front();
+        float f = strtof(data->data(), NULL);
+        auto data2 = context->deque->pop_front();
+        float e = strtof(data2->data(), NULL);
+        auto data3 = context->deque->pop_front();
+        float d = strtof(data3->data(), NULL);
+        auto data4 = context->deque->pop_front();
+        float c = strtof(data4->data(), NULL);
+        auto data5 = context->deque->pop_front();
+        float b = strtof(data5->data(), NULL);
+        auto data6 = context->deque->pop_front();
+        float a = strtof(data6->data(), NULL);
+        cmd->type = TOKEN_OPERATOR_cm;
+        cmd->cm.x1 = a;
+        cmd->cm.y1 = b;
+        cmd->cm.x2 = c;
+        cmd->cm.y2 = d;
+        cmd->cm.x3 = e;
+        cmd->cm.y3 = f;
+    }
+    else
+    {
+        plutovg_matrix_t ctm;
+        plutovg_matrix_init(&ctm, 
+            cmd->cm.x1, cmd->cm.y1, cmd->cm.x2, cmd->cm.y2, cmd->cm.x3, cmd->cm.y3);
+        plutovg_canvas_transform(context->canvas, &ctm);
+    }
+}
+
+
+
+void handle_d(pdf_render* context, pdf_render_command* cmd, bool dry_run)
+{
+    // set line dash pattern
+    // dashArray dashPhase
+    if (dry_run)
+    {
+        auto data = context->deque->pop_front();
+        float offset = strtof(data->data(), NULL);
+
+        int index = 2;
+        float dashs[2] = { 0 };
+        while (true)
+        {
+            auto data2 = context->deque->pop_front();
+            if (!strcmp(data2->data(), "]"))
+            {
+                // ignore
+            }
+            else if (!strcmp(data2->data(), "["))
+            {
+                break;
+            }
+            else
+            {
+                float dash = strtof(data2->data(), NULL);
+                if (index > 0)
+                    dashs[--index] = dash;
+            }
+        }
+        cmd->type = TOKEN_OPERATOR_d;
+        cmd->d.offset = offset;
+        cmd->d.dashs[0] = dashs[0];
+        cmd->d.dashs[1] = dashs[1];
+    }
+    else
+    {
+        plutovg_canvas_set_dash_offset(context->canvas, cmd->d.offset);
+        plutovg_canvas_set_dash_array(context->canvas, cmd->d.dashs, 2);
+    }
+}
+
+void handle_d0(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
     // wx wy
-    auto data = context->deque->pop_front();
-    float wy = strtof(data->data(), NULL);
-    auto data2 = context->deque->pop_front();
-    float wx = strtof(data2->data(), NULL);
-    // plutovg_canvas_translate(context->canvas, wx, wy);
-    return [context, wx, wy] {
-
-    };
+    if (dry_run)
+    {
+        auto data = context->deque->pop_front();
+        float wy = strtof(data->data(), NULL);
+        auto data2 = context->deque->pop_front();
+        float wx = strtof(data2->data(), NULL);
+        cmd->type = TOKEN_OPERATOR_d0;
+    }
 }
 
-std::function<void()> handle_d1(pdf_render* context)
+void handle_d1(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
     // wx wy llx lly urx ury
-    auto data = context->deque->pop_front();
-    float ury = strtof(data->data(), NULL);
-    auto data2 = context->deque->pop_front();
-    float urx = strtof(data2->data(), NULL);
-    auto data3 = context->deque->pop_front();
-    float lly = strtof(data3->data(), NULL);
-    auto data4 = context->deque->pop_front();
-    float llx = strtof(data4->data(), NULL);
-    auto data5 = context->deque->pop_front();
-    float wy = strtof(data5->data(), NULL);
-    auto data6 = context->deque->pop_front();
-    float wx = strtof(data6->data(), NULL);
-    // plutovg_canvas_translate(context->canvas, wx, wy);
-    // plutovg_canvas_rect(context->canvas, llx, lly, urx - llx, ury - lly);
-    return [context, wx, wy, llx, lly, urx, ury] {
-
-    };
+    if (dry_run)
+    {
+        auto data = context->deque->pop_front();
+        float ury = strtof(data->data(), NULL);
+        auto data2 = context->deque->pop_front();
+        float urx = strtof(data2->data(), NULL);
+        auto data3 = context->deque->pop_front();
+        float lly = strtof(data3->data(), NULL);
+        auto data4 = context->deque->pop_front();
+        float llx = strtof(data4->data(), NULL);
+        auto data5 = context->deque->pop_front();
+        float wy = strtof(data5->data(), NULL);
+        auto data6 = context->deque->pop_front();
+        float wx = strtof(data6->data(), NULL);
+        cmd->type = TOKEN_OPERATOR_d1;
+    }
 }
 
-std::function<void()> handle_DP(pdf_render* context)
+void handle_DP(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
     // tag properties
-    auto data = context->deque->pop_front();
-    auto data2 = context->deque->pop_front();
-    return [context] {
-
-    };
+    if (dry_run)
+    {
+        auto data = context->deque->pop_front();
+        auto data2 = context->deque->pop_front();
+        cmd->type = TOKEN_OPERATOR_DP;
+    }
 }
-// std::function<void()> handle_EI(pdf_render* context)
+// void handle_EI(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 // {
 //     // end an inline image object
 // }
 
-std::function<void()> handle_EMC(pdf_render* context) {
-    return [context] {
-
-    };
+void handle_EMC(pdf_render* context, pdf_render_command* cmd, bool dry_run) {
+    if (dry_run)
+    {
+        cmd->type = TOKEN_OPERATOR_EMC;
+    }
 }
 
-std::function<void()> handle_gs(pdf_render* context)
+void handle_gs(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
     // set specified parameters
     // dictName shall be the name of
     // a graphics state parameter dictionary
     // in the ExtGState subdictionary of the current resource dictionary
     // dictName
-    auto data = context->deque->pop_front();
-    return [context] {
-
-    };
-    // pdf_page_get_ext_gstate(context->page, buf);
+    if (dry_run)
+    {
+        auto data = context->deque->pop_front();
+        cmd->type = TOKEN_OPERATOR_gs;
+    }
 }
 
-std::function<void()> handle_i(pdf_render* context)
+void handle_i(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
     // set flatness tolerance
     // flatness
-    auto data = context->deque->pop_front();
-    return [context] {
-
-    };
-    //float i = strtof(buf, NULL);
-    // context->graphics_state.flatness = i;
+    if (dry_run)
+    {
+        auto data = context->deque->pop_front();
+        cmd->type = TOKEN_OPERATOR_i;
+    }
 }
 
-// std::function<void()> handle_ID(pdf_render* context)
+// void handle_ID(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 // {
 //     // begin the image data for an inline image object
 // }
 
-std::function<void()> handle_j(pdf_render* context)
+void handle_j(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
     // set join style
     // lineJoin
-
-    auto data = context->deque->pop_front();
-    int j = atoi(data->data());
-    return [context, j] {
-        plutovg_canvas_set_line_join(context->canvas, (plutovg_line_join_t)j);
-        context->state->lineJoin = j;
-    };
+    if (dry_run)
+    {
+        auto data = context->deque->pop_front();
+        int j = atoi(data->data());
+        cmd->type = TOKEN_OPERATOR_j;
+        cmd->j.i = j;
+    }
+    else
+    {
+        plutovg_canvas_set_line_join(context->canvas, (plutovg_line_join_t)cmd->j.i);
+        context->state->lineJoin = cmd->j.i;
+    }
 }
 
-std::function<void()> handle_J(pdf_render* context)
+void handle_J(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
     // set cap style
     // lineCap
-    auto data = context->deque->pop_front();
-    int c = atoi(data->data());
-    return [context, c] {
-        plutovg_canvas_set_line_cap(context->canvas, (plutovg_line_cap_t)c);
-        context->state->lineCap = c;
-    };
+    if (dry_run)
+    {
+        auto data = context->deque->pop_front();
+        int c = atoi(data->data());
+        cmd->type = TOKEN_OPERATOR_J;
+        cmd->J.i = c;
+    }
+    else
+    {
+        plutovg_canvas_set_line_cap(context->canvas, (plutovg_line_cap_t)cmd->J.i);
+        context->state->lineCap = cmd->J.i;
+    }
 }
 
 
-std::function<void()> handle_M(pdf_render* context)
+void handle_M(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
     // set miter limit
     // miterLimit
-    auto data = context->deque->pop_front();
-    float m = strtof(data->data(), NULL);
-    return [context, m] {
-        plutovg_canvas_set_miter_limit(context->canvas, m);
-        context->state->miterLimit = m;
-    };
+    if (dry_run)
+    {
+        auto data = context->deque->pop_front();
+        float m = strtof(data->data(), NULL);
+        cmd->type = TOKEN_OPERATOR_M;
+        cmd->M.f = m;
+    }
+    else
+    {
+        plutovg_canvas_set_miter_limit(context->canvas, cmd->M.f);
+        context->state->miterLimit = cmd->M.f;
+    }
 }
-std::function<void()> handle_MP(pdf_render* context)
+void handle_MP(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
     // tag
-    auto data = context->deque->pop_front();
-    return [context] {};
+    if (dry_run)
+    {
+        auto data = context->deque->pop_front();
+        cmd->type = TOKEN_OPERATOR_MP;
+    }
 }
 
-std::function<void()> handle_q(pdf_render* context)
+void handle_q(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
     // store state
-    return [context] {
+    if (dry_run)
+    {
+        cmd->type = TOKEN_OPERATOR_q;
+    }
+    else
+    {
         plutovg_canvas_save(context->canvas);
         if (context->state == NULL) _init_state(context);
         pdf_graphics_state_t* new_state = (pdf_graphics_state_t*)malloc(sizeof(pdf_graphics_state_t));
         memcpy(new_state, context->state, sizeof(pdf_graphics_state_t));
         new_state->next = context->state;
         context->state = new_state;
-    };
+    }
 }
 
-std::function<void()> handle_Q(pdf_render* context)
+void handle_Q(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
     // restore state
-    return [context] {
+    if (dry_run)
+    {
+        cmd->type = TOKEN_OPERATOR_Q;
+    }
+    else
+    {
         plutovg_canvas_restore(context->canvas);
         pdf_graphics_state_t* old_state = context->state;
         context->state = old_state->next;
@@ -822,21 +908,27 @@ std::function<void()> handle_Q(pdf_render* context)
         plutovg_canvas_set_line_cap(context->canvas, (plutovg_line_cap_t)context->state->lineCap);
         plutovg_canvas_set_line_join(context->canvas, (plutovg_line_join_t)context->state->lineJoin);
         plutovg_canvas_set_miter_limit(context->canvas, context->state->miterLimit);
-    };
+    }
 }
 
 
-std::function<void()> handle_ri(pdf_render* context)
+void handle_ri(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
     // set color rendering intent
     // intent
-    auto data = context->deque->pop_front();
-    return [context] {};
+    if (dry_run)
+    {
+        auto data = context->deque->pop_front();
+        cmd->type = TOKEN_OPERATOR_ri;
+    }
 }
 
-std::function<void()> handle_sh(pdf_render* context)
+void handle_sh(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
     // name
-    auto data = context->deque->pop_front();
-    return [context] {};
+    if (dry_run)
+    {
+        auto data = context->deque->pop_front();
+        cmd->type = TOKEN_OPERATOR_sh;
+    }
 }

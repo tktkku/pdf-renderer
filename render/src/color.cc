@@ -1,28 +1,33 @@
 #include "pdf-render.h"
 #include "pdf-render-private.h"
-std::function<void()> handle_cs(pdf_render* context)
+#include <winscard.h>
+void handle_cs(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
     // for nonstroking
     // char buf[1024] = { 0 };
     // deque_node_t node;
     // node.data = buf;
     // deque_pop(context->deque, &node);
-
-    auto data = context->deque->pop_front();
-    std::string color = data->data();
-    return [context, color] () {
-        if (!strcmp(color.c_str(), "/DeviceGray") || !strcmp(color.c_str(), "/DeviceRGB") || !strcmp(color.c_str(), "/DeviceCMYK"))
+    if (dry_run)
+    {
+        auto data = context->deque->pop_front();
+        cmd->type = TOKEN_OPERATOR_cs;
+        memcpy(cmd->cs.color, data->data(), data->size());
+    }
+    else
+    {
+        if (!strcmp(cmd->cs.color, "/DeviceGray") || !strcmp(cmd->cs.color, "/DeviceRGB") || !strcmp(cmd->cs.color, "/DeviceCMYK"))
         {
-            strcpy(context->state->fill.currentColorSpace, color.c_str());
+            strcpy(context->state->fill.currentColorSpace, cmd->cs.color);
         }
         else
         {
-            pdf_obj_get_colorspace(context->current_obj, color.c_str(), context->state->fill.currentColorSpace);
+            pdf_obj_get_colorspace(context->current_obj, cmd->cs.color, context->state->fill.currentColorSpace);
         }
-    };
+    }
 }
 
-std::function<void()> handle_CS(pdf_render* context)
+void handle_CS(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
     // set color space
     // /DeviceGray
@@ -32,135 +37,179 @@ std::function<void()> handle_CS(pdf_render* context)
     // /DeviceCMYK
     // initialize the corresponding current color of cyan magenta yellow to 0.0
     // and the black to 1.0
-    auto data = context->deque->pop_front();
-    std::string color = data->data();
-    return [context, color] {
-        if (!strcmp(color.c_str(), "/DeviceGray") || !strcmp(color.c_str(), "/DeviceRGB") || !strcmp(color.c_str(), "/DeviceCMYK"))
+    if (dry_run)
+    {
+        auto data = context->deque->pop_front();
+        cmd->type = TOKEN_OPERATOR_CS;
+        memcpy(cmd->CS.color, data->data(), data->size());
+    }
+    else
+    {
+        if (!strcmp(cmd->CS.color, "/DeviceGray") || !strcmp(cmd->CS.color, "/DeviceRGB") || !strcmp(cmd->CS.color, "/DeviceCMYK"))
         {
-            strcpy(context->state->stroke.currentColorSpace, color.c_str());
+            strcpy(context->state->stroke.currentColorSpace, cmd->CS.color);
         }
         else
         {
-            pdf_obj_get_colorspace(context->current_obj, color.c_str(), context->state->stroke.currentColorSpace);
+            pdf_obj_get_colorspace(context->current_obj, cmd->CS.color, context->state->stroke.currentColorSpace);
         }
-    };
+    }
 }
 
-std::function<void()> handle_g(pdf_render* context)
+void handle_g(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
     // for nonstroking
-    auto data = context->deque->pop_front();
-    float g = strtof(data->data(), NULL);
-    return [context, g] {
-        context->state->fill.color[0] = g;
-        context->state->fill.color[1] = g;
-        context->state->fill.color[2] = g;
+    if (dry_run)
+    {
+        auto data = context->deque->pop_front();
+        float g = strtof(data->data(), NULL);
+        cmd->type = TOKEN_OPERATOR_g;
+        cmd->g.g = g;
+    }
+    else
+    {
+        context->state->fill.color[0] = cmd->g.g;
+        context->state->fill.color[1] = cmd->g.g;
+        context->state->fill.color[2] = cmd->g.g;
         strcpy(context->state->fill.currentColorSpace, "/DeviceGray");
-    };
-    // handle_G(context);
-    //plutovg_canvas_set_rgb(context->canvas, g, g, g);
-
+    }
 }
 
-std::function<void()> handle_G(pdf_render* context)
+void handle_G(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
     // set both in one operation
     // gray
-    auto data = context->deque->pop_front();
-    float g = strtof(data->data(), NULL);
-    return [context, g] {
-        context->state->stroke.color[0] = g;
-        context->state->stroke.color[1] = g;
-        context->state->stroke.color[2] = g;
+    if (dry_run)
+    {
+        auto data = context->deque->pop_front();
+        float g = strtof(data->data(), NULL);
+        cmd->type = TOKEN_OPERATOR_G;
+        cmd->G.g = g;
+    }
+    else
+    {
+        context->state->stroke.color[0] = cmd->G.g;
+        context->state->stroke.color[1] = cmd->G.g;
+        context->state->stroke.color[2] = cmd->G.g;
         strcpy(context->state->stroke.currentColorSpace, "/DeviceGray");
-    };
+    }
 }
 
-std::function<void()> handle_k(pdf_render* context)
+void handle_k(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
     // for nonstroking
-    auto data = context->deque->pop_front();
-    float k = strtof(data->data(), NULL);
-    auto data2 = context->deque->pop_front();
-    float y = strtof(data2->data(), NULL);
-    auto data3 = context->deque->pop_front();
-    float m = strtof(data3->data(), NULL);
-    auto data4 = context->deque->pop_front();
-    float c = strtof(data4->data(), NULL);
-    // handle_K(context);
-    float r = (1.0 - c) * (1.0 - k);
-    float g = (1.0 - m) * (1.0 - k);
-    float b = (1.0 - y) * (1.0 - k);
-    return [context, r, g, b] {
-        context->state->fill.color[0] = r;
-        context->state->fill.color[1] = g;
-        context->state->fill.color[2] = b;
+
+    if (dry_run)
+    {
+        auto data = context->deque->pop_front();
+        float k = strtof(data->data(), NULL);
+        auto data2 = context->deque->pop_front();
+        float y = strtof(data2->data(), NULL);
+        auto data3 = context->deque->pop_front();
+        float m = strtof(data3->data(), NULL);
+        auto data4 = context->deque->pop_front();
+        float c = strtof(data4->data(), NULL);
+        // handle_K(context);
+        float r = (1.0 - c) * (1.0 - k);
+        float g = (1.0 - m) * (1.0 - k);
+        float b = (1.0 - y) * (1.0 - k);
+        cmd->type = TOKEN_OPERATOR_k;
+        cmd->k.r = r;
+        cmd->k.g = g;
+        cmd->k.b = b;
+    }
+    else
+    {
+        context->state->fill.color[0] = cmd->k.r;
+        context->state->fill.color[1] = cmd->k.g;
+        context->state->fill.color[2] = cmd->k.b;
         strcpy(context->state->fill.currentColorSpace, "/DeviceCMYK");
-    };
-    //plutovg_canvas_set_rgb(context->canvas, r, g, b);
+    }
 }
 
-std::function<void()> handle_K(pdf_render* context)
+void handle_K(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
     // combine CS and SC for DeviceCMYK
-    auto data = context->deque->pop_front();
-    float k = strtof(data->data(), NULL);
-    auto data2 = context->deque->pop_front();
-    float y = strtof(data2->data(), NULL);
-    auto data3 = context->deque->pop_front();
-    float m = strtof(data3->data(), NULL);
-    auto data4 = context->deque->pop_front();
-    float c = strtof(data4->data(), NULL);
-    float r = (1.0 - c) * (1.0 - k);
-    float g = (1.0 - m) * (1.0 - k);
-    float b = (1.0 - y) * (1.0 - k);
-    return [context, r, g, b] {
-        context->state->stroke.color[0] = r;
-        context->state->stroke.color[1] = g;
-        context->state->stroke.color[2] = b;
+    if (dry_run)
+    {
+        auto data = context->deque->pop_front();
+        float k = strtof(data->data(), NULL);
+        auto data2 = context->deque->pop_front();
+        float y = strtof(data2->data(), NULL);
+        auto data3 = context->deque->pop_front();
+        float m = strtof(data3->data(), NULL);
+        auto data4 = context->deque->pop_front();
+        float c = strtof(data4->data(), NULL);
+        float r = (1.0 - c) * (1.0 - k);
+        float g = (1.0 - m) * (1.0 - k);
+        float b = (1.0 - y) * (1.0 - k);
+        cmd->type = TOKEN_OPERATOR_K;
+        cmd->K.r = r;
+        cmd->K.g = g;
+        cmd->K.b = b;
+    }
+    else
+    {
+        context->state->stroke.color[0] = cmd->K.r;
+        context->state->stroke.color[1] = cmd->K.g;
+        context->state->stroke.color[2] = cmd->K.b;
         strcpy(context->state->stroke.currentColorSpace, "/DeviceCMYK");
-    };
+    }
 }
 
-std::function<void()> handle_rg(pdf_render* context)
+void handle_rg(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
     // for nonstroking
-    auto data = context->deque->pop_front();
-    float b = strtof(data->data(), NULL);
-    auto data2 = context->deque->pop_front();
-    float g = strtof(data2->data(), NULL);
-    auto data3 = context->deque->pop_front();
-    float r = strtof(data3->data(), NULL);
-    return [context, r, g, b] {
-        context->state->fill.color[0] = r;
-        context->state->fill.color[1] = g;
-        context->state->fill.color[2] = b;
+    if (dry_run)
+    {
+        auto data = context->deque->pop_front();
+        float b = strtof(data->data(), NULL);
+        auto data2 = context->deque->pop_front();
+        float g = strtof(data2->data(), NULL);
+        auto data3 = context->deque->pop_front();
+        float r = strtof(data3->data(), NULL);
+        cmd->type = TOKEN_OPERATOR_rg;
+        cmd->rg.r = r;
+        cmd->rg.g = g;
+        cmd->rg.b = b;
+    }
+    else
+    {
+        context->state->fill.color[0] = cmd->rg.r;
+        context->state->fill.color[1] = cmd->rg.g;
+        context->state->fill.color[2] = cmd->rg.b;
         strcpy(context->state->fill.currentColorSpace, "/DeviceRGB");
-        // handle_RG(context);
-    };
-    //plutovg_canvas_set_rgb(context->canvas, r, g, b);
+    }
 }
 
 
-std::function<void()> handle_RG(pdf_render* context)
+void handle_RG(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
     // combine CS and SC for DeviceRGB
-    auto data = context->deque->pop_front();
-    float b = strtof(data->data(), NULL);
-    auto data2 = context->deque->pop_front();
-    float g = strtof(data2->data(), NULL);
-    auto data3 = context->deque->pop_front();
-    float r = strtof(data3->data(), NULL);
-    return [context, r, g, b] {
-        context->state->stroke.color[0] = r;
-        context->state->stroke.color[1] = g;
-        context->state->stroke.color[2] = b;
+    if (dry_run)
+    {
+        auto data = context->deque->pop_front();
+        float b = strtof(data->data(), NULL);
+        auto data2 = context->deque->pop_front();
+        float g = strtof(data2->data(), NULL);
+        auto data3 = context->deque->pop_front();
+        float r = strtof(data3->data(), NULL);
+        cmd->type = TOKEN_OPERATOR_RG;
+        cmd->RG.r = r;
+        cmd->RG.g = g;
+        cmd->RG.b = b;
+    }
+    else
+    {
+        context->state->stroke.color[0] =  cmd->RG.r;
+        context->state->stroke.color[1] =  cmd->RG.g;
+        context->state->stroke.color[2] =  cmd->RG.b;
         // plutovg_canvas_set_rgb(context->canvas, gray, gray, gray);
         strcpy(context->state->stroke.currentColorSpace, "/DeviceRGB");
-    };
+    }
 }
 
-std::function<void()> handle_sc(pdf_render* context)
+void handle_sc(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
     // for nonstroking
     // char buf[1024] = { 0 };
@@ -171,120 +220,155 @@ std::function<void()> handle_sc(pdf_render* context)
     if (!strcmp(context->state->fill.currentColorSpace, "/DeviceGray"))
     {
         // gray
-        auto data = context->deque->pop_front();
-        float g = strtof(data->data(), NULL);
-        // plutovg_canvas_set_rgb(context->canvas, g, g, g);
-        return [context, g] {
-            context->state->fill.color[0] = g;
-            context->state->fill.color[1] = g;
-            context->state->fill.color[2] = g;
-
-        };
+        if (dry_run)
+        {
+            auto data = context->deque->pop_front();
+            float g = strtof(data->data(), NULL);
+            cmd->type = TOKEN_OPERATOR_sc;
+            cmd->sc.g = g;
+        }
+        else
+        {
+            context->state->fill.color[0] = cmd->sc.g;
+            context->state->fill.color[1] = cmd->sc.g;
+            context->state->fill.color[2] = cmd->sc.g;
+        }
     }
     else if (!strcmp(context->state->fill.currentColorSpace,
         "/DeviceRGB"))
     {
         // red green blue
-
-        auto data = context->deque->pop_front();
-        float b = strtof(data->data(), NULL);
-        auto data2 = context->deque->pop_front();
-        float g = strtof(data2->data(), NULL);
-        auto data3 = context->deque->pop_front();
-        float r = strtof(data3->data(), NULL);
-        return [context, r, g, b] {
-            context->state->fill.color[0] = r;
-            context->state->fill.color[1] = g;
-            context->state->fill.color[2] = b;
-        };
-        // plutovg_canvas_set_rgb(context->canvas, r, g, b);
-
+        if (dry_run)
+        {
+            auto data = context->deque->pop_front();
+            float b = strtof(data->data(), NULL);
+            auto data2 = context->deque->pop_front();
+            float g = strtof(data2->data(), NULL);
+            auto data3 = context->deque->pop_front();
+            float r = strtof(data3->data(), NULL);
+            cmd->type = TOKEN_OPERATOR_sc;
+            cmd->sc.r = r;
+            cmd->sc.g = g;
+            cmd->sc.b = b;
+        }
+        else
+        {
+            context->state->fill.color[0] = cmd->sc.r;
+            context->state->fill.color[1] = cmd->sc.g;
+            context->state->fill.color[2] = cmd->sc.b;
+        }
     }
     else if (!strcmp(context->state->fill.currentColorSpace,
         "/DeviceCMYK"))
     {
         // cyan magenta yellow black
-        auto data = context->deque->pop_front();
-        float k = strtof(data->data(), NULL);
-        auto data2 = context->deque->pop_front();
-        float y = strtof(data2->data(), NULL);
-        auto data3 = context->deque->pop_front();
-        float m = strtof(data3->data(), NULL);
-        auto data4 = context->deque->pop_front();
-        float c = strtof(data4->data(), NULL);
+        if (dry_run)
+        {
+            auto data = context->deque->pop_front();
+            float k = strtof(data->data(), NULL);
+            auto data2 = context->deque->pop_front();
+            float y = strtof(data2->data(), NULL);
+            auto data3 = context->deque->pop_front();
+            float m = strtof(data3->data(), NULL);
+            auto data4 = context->deque->pop_front();
+            float c = strtof(data4->data(), NULL);
 
-        float r = (1.0 - c) * (1.0 - k);
-        float g = (1.0 - m) * (1.0 - k);
-        float b = (1.0 - y) * (1.0 - k);
-
-        return [context, r, g, b] {
-            context->state->fill.color[0] = r;
-            context->state->fill.color[1] = g;
-            context->state->fill.color[2] = b;
-        };
+            float r = (1.0 - c) * (1.0 - k);
+            float g = (1.0 - m) * (1.0 - k);
+            float b = (1.0 - y) * (1.0 - k);
+            cmd->type = TOKEN_OPERATOR_sc;
+            cmd->sc.r = r;
+            cmd->sc.g = g;
+            cmd->sc.b = b;
+        }
+        else
+        {
+            context->state->fill.color[0] = cmd->sc.r;
+            context->state->fill.color[1] = cmd->sc.g;
+            context->state->fill.color[2] = cmd->sc.b;
+        }
     }
 }
 
 
-std::function<void()> handle_SC(pdf_render* context)
+void handle_SC(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
     // set gray level, 0.0 to balck 1.0 to white
     if (!strcmp(context->state->stroke.currentColorSpace, "/DeviceGray"))
     {
         // gray
-        auto data = context->deque->pop_front();
-        float g = strtof(data->data(), NULL);
-        // plutovg_canvas_set_rgb(context->canvas, g, g, g);
-        return [context, g] {
-            context->state->stroke.color[0] = g;
-            context->state->stroke.color[1] = g;
-            context->state->stroke.color[2] = g;
-        };
+        if (dry_run)
+        {
+            auto data = context->deque->pop_front();
+            float g = strtof(data->data(), NULL);
+            cmd->type = TOKEN_OPERATOR_sc;
+            cmd->sc.g = g;
+        }
+        else
+        {
+            context->state->stroke.color[0] = cmd->sc.g;
+            context->state->stroke.color[1] = cmd->sc.g;
+            context->state->stroke.color[2] = cmd->sc.g;
+        }
     }
     else if (!strcmp(context->state->stroke.currentColorSpace,
         "/DeviceRGB"))
     {
         // red green blue
 
-        auto data = context->deque->pop_front();
-        float b = strtof(data->data(), NULL);
-        auto data2 = context->deque->pop_front();
-        float g = strtof(data2->data(), NULL);
-        auto data3 = context->deque->pop_front();
-        float r = strtof(data3->data(), NULL);
-        // plutovg_canvas_set_rgb(context->canvas, r, g, b);
-        return [context, r, g, b] {
-            context->state->stroke.color[0] = r;
-            context->state->stroke.color[1] = g;
-            context->state->stroke.color[2] = b;
-        };
+        if (dry_run)
+        {
+            auto data = context->deque->pop_front();
+            float b = strtof(data->data(), NULL);
+            auto data2 = context->deque->pop_front();
+            float g = strtof(data2->data(), NULL);
+            auto data3 = context->deque->pop_front();
+            float r = strtof(data3->data(), NULL);
+            cmd->type = TOKEN_OPERATOR_sc;
+            cmd->sc.r = r;
+            cmd->sc.g = g;
+            cmd->sc.b = b;
+        }
+        else
+        {
+            context->state->stroke.color[0] = cmd->sc.r;
+            context->state->stroke.color[1] = cmd->sc.g;
+            context->state->stroke.color[2] = cmd->sc.b;
+        }
     }
     else if (!strcmp(context->state->stroke.currentColorSpace,
         "/DeviceCMYK"))
     {
         // cyan magenta yellow black
-        auto data = context->deque->pop_front();
-        float k = strtof(data->data(), NULL);
-        auto data2 = context->deque->pop_front();
-        float y = strtof(data2->data(), NULL);
-        auto data3 = context->deque->pop_front();
-        float m = strtof(data3->data(), NULL);
-        auto data4 = context->deque->pop_front();
-        float c = strtof(data4->data(), NULL);
+        if (dry_run)
+        {
+            auto data = context->deque->pop_front();
+            float k = strtof(data->data(), NULL);
+            auto data2 = context->deque->pop_front();
+            float y = strtof(data2->data(), NULL);
+            auto data3 = context->deque->pop_front();
+            float m = strtof(data3->data(), NULL);
+            auto data4 = context->deque->pop_front();
+            float c = strtof(data4->data(), NULL);
 
-        float r = (1.0 - c) * (1.0 - k);
-        float g = (1.0 - m) * (1.0 - k);
-        float b = (1.0 - y) * (1.0 - k);
-
-        return [context, r, g, b] {
-            context->state->stroke.color[0] = r;
-            context->state->stroke.color[1] = g;
-            context->state->stroke.color[2] = b;
-        };
+            float r = (1.0 - c) * (1.0 - k);
+            float g = (1.0 - m) * (1.0 - k);
+            float b = (1.0 - y) * (1.0 - k);
+            cmd->type = TOKEN_OPERATOR_sc;
+            cmd->sc.r = r;
+            cmd->sc.g = g;
+            cmd->sc.b = b;
+        }
+        else
+        {
+            context->state->stroke.color[0] = cmd->sc.r;
+            context->state->stroke.color[1] = cmd->sc.g;
+            context->state->stroke.color[2] = cmd->sc.b;
+        }
     }
 }
 
-std::function<void()> handle_scn(pdf_render* context)
+void handle_scn(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
     // char buf[1024] = { 0 };
     // pdf_node_t node;
@@ -296,20 +380,20 @@ std::function<void()> handle_scn(pdf_render* context)
     || !strcmp(context->state->fill.currentColorSpace, "/DeviceRGB") 
     || !strcmp(context->state->fill.currentColorSpace, "/DeviceCMYK"))
     {
-        return handle_sc(context);
+        return handle_sc(context, cmd, dry_run);
     }
     auto data = context->deque->pop_front();
     auto data2 = context->deque->pop_front();
     auto data3 = context->deque->pop_front();
 }
 
-std::function<void()> handle_SCN(pdf_render* context)
+void handle_SCN(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
     if (!strcmp(context->state->stroke.currentColorSpace, "/DeviceGray") 
     || !strcmp(context->state->stroke.currentColorSpace, "/DeviceRGB") 
     || !strcmp(context->state->stroke.currentColorSpace, "/DeviceCMYK"))
     {
-        return handle_SC(context);
+        return handle_SC(context, cmd, dry_run);
     }
   
     auto data = context->deque->pop_front();

@@ -15,7 +15,7 @@
 #include <chrono>
 #include <locale.h>
 #include "plutovg.h"
-
+#include <memory>
 #include "MiniFB.h"
 
 static uint64_t get_wall_time(void)
@@ -72,31 +72,28 @@ int main(int argc, char* argv[])
     int window_width = 1200, window_height = 900;
     int dpi = 96;
     int window_stride = window_width * 4;
-    int window_size = window_stride * window_height;
-    std::vector<unsigned char*> page_pixels;
+    std::vector<std::shared_ptr<unsigned char[]>> page_pixels;
+    auto render = [pdf, &page_pixels, window_width, window_height, window_stride, dpi] (int i) {
+        pdf_page_t* page = pdf_file_get_page(pdf, i - 1);
+        if (page == NULL)
+            return;
+        
+        pdf_render* r = pdf_render_init(page);
+        pdf_render_build(r);
+        pdf_render_for_paper(r, window_width, window_height, window_stride, 1, dpi);
+        std::shared_ptr<unsigned char[]> pixels(new unsigned char[window_height * window_stride]);
+        memset(pixels.get(), 0xFF, window_height * window_stride);
+        pdf_render_copy_to_buffer(r, pixels.get(), window_height * window_stride);
+        page_pixels.push_back(pixels);
+        // free(pixels);
+        pdf_render_free(r);
+        pdf_page_free(page);
+    };
     if (pages == NULL)
     {
         for (int i = 1; i <= num_pages; i++)
         {
-            pdf_page_t* page = pdf_file_get_page(pdf, i - 1);
-            if (page == NULL)
-                continue;
-            
-            pdf_render* r = pdf_render_init(page);
-            pdf_render_build(r);
-            pdf_render_for_paper(r, window_width, window_height, window_stride, 1, dpi);
-            unsigned char* pixels = (unsigned char*)malloc(window_size);
-            if (pixels == nullptr)
-            {
-                pdf_page_free(page);
-                break;
-            }
-            memset(pixels, 0xFF, window_size);
-            pdf_render_copy_to_buffer(r, pixels, window_size);
-            page_pixels.push_back(pixels);
-            // free(pixels);
-            pdf_render_free(r);
-            pdf_page_free(page);
+            render(i);
         }
     }
     else
@@ -127,25 +124,7 @@ int main(int argc, char* argv[])
             if (end > num_pages) end = num_pages;
             for (int i = start; i <= end; i++)
             {
-                pdf_page_t* page = pdf_file_get_page(pdf, i - 1);
-                if (page == NULL)
-                    continue;
-                
-                pdf_render* r = pdf_render_init(page);
-                pdf_render_build(r);
-                pdf_render_for_paper(r, window_width, window_height, window_stride, 1, dpi);
-                unsigned char* pixels = (unsigned char*)malloc(window_size);
-                if (pixels == nullptr)
-                {
-                    pdf_page_free(page);
-                    break;
-                }
-                memset(pixels, 0xFF, window_size);
-                pdf_render_copy_to_buffer(r, pixels, window_size);
-                page_pixels.push_back(pixels);
-                // free(pixels);
-                pdf_render_free(r);
-                pdf_page_free(page);
+                render(i);
             }
         }
 
@@ -181,7 +160,7 @@ int main(int argc, char* argv[])
                     if (cur_index < page_pixels.size() - 1) cur_index++;
                 }
             }
-            state = mfb_update(window, page_pixels[cur_index]);
+            state = mfb_update(window, page_pixels[cur_index].get());
     }, window);
     int cur_x = -1, cur_y = -1;
     mfb_set_mouse_move_callback([&cur_x, &cur_y](struct mfb_window* window, int x, int y) mutable {
@@ -193,7 +172,7 @@ int main(int argc, char* argv[])
         
     }, window);
     do {
-        state = mfb_update(window, page_pixels[cur_index]);
+        state = mfb_update(window, page_pixels[cur_index].get());
         if (state != STATE_OK)
             break;
     } while (mfb_wait_sync(window));

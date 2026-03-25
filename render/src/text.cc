@@ -1,62 +1,80 @@
+#include "pdf-private.h"
 #include "pdf-render.h"
 #include "pdf-render-private.h"
-std::function<void()> handle_apostrophe(pdf_render* context)
+void handle_apostrophe(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
     // move to the next line and show a text string
     // string
     // same as
     // T*
     // string Tj
-    plutovg_matrix_translate(&context->state->textState.textMatrix, 0, -context->state->textState.textLeading);
-    context->state->textState.textLineWidth = 0;
-    auto data = context->deque->pop_front();
-    int len = data->size();
-    char* raw = new char[len];
-    std::shared_ptr<char> text(raw, std::default_delete<char[]>());
-    memcpy(text.get(), data->data(), len);
-    return [context, text, len] {
+    if (dry_run)
+    {
+        auto data = context->deque->pop_front();
+        int len = data->size();
+        cmd->type = TOKEN_OPERATOR_apostrophe;
+        new (&cmd->apostrophe.data) std::unique_ptr<pdf_node>(std::move(data));
+    }
+    else
+    {
+        plutovg_matrix_translate(&context->state->textState.textMatrix, 0, -context->state->textState.textLeading);
+        context->state->textState.textLineWidth = 0;
         if (context->state->textState.font == NULL)
             return;
-        _do_text_render(context, (char*)text.get(), len);
-    };
+        _do_text_render(context, (char*)cmd->apostrophe.data->data(), cmd->apostrophe.data->size());
+    }
 }
 
-std::function<void()> handle_BT(pdf_render* context)
+void handle_BT(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
-    return [context] {
+    if (dry_run)
+    {
+        cmd->type = TOKEN_OPERATOR_BT;
+    }
+    else
+    {
         plutovg_canvas_save(context->canvas);
         //plutovg_canvas_move_to(context->canvas, 0, 0);
         // context->fontface = NULL;
         // context->font = NULL;
         context->state->textState.textLineWidth = 0;
         plutovg_matrix_init_identity(&context->state->textState.textMatrix);
-    }; 
-    // begin text
+    }
 }
 
-std::function<void()> handle_ET(pdf_render* context)
+void handle_ET(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
     // end text
-   return [context] {
+    if (dry_run)
+    {
+        cmd->type = TOKEN_OPERATOR_ET;
+    }
+    else
+    {
         plutovg_canvas_restore(context->canvas);
-   };
+    };
 }
 
-std::function<void()> handle_quotation(pdf_render* context)
+void handle_quotation(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
     // move to the next line and show a text string
     // aw as the word spacing
     // ac as the character spacing
     // aw ac string
-    context->deque->pop_front();
-    context->deque->pop_front();
-    context->deque->pop_front();
-    return [context] {
+    if (dry_run)
+    {
+        context->deque->pop_front();
+        context->deque->pop_front();
+        context->deque->pop_front();
+        cmd->type = TOKEN_OPERATOR_quotation;
+    }
+    else
+    {
         context->state->textState.textLineWidth = 0;
-    };
+    }
 }
 
-std::function<void()> handle_T_star(pdf_render* context)
+void handle_T_star(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
     // move to the start of the next line
     // has the same effects as the code
@@ -66,103 +84,129 @@ std::function<void()> handle_T_star(pdf_render* context)
     // plutovg_canvas_move_to(context->canvas, x, y);
     // plutovg_canvas_translate(context->canvas, 0, -context->state->textState.textLeading);
     // plutovg_canvas_move_to(context->canvas, 0, 0);
-    return [context] {
+    if (dry_run)
+    {
+        cmd->type = TOKEN_OPERATOR_T_star;
+    }
+    else
+    {
         plutovg_matrix_translate(&context->state->textState.textMatrix, 0, -context->state->textState.textLeading);
         context->state->textState.textLineWidth = 0;
     };
 }
 
-std::function<void()> handle_Tc(pdf_render* context)
+void handle_Tc(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
     // character spacing
     // used by Tj TJ '
     // charSpace initial value=0
-    auto data = context->deque->pop_front();
-    float c = strtof(data->data(), NULL);
-    return [context, c] {
-        context->state->textState.characterSpacing = c;
-    };
+    if (dry_run)
+    {
+        auto data = context->deque->pop_front();
+        float c = strtof(data->data(), NULL);
+        cmd->type = TOKEN_OPERATOR_Tc;
+        cmd->Tc.f = c;
+    }
+    else
+    {
+        context->state->textState.characterSpacing = cmd->Tc.f;
+    }
 }
 
-std::function<void()> handle_Td(pdf_render* context)
+void handle_Td(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
     // set start position on the page
     // tx ty
-    auto data = context->deque->pop_front();
-    float ty = strtof(data->data(), NULL);
-    auto data2 = context->deque->pop_front();
-    float tx = strtof(data2->data(), NULL);
-
-    return [context, tx, ty] {
-        plutovg_matrix_translate(&context->state->textState.textMatrix, tx, ty);
+    if (dry_run)
+    {
+        auto data = context->deque->pop_front();
+        float ty = strtof(data->data(), NULL);
+        auto data2 = context->deque->pop_front();
+        float tx = strtof(data2->data(), NULL);
+        cmd->type = TOKEN_OPERATOR_Td;
+        cmd->Td.x = tx;
+        cmd->Td.y = ty;
+    }
+    else
+    {
+        plutovg_matrix_translate(&context->state->textState.textMatrix, cmd->Td.x, cmd->Td.y);
         context->state->textState.textLineWidth = 0;
-    };
-    // plutovg_canvas_translate(context->canvas, tx, ty);
-    // plutovg_canvas_move_to(context->canvas, 0, 0);
-
+    }
 }
 
-std::function<void()> handle_TD(pdf_render* context)
+void handle_TD(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
     // move to the start of the next line
     // offset form the start of the current line
     // tx ty
-    auto data = context->deque->pop_front();
-    float ty = strtof(data->data(), NULL);
-    auto data2 = context->deque->pop_front();
-    float tx = strtof(data2->data(), NULL);
-    return [context, tx, ty] {
-        // plutovg_canvas_translate(context->canvas, tx, ty);
-        // plutovg_canvas_move_to(context->canvas, 0, 0);
-        plutovg_matrix_translate(&context->state->textState.textMatrix, tx, ty);
-        context->state->textState.textLeading = -ty;
+    if (dry_run)
+    {
+        auto data = context->deque->pop_front();
+        float ty = strtof(data->data(), NULL);
+        auto data2 = context->deque->pop_front();
+        float tx = strtof(data2->data(), NULL);
+        cmd->type = TOKEN_OPERATOR_TD;
+        cmd->TD.x = tx;
+        cmd->TD.y = ty;
+    }
+    else
+    {
+        plutovg_matrix_translate(&context->state->textState.textMatrix, cmd->TD.x, cmd->TD.y);
+        context->state->textState.textLeading = -cmd->TD.y;
         context->state->textState.textLineWidth = 0;
-        // side effect, set the leading parameter in the text state
-        // -ty TL
-        // tx ty Td
-    };
+    }
 }
 
-std::function<void()> handle_Tj(pdf_render* context)
+void handle_Tj(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
     // show / paint the glyphs for a string
     // string
-    auto data = context->deque->pop_front();
-    int len = data->size();
-    char* raw = new char[len];
-    std::shared_ptr<char> text(raw, std::default_delete<char[]>());
-    memcpy(text.get(), data->data(), len);
-    return [context, text, len] {
+    if (dry_run)
+    {
+        std::unique_ptr<pdf_node> data = context->deque->pop_front();
+        int len = data->size();
+        cmd->type = TOKEN_OPERATOR_Tj;
+        new (&cmd->Tj.data) std::unique_ptr<pdf_node>(std::move(data));
+    }
+    else
+    {
         if (context->state->textState.font == NULL)
             return;
-        _do_text_render(context, (char*)text.get(), len);
-    };
+        _do_text_render(context, (char*)cmd->Tj.data->data(), cmd->Tj.data->size());
+    }
 }
 
-std::function<void()> handle_TJ(pdf_render* context)
+void handle_TJ(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
     // show one or more text strings
     // array
     // if the element is a string , show the string
     // if the element is a number, adjust the position
-    auto tmp_deque = std::make_shared<pdf_deque>();
-    while (true)
+    if (dry_run)
     {
-        auto data = context->deque->pop_front();
-        if (!strcmp(data->data(), "]"))
+        auto tmp_deque = std::shared_ptr<pdf_deque>();
+        while (true)
         {
-            // ignore
+            auto data = context->deque->pop_front();
+            if (!strcmp(data->data(), "]"))
+            {
+                // ignore
+            }
+            else if (!strcmp(data->data(), "["))
+            {
+                break;
+            }
+            else
+            {
+                tmp_deque->push_front(data->data(), data->size());
+            }
         }
-        else if (!strcmp(data->data(), "["))
-        {
-            break;
-        }
-        else
-        {
-            tmp_deque->push_front(data->data(), data->size());
-        }
+        cmd->type = TOKEN_OPERATOR_TJ;
+        new (&cmd->TJ.tmp_deque) std::shared_ptr<pdf_deque>(std::move(tmp_deque));
     }
-    return [context, tmp_deque] {
+    else
+    {
+        auto tmp_deque = cmd->TJ.tmp_deque;
         if (context->state->textState.font == NULL)
         {
             return;
@@ -183,42 +227,58 @@ std::function<void()> handle_TJ(pdf_render* context)
                 context->state->textState.textLineWidth -= (a * (context->state->textState.fontSize / 1000.0));
             }
         }
-    };
+    }
 }
 
-std::function<void()> handle_TL(pdf_render* context)
+void handle_TL(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
     // text leading
     // used by T* ' "
     // leading initial value = 0
-    auto data = context->deque->pop_front();
-    float t = strtof(data->data(), NULL);
-    return [context, t] {
-        context->state->textState.textLeading = t;
-    };
+    if (dry_run)
+    {
+        auto data = context->deque->pop_front();
+        float t = strtof(data->data(), NULL);
+        cmd->type = TOKEN_OPERATOR_TL;
+        cmd->TL.f = t;
+    }
+    else
+    {
+        context->state->textState.textLeading = cmd->TL.f;
+    }
 }
 
-std::function<void()> handle_Tm(pdf_render* context)
+void handle_Tm(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
     // set the text matrix, and the text line matrix
     // a b c d e f
-    
-    float a, b, c, d, e, f;
-    auto data = context->deque->pop_front();
-    f = strtof(data->data(), NULL);
-    auto data2 = context->deque->pop_front();
-    e = strtof(data2->data(), NULL);
-    auto data3 = context->deque->pop_front();
-    d = strtof(data3->data(), NULL);
-    auto data4 = context->deque->pop_front();
-    c = strtof(data4->data(), NULL);
-    auto data5 = context->deque->pop_front();
-    b = strtof(data5->data(), NULL);
-    auto data6 = context->deque->pop_front();
-    a = strtof(data6->data(), NULL);
-    return [context, a, b, c, e, d, f] {
+    if (dry_run)
+    {
+        float a, b, c, d, e, f;
+        auto data = context->deque->pop_front();
+        f = strtof(data->data(), NULL);
+        auto data2 = context->deque->pop_front();
+        e = strtof(data2->data(), NULL);
+        auto data3 = context->deque->pop_front();
+        d = strtof(data3->data(), NULL);
+        auto data4 = context->deque->pop_front();
+        c = strtof(data4->data(), NULL);
+        auto data5 = context->deque->pop_front();
+        b = strtof(data5->data(), NULL);
+        auto data6 = context->deque->pop_front();
+        a = strtof(data6->data(), NULL);
+        cmd->type = TOKEN_OPERATOR_Tm;
+        cmd->Tm.x1 = a;
+        cmd->Tm.y1 = b;
+        cmd->Tm.x2 = c;
+        cmd->Tm.y2 = d;
+        cmd->Tm.x3 = e;
+        cmd->Tm.y3 = f;
+    }
+    else
+    {
         plutovg_matrix_t m;
-        plutovg_matrix_init(&m, a, b, c, d, e, f);
+        plutovg_matrix_init(&m, cmd->Tm.x1, cmd->Tm.y1, cmd->Tm.x2, cmd->Tm.y2, cmd->Tm.x3, cmd->Tm.y3);
 
         //plutovg_matrix_multiply(&m, &context->textState.fontMatrixPlutovg, &m);
         // set font matrix
@@ -226,52 +286,74 @@ std::function<void()> handle_Tm(pdf_render* context)
         // plutovg_canvas_move_to(context->canvas, 0, 0);
         context->state->textState.textMatrix = m;
         context->state->textState.textLineWidth = 0;
-    };
+    }
 }
 
-std::function<void()> handle_Tr(pdf_render* context)
+void handle_Tr(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
     // set text rendering mode
     // mode initial value =0
-    auto data = context->deque->pop_front();
-    int v = strtof(data->data(), NULL);
-    // STROKE FILL BOTH CLIP
-    return [context, v] {
-        context->state->textState.textMode = v;
-    };
+    if (dry_run)
+    {
+        auto data = context->deque->pop_front();
+        int v = strtof(data->data(), NULL);
+        cmd->type = TOKEN_OPERATOR_Tr;
+        cmd->Tr.i = v;
+    }
+    else
+    {
+        context->state->textState.textMode = cmd->Tr.i;
+    }
 }
 
-std::function<void()> handle_Ts(pdf_render* context)
+void handle_Ts(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
     // set text rise
     // rise initial value=0
-    auto data = context->deque->pop_front();   
-    float r = strtof(data->data(), NULL);
-    return [context, r] {
-        context->state->textState.textRise = r;
-    };
+    if (dry_run)
+    {
+        auto data = context->deque->pop_front();   
+        float r = strtof(data->data(), NULL);
+        cmd->type = TOKEN_OPERATOR_Ts;
+        cmd->Ts.f = r;
+    }
+    else
+    {
+        context->state->textState.textRise = cmd->Ts.f;
+    }
 }
 
-std::function<void()> handle_Tw(pdf_render* context)
+void handle_Tw(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
     // word spacing
     // used by Tj TJ '
     // wordSpace initial value=0
-    auto data = context->deque->pop_front();
-    float w = strtof(data->data(), NULL);
-    return [context, w] {
-        context->state->textState.wordSpacing = w;
-    };
+    if (dry_run)
+    {
+        auto data = context->deque->pop_front();
+        float w = strtof(data->data(), NULL);
+        cmd->type = TOKEN_OPERATOR_Tw;
+        cmd->Tw.f = w;
+    }
+    else
+    {
+        context->state->textState.wordSpacing = cmd->Tw.f;
+    }
 }
 
-std::function<void()> handle_Tz(pdf_render* context)
+void handle_Tz(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
     // horizontal scaling
     // scale initial value=100
-    auto data = context->deque->pop_front();
-    float h = strtof(data->data(), NULL);
-    return [context, h] {
-        context->state->textState.horizontalScaling = h;
-    };
-    //plutovg_canvas_scale(context->canvas, h / 100.0, 1.0);
+    if (dry_run)
+    {
+        auto data = context->deque->pop_front();
+        float h = strtof(data->data(), NULL);
+        cmd->type = TOKEN_OPERATOR_Tz;
+        cmd->Tz.f = h;
+    }
+    else
+    {
+        context->state->textState.horizontalScaling = cmd->Tz.f;
+    }
 }
