@@ -1,4 +1,4 @@
-project(pdf-render LANGUAGES CXX)
+project(pdf-render LANGUAGES CXX VERSION 1.0.0)
 
 set(PARSER_SOURCES
     include/pdf.h

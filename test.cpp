@@ -69,7 +69,8 @@ int main(int argc, char* argv[])
     fclose(f);
     pdf_file_t* pdf = pdf_file_read_buffer(filebuffer, filesize);
     int num_pages = pdf_file_get_pages(pdf);
-    int window_width = 900, window_height = 600;
+    int window_width = 1200, window_height = 900;
+    int dpi = 96;
     int window_stride = window_width * 4;
     int window_size = window_stride * window_height;
     std::vector<unsigned char*> page_pixels;
@@ -81,8 +82,9 @@ int main(int argc, char* argv[])
             if (page == NULL)
                 continue;
             
-            pdf_render* r = pdf_render_init_for_paper(page, window_width, window_height, window_stride, 1, 203);
-            pdf_render_do(r);
+            pdf_render* r = pdf_render_init(page);
+            pdf_render_build(r);
+            pdf_render_for_paper(r, window_width, window_height, window_stride, 1, dpi);
             unsigned char* pixels = (unsigned char*)malloc(window_size);
             if (pixels == nullptr)
             {
@@ -129,8 +131,9 @@ int main(int argc, char* argv[])
                 if (page == NULL)
                     continue;
                 
-                pdf_render* r = pdf_render_init_for_paper(page, window_width, window_height, window_stride, 1, 203);
-                pdf_render_do(r);
+                pdf_render* r = pdf_render_init(page);
+                pdf_render_build(r);
+                pdf_render_for_paper(r, window_width, window_height, window_stride, 1, dpi);
                 unsigned char* pixels = (unsigned char*)malloc(window_size);
                 if (pixels == nullptr)
                 {
@@ -161,22 +164,25 @@ int main(int argc, char* argv[])
     mfb_show_cursor(window, true);
     mfb_update_state state;
     mfb_set_mouse_button_callback(
-            [&cur_index, &state, page_pixels](struct mfb_window* window, mfb_mouse_button button, 
+            [](struct mfb_window* window, mfb_mouse_button button, 
                 mfb_key_mod mod, bool is_pressed) mutable {
             
+        }, window);
+    mfb_set_keyboard_callback([&cur_index, &state, page_pixels]
+        (struct mfb_window* window, mfb_key key, mfb_key_mod mod, bool is_pressed) mutable {
             if (is_pressed)
             {
-                if (button == MOUSE_LEFT)
+                if (key == KB_KEY_A)
                 {
                     if (cur_index > 0) cur_index--;
                 }
-                else if (button == MOUSE_RIGHT)
+                else if (key == KB_KEY_D)
                 {
                     if (cur_index < page_pixels.size() - 1) cur_index++;
                 }
             }
             state = mfb_update(window, page_pixels[cur_index]);
-        }, window);
+    }, window);
     int cur_x = -1, cur_y = -1;
     mfb_set_mouse_move_callback([&cur_x, &cur_y](struct mfb_window* window, int x, int y) mutable {
         cur_x = x;

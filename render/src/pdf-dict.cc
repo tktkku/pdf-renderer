@@ -63,7 +63,7 @@ double pdf_dict::get_number(const char* key)
     {
         return it->second->val.number;
     }
-    return 0;
+    return -1;
 }
 
 bool pdf_dict::is_number(const char* key)

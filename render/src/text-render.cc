@@ -366,8 +366,10 @@ float plutovg_font_face_traverse_glyph_path1(pdf_font_face_t* face,
     unsigned int lsb = codepoint & 0xFF;
     if(face->glyphs[msb][lsb] == NULL) {
         glyph_t* glyph = (glyph_t*)malloc(sizeof(glyph_t));
-        if (isGid) glyph->index = codepoint;
-        else glyph->index = stbtt_FindGlyphIndex(&face->info, codepoint);
+        if (isGid) 
+            glyph->index = codepoint;
+        else 
+            glyph->index = stbtt_FindGlyphIndex(&face->info, codepoint);
         glyph->nvertices = stbtt_GetGlyphShape(&face->info, glyph->index, &glyph->vertices);
         stbtt_GetGlyphHMetrics(&face->info, glyph->index, &glyph->advance_width, &glyph->left_side_bearing);
         if(!stbtt_GetGlyphBox(&face->info, glyph->index, &glyph->x1, &glyph->y1, &glyph->x2, &glyph->y2))
@@ -484,6 +486,7 @@ void _do_text_render(pdf_render* context, char* buf, int len)
     pdf_font_t* font = context->state->textState.font;
     if (font == NULL)
         return;
+
     if (font->subtype == FONT_SUBTYPE_TYPE3)
     {
         pdf_font_type3_t* type3 = font->type3;
@@ -512,7 +515,7 @@ void _do_text_render(pdf_render* context, char* buf, int len)
                     {
                         uint32_t tmp = _convert_unicode_from_cmap(to_unicode_map, code);
                         wchar_t wc = tmp;
-                        // printf("code = %d unicdoe = %d (%lc)\n", code, tmp, wc);
+                        //printf("code = %d unicdoe = %d (%lc)\n", code, tmp, wc);
                         break;
                     }
                 }
@@ -554,7 +557,7 @@ void _do_text_render(pdf_render* context, char* buf, int len)
                 unicode[unicode_cnt].isGid = false;
                 unicode_cnt++;
                 wchar_t wc = uni;
-                // printf("code = %d unicode = %d (%lc)\n", code, uni, wc);
+                //printf("code = %d unicode = %d (%lc)\n", code, uni, wc);
             }
         }
 
@@ -620,7 +623,7 @@ void _do_text_render(pdf_render* context, char* buf, int len)
                         if (code >= encoding->code_range_map[k].srcStart && code <= encoding->code_range_map[k].srcEnd)
                         {
                             cid = _convert_code_from_cmap(encoding, code);
-                            // printf("code = %5d cid = %5d gid = %5d ", code, cid, cid);
+                            //printf("code = %5d cid = %5d gid = %5d ", code, cid, cid);
                             i += j;
                             found = true;
                             break;
@@ -647,7 +650,7 @@ void _do_text_render(pdf_render* context, char* buf, int len)
                         {
                             uint32_t uni = _convert_unicode_from_cmap(to_unicode_map, code);
                             wchar_t wc = uni;
-                            // printf("unicode = %5d (%lc)\n", uni, wc);
+                            //printf("unicode = %5d (%lc)\n", uni, wc);
                             break;
                         }
                     }
@@ -655,11 +658,11 @@ void _do_text_render(pdf_render* context, char* buf, int len)
                 else if (encoding && encoding->name && !strncmp(encoding->name, "Uni", 3))
                 {
                     wchar_t wc = code;
-                    // printf("unicode = %5d(%lc)\n", code, wc);
+                    //printf("unicode = %5d(%lc)\n", code, wc);
                 }
                 else
                 {
-                    // printf("\n");
+                    //printf("\n");
                 }
             }
         }
@@ -688,7 +691,7 @@ void _do_text_render(pdf_render* context, char* buf, int len)
                         if (code >= encoding->code_range_map[k].srcStart && code <= encoding->code_range_map[k].srcEnd)
                         {
                             cid = _convert_code_from_cmap(encoding, code);
-                            // printf("code = %5d cid = %5d ", code, cid);
+                            //printf("code = %5d cid = %5d ", code, cid);
                             i += j;
                             found = true;
                             break;
@@ -707,7 +710,7 @@ void _do_text_render(pdf_render* context, char* buf, int len)
                         if (cid >= cid_to_gid_map->code_range_map[j].srcStart && cid <= cid_to_gid_map->code_range_map[j].srcEnd)
                         {
                             uint32_t gid = _convert_code_from_cmap(cid_to_gid_map, cid);
-                            // printf("gid = %5d ", gid);
+                            //printf("gid = %5d ", gid);
                             unicode[unicode_cnt].utf32 = gid;
                             unicode[unicode_cnt].encoding = PLUTOVG_TEXT_ENCODING_UTF32;
                             unicode[unicode_cnt].isGid = true;
@@ -729,7 +732,7 @@ void _do_text_render(pdf_render* context, char* buf, int len)
                             {
                                 uint32_t uni = _convert_unicode_from_cmap(c, cid);
                                 wchar_t wc = uni;
-                                // printf("unicode = %5d (%lc)", uni, wc);
+                                //printf("unicode = %5d (%lc)", uni, wc);
 
                                 unicode[unicode_cnt].utf32 = uni;
                                 unicode[unicode_cnt].encoding = PLUTOVG_TEXT_ENCODING_UTF32;
@@ -748,7 +751,7 @@ void _do_text_render(pdf_render* context, char* buf, int len)
                         {
                             uint32_t uni = _convert_unicode_from_cmap(to_unicode_map, code);
                             wchar_t wc = uni;
-                            // printf("unicode = %5d (%lc)\n", uni, wc);
+                            //printf("unicode = %5d (%lc)\n", uni, wc);
                             break;
                         }
                     }

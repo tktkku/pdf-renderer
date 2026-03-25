@@ -1,6 +1,6 @@
 #include "pdf-render.h"
 #include "pdf-render-private.h"
-void handle_cs(pdf_render* context)
+std::function<void()> handle_cs(pdf_render* context)
 {
     // for nonstroking
     // char buf[1024] = { 0 };
@@ -9,17 +9,20 @@ void handle_cs(pdf_render* context)
     // deque_pop(context->deque, &node);
 
     auto data = context->deque->pop_front();
-    if (!strcmp(data->data(), "/DeviceGray") || !strcmp(data->data(), "/DeviceRGB") || !strcmp(data->data(), "/DeviceCMYK"))
-    {
-        strcpy(context->state->fill.currentColorSpace, data->data());
-    }
-    else
-    {
-        pdf_obj_get_colorspace(context->current_obj, data->data(), context->state->fill.currentColorSpace);
-    }
+    std::string color = data->data();
+    return [context, color] () {
+        if (!strcmp(color.c_str(), "/DeviceGray") || !strcmp(color.c_str(), "/DeviceRGB") || !strcmp(color.c_str(), "/DeviceCMYK"))
+        {
+            strcpy(context->state->fill.currentColorSpace, color.c_str());
+        }
+        else
+        {
+            pdf_obj_get_colorspace(context->current_obj, color.c_str(), context->state->fill.currentColorSpace);
+        }
+    };
 }
 
-void handle_CS(pdf_render* context)
+std::function<void()> handle_CS(pdf_render* context)
 {
     // set color space
     // /DeviceGray
@@ -30,42 +33,50 @@ void handle_CS(pdf_render* context)
     // initialize the corresponding current color of cyan magenta yellow to 0.0
     // and the black to 1.0
     auto data = context->deque->pop_front();
-    if (!strcmp(data->data(), "/DeviceGray") || !strcmp(data->data(), "/DeviceRGB") || !strcmp(data->data(), "/DeviceCMYK"))
-    {
-        strcpy(context->state->stroke.currentColorSpace, data->data());
-    }
-    else
-    {
-        pdf_obj_get_colorspace(context->current_obj, data->data(), context->state->stroke.currentColorSpace);
-    }
+    std::string color = data->data();
+    return [context, color] {
+        if (!strcmp(color.c_str(), "/DeviceGray") || !strcmp(color.c_str(), "/DeviceRGB") || !strcmp(color.c_str(), "/DeviceCMYK"))
+        {
+            strcpy(context->state->stroke.currentColorSpace, color.c_str());
+        }
+        else
+        {
+            pdf_obj_get_colorspace(context->current_obj, color.c_str(), context->state->stroke.currentColorSpace);
+        }
+    };
 }
 
-void handle_g(pdf_render* context)
+std::function<void()> handle_g(pdf_render* context)
 {
     // for nonstroking
     auto data = context->deque->pop_front();
     float g = strtof(data->data(), NULL);
+    return [context, g] {
+        context->state->fill.color[0] = g;
+        context->state->fill.color[1] = g;
+        context->state->fill.color[2] = g;
+        strcpy(context->state->fill.currentColorSpace, "/DeviceGray");
+    };
     // handle_G(context);
     //plutovg_canvas_set_rgb(context->canvas, g, g, g);
-    context->state->fill.color[0] = g;
-    context->state->fill.color[1] = g;
-    context->state->fill.color[2] = g;
-    strcpy(context->state->fill.currentColorSpace, "/DeviceGray");
+
 }
 
-void handle_G(pdf_render* context)
+std::function<void()> handle_G(pdf_render* context)
 {
     // set both in one operation
     // gray
     auto data = context->deque->pop_front();
     float g = strtof(data->data(), NULL);
-    context->state->stroke.color[0] = g;
-    context->state->stroke.color[1] = g;
-    context->state->stroke.color[2] = g;
-    strcpy(context->state->stroke.currentColorSpace, "/DeviceGray");
+    return [context, g] {
+        context->state->stroke.color[0] = g;
+        context->state->stroke.color[1] = g;
+        context->state->stroke.color[2] = g;
+        strcpy(context->state->stroke.currentColorSpace, "/DeviceGray");
+    };
 }
 
-void handle_k(pdf_render* context)
+std::function<void()> handle_k(pdf_render* context)
 {
     // for nonstroking
     auto data = context->deque->pop_front();
@@ -80,14 +91,16 @@ void handle_k(pdf_render* context)
     float r = (1.0 - c) * (1.0 - k);
     float g = (1.0 - m) * (1.0 - k);
     float b = (1.0 - y) * (1.0 - k);
+    return [context, r, g, b] {
+        context->state->fill.color[0] = r;
+        context->state->fill.color[1] = g;
+        context->state->fill.color[2] = b;
+        strcpy(context->state->fill.currentColorSpace, "/DeviceCMYK");
+    };
     //plutovg_canvas_set_rgb(context->canvas, r, g, b);
-    context->state->fill.color[0] = r;
-    context->state->fill.color[1] = g;
-    context->state->fill.color[2] = b;
-    strcpy(context->state->fill.currentColorSpace, "/DeviceCMYK");
 }
 
-void handle_K(pdf_render* context)
+std::function<void()> handle_K(pdf_render* context)
 {
     // combine CS and SC for DeviceCMYK
     auto data = context->deque->pop_front();
@@ -98,13 +111,18 @@ void handle_K(pdf_render* context)
     float m = strtof(data3->data(), NULL);
     auto data4 = context->deque->pop_front();
     float c = strtof(data4->data(), NULL);
-    context->state->stroke.color[0] = (1.0 - c) * (1.0 - k);
-    context->state->stroke.color[1] = (1.0 - m) * (1.0 - k);
-    context->state->stroke.color[2] = (1.0 - y) * (1.0 - k);
-    strcpy(context->state->stroke.currentColorSpace, "/DeviceCMYK");
+    float r = (1.0 - c) * (1.0 - k);
+    float g = (1.0 - m) * (1.0 - k);
+    float b = (1.0 - y) * (1.0 - k);
+    return [context, r, g, b] {
+        context->state->stroke.color[0] = r;
+        context->state->stroke.color[1] = g;
+        context->state->stroke.color[2] = b;
+        strcpy(context->state->stroke.currentColorSpace, "/DeviceCMYK");
+    };
 }
 
-void handle_rg(pdf_render* context)
+std::function<void()> handle_rg(pdf_render* context)
 {
     // for nonstroking
     auto data = context->deque->pop_front();
@@ -113,16 +131,18 @@ void handle_rg(pdf_render* context)
     float g = strtof(data2->data(), NULL);
     auto data3 = context->deque->pop_front();
     float r = strtof(data3->data(), NULL);
+    return [context, r, g, b] {
+        context->state->fill.color[0] = r;
+        context->state->fill.color[1] = g;
+        context->state->fill.color[2] = b;
+        strcpy(context->state->fill.currentColorSpace, "/DeviceRGB");
+        // handle_RG(context);
+    };
     //plutovg_canvas_set_rgb(context->canvas, r, g, b);
-    context->state->fill.color[0] = r;
-    context->state->fill.color[1] = g;
-    context->state->fill.color[2] = b;
-    strcpy(context->state->fill.currentColorSpace, "/DeviceRGB");
-    // handle_RG(context);
 }
 
 
-void handle_RG(pdf_render* context)
+std::function<void()> handle_RG(pdf_render* context)
 {
     // combine CS and SC for DeviceRGB
     auto data = context->deque->pop_front();
@@ -131,14 +151,16 @@ void handle_RG(pdf_render* context)
     float g = strtof(data2->data(), NULL);
     auto data3 = context->deque->pop_front();
     float r = strtof(data3->data(), NULL);
-    context->state->stroke.color[0] = r;
-    context->state->stroke.color[1] = g;
-    context->state->stroke.color[2] = b;
-    // plutovg_canvas_set_rgb(context->canvas, gray, gray, gray);
-    strcpy(context->state->stroke.currentColorSpace, "/DeviceRGB");
+    return [context, r, g, b] {
+        context->state->stroke.color[0] = r;
+        context->state->stroke.color[1] = g;
+        context->state->stroke.color[2] = b;
+        // plutovg_canvas_set_rgb(context->canvas, gray, gray, gray);
+        strcpy(context->state->stroke.currentColorSpace, "/DeviceRGB");
+    };
 }
 
-void handle_sc(pdf_render* context)
+std::function<void()> handle_sc(pdf_render* context)
 {
     // for nonstroking
     // char buf[1024] = { 0 };
@@ -152,9 +174,12 @@ void handle_sc(pdf_render* context)
         auto data = context->deque->pop_front();
         float g = strtof(data->data(), NULL);
         // plutovg_canvas_set_rgb(context->canvas, g, g, g);
-        context->state->fill.color[0] = g;
-        context->state->fill.color[1] = g;
-        context->state->fill.color[2] = g;
+        return [context, g] {
+            context->state->fill.color[0] = g;
+            context->state->fill.color[1] = g;
+            context->state->fill.color[2] = g;
+
+        };
     }
     else if (!strcmp(context->state->fill.currentColorSpace,
         "/DeviceRGB"))
@@ -167,10 +192,13 @@ void handle_sc(pdf_render* context)
         float g = strtof(data2->data(), NULL);
         auto data3 = context->deque->pop_front();
         float r = strtof(data3->data(), NULL);
+        return [context, r, g, b] {
+            context->state->fill.color[0] = r;
+            context->state->fill.color[1] = g;
+            context->state->fill.color[2] = b;
+        };
         // plutovg_canvas_set_rgb(context->canvas, r, g, b);
-        context->state->fill.color[0] = r;
-        context->state->fill.color[1] = g;
-        context->state->fill.color[2] = b;
+
     }
     else if (!strcmp(context->state->fill.currentColorSpace,
         "/DeviceCMYK"))
@@ -189,14 +217,16 @@ void handle_sc(pdf_render* context)
         float g = (1.0 - m) * (1.0 - k);
         float b = (1.0 - y) * (1.0 - k);
 
-        context->state->fill.color[0] = r;
-        context->state->fill.color[1] = g;
-        context->state->fill.color[2] = b;
+        return [context, r, g, b] {
+            context->state->fill.color[0] = r;
+            context->state->fill.color[1] = g;
+            context->state->fill.color[2] = b;
+        };
     }
 }
 
 
-void handle_SC(pdf_render* context)
+std::function<void()> handle_SC(pdf_render* context)
 {
     // set gray level, 0.0 to balck 1.0 to white
     if (!strcmp(context->state->stroke.currentColorSpace, "/DeviceGray"))
@@ -205,9 +235,11 @@ void handle_SC(pdf_render* context)
         auto data = context->deque->pop_front();
         float g = strtof(data->data(), NULL);
         // plutovg_canvas_set_rgb(context->canvas, g, g, g);
-        context->state->stroke.color[0] = g;
-        context->state->stroke.color[1] = g;
-        context->state->stroke.color[2] = g;
+        return [context, g] {
+            context->state->stroke.color[0] = g;
+            context->state->stroke.color[1] = g;
+            context->state->stroke.color[2] = g;
+        };
     }
     else if (!strcmp(context->state->stroke.currentColorSpace,
         "/DeviceRGB"))
@@ -221,9 +253,11 @@ void handle_SC(pdf_render* context)
         auto data3 = context->deque->pop_front();
         float r = strtof(data3->data(), NULL);
         // plutovg_canvas_set_rgb(context->canvas, r, g, b);
-        context->state->stroke.color[0] = r;
-        context->state->stroke.color[1] = g;
-        context->state->stroke.color[2] = b;
+        return [context, r, g, b] {
+            context->state->stroke.color[0] = r;
+            context->state->stroke.color[1] = g;
+            context->state->stroke.color[2] = b;
+        };
     }
     else if (!strcmp(context->state->stroke.currentColorSpace,
         "/DeviceCMYK"))
@@ -242,13 +276,15 @@ void handle_SC(pdf_render* context)
         float g = (1.0 - m) * (1.0 - k);
         float b = (1.0 - y) * (1.0 - k);
 
-        context->state->stroke.color[0] = r;
-        context->state->stroke.color[1] = g;
-        context->state->stroke.color[2] = b;
+        return [context, r, g, b] {
+            context->state->stroke.color[0] = r;
+            context->state->stroke.color[1] = g;
+            context->state->stroke.color[2] = b;
+        };
     }
 }
 
-void handle_scn(pdf_render* context)
+std::function<void()> handle_scn(pdf_render* context)
 {
     // char buf[1024] = { 0 };
     // pdf_node_t node;
@@ -267,7 +303,7 @@ void handle_scn(pdf_render* context)
     auto data3 = context->deque->pop_front();
 }
 
-void handle_SCN(pdf_render* context)
+std::function<void()> handle_SCN(pdf_render* context)
 {
     if (!strcmp(context->state->stroke.currentColorSpace, "/DeviceGray") 
     || !strcmp(context->state->stroke.currentColorSpace, "/DeviceRGB") 

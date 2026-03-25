@@ -2,7 +2,8 @@
 #include "pdf-render-private.h"
 #include "plutovg-stb-image-write.h"
 #include "plutovg-stb-image.h"
-void handle_Do(pdf_render* context)
+#include <algorithm>
+std::function<void()> handle_Do(pdf_render* context)
 {
     // paint a specified XObject
     // name
@@ -20,7 +21,7 @@ void handle_Do(pdf_render* context)
     }
     else
     {
-        return;
+        return []{};
     }
     // if (xobj == NULL)
     // {
@@ -28,22 +29,10 @@ void handle_Do(pdf_render* context)
     // }
     //xobj = pdf_obj_get_xobject(context->page->obj, buf);
     if (xobj == NULL)
-        return;
-    plutovg_canvas_save(context->canvas);
+        return []{};
     if (xobj->type == XOBJ_FORM)
     {
-        plutovg_matrix_t m;
-        plutovg_matrix_init(&m, xobj->form->matrix[0], xobj->form->matrix[1],
-            xobj->form->matrix[2], xobj->form->matrix[3],
-            xobj->form->matrix[4], xobj->form->matrix[5]);
-
-        plutovg_canvas_transform(context->canvas, &m);
-        // plutovg_canvas_move_to(context->canvas, 0, 0);
-        // plutovg_canvas_rect(context->canvas, xobj->form->bbox[0],
-        //     xobj->form->bbox[1], xobj->form->bbox[2],
-        //     xobj->form->bbox[3]);
-        // plutovg_canvas_clip(context->canvas);
-
+        std::vector<std::function<void()>> operations;
         if (xobj->obj->stream != NULL)
         {
             pdf_obj_t* save_obj = context->current_obj;
@@ -54,13 +43,31 @@ void handle_Do(pdf_render* context)
             {
                 if (tk->type() == TOKEN_STREAM_END)
                     break;
-                _do_render_operation(xobj->obj->stream, context, tk);
+                operations.push_back(_do_render_operation(xobj->obj->stream, context, tk));
                 delete tk;
             }
 
             pdf_stream_close(xobj->obj->stream);
             context->current_obj = save_obj;
         }
+        return [context, operations, xobj] {
+            plutovg_canvas_save(context->canvas);
+            plutovg_matrix_t m;
+            plutovg_matrix_init(&m, xobj->form->matrix[0], xobj->form->matrix[1],
+                xobj->form->matrix[2], xobj->form->matrix[3],
+                xobj->form->matrix[4], xobj->form->matrix[5]);
+
+            plutovg_canvas_transform(context->canvas, &m);
+            // plutovg_canvas_move_to(context->canvas, 0, 0);
+            // plutovg_canvas_rect(context->canvas, xobj->form->bbox[0],
+            //     xobj->form->bbox[1], xobj->form->bbox[2],
+            //     xobj->form->bbox[3]);
+            // plutovg_canvas_clip(context->canvas);
+            std::for_each(operations.begin(), operations.end(), [](auto& opt) {
+                opt();
+            });
+            plutovg_canvas_restore(context->canvas);
+        };
     }
     else if (xobj->type == XOBJ_IMAGE)
     {
@@ -74,7 +81,7 @@ void handle_Do(pdf_render* context)
         }
         if (xobj->image->data_len == 0)
         {
-            return;
+            return [] {};
         }
         plutovg_surface_t* s = NULL;
         if (memcmp(xobj->image->data, "\xFF\xD8", 2) == 0) // jpeg
@@ -165,30 +172,23 @@ void handle_Do(pdf_render* context)
 
         if (s == NULL)
         {
-            return;
+            return [] {};
         }
-
-        sprintf(filename, "%s.png", data->data() + 1);
+        return [context, xobj, s] {
+            // Do_image操作实现
+            plutovg_canvas_save(context->canvas);
+            float scale_x = 1.f / xobj->image->width;
+            float scale_y = 1.f / xobj->image->height;
+            plutovg_matrix_t m = { scale_x,  0,
+                                    0, -scale_y,
+                                    0, xobj->image->height * scale_y };
+            plutovg_canvas_set_texture(context->canvas, s, PLUTOVG_TEXTURE_TYPE_PLAIN,
+                1.0f, &m);
+            plutovg_canvas_paint(context->canvas);
+            plutovg_canvas_restore(context->canvas);
+        };
         // plutovg_surface_write_to_png(s, filename);
-
-        // Scale factors to normalize image dimensions to unit space
-        // plutovg_matrix_t m = { xobj->image->width, 0, 0, -xobj->image->height, 0,
-        // xobj->image->height }; plutovg_matrix_invert(&m, &m);
-        // plutovg_canvas_set_texture(context->canvas, s,
-        // PLUTOVG_TEXTURE_TYPE_PLAIN, 1.f, &m);
-        float scale_x = 1.f / xobj->image->width;
-        float scale_y = 1.f / xobj->image->height;
-
-        // Transformation matrix to scale and flip the image vertically
-        plutovg_matrix_t m = { scale_x,  0,
-                                0, -scale_y,
-                                0, xobj->image->height * scale_y };
-
-        plutovg_canvas_set_texture(context->canvas, s, PLUTOVG_TEXTURE_TYPE_PLAIN,
-            1.0f, &m);
-        plutovg_canvas_paint(context->canvas);
-        plutovg_surface_destroy(s);
     }
     // pdf_page_xobject_free(xobj);
-    plutovg_canvas_restore(context->canvas);
+    
 }

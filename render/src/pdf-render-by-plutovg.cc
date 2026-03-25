@@ -1,8 +1,12 @@
+#include "pdf-private.h"
 #include "pdf-render.h"
 #include "pdf-render-private.h"
+#include <cstddef>
 #include <plutovg-private.h>
 #include <math.h>
-
+#include <typeinfo>
+#include <wingdi.h>
+#include <algorithm>
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
@@ -34,138 +38,20 @@ void _init_state(pdf_render* context)
     context->state->textState.font = NULL;
     context->state->textState.fontface = NULL;
 }
-pdf_render* pdf_render_init_with_size(pdf_page_t* page, int width, int height, int stride, int dpi)
+pdf_render* pdf_render_init(pdf_page_t* page)
 {
     if (page == NULL) return NULL;
     pdf_render* r = new pdf_render();
     r->page = page;
     r->pdf = page->pdf;
     r->current_obj = page->obj;
-
-    unsigned char* pixels = (unsigned char*)malloc(stride * height);
-    memset(pixels, 0xFF, stride * height);
-    r->pixels = pixels;
-    r->width = width;
-    r->height = height;
-    r->stride = stride;
-
-    pdf_deque* deque = new pdf_deque();
-
-    plutovg_surface_t* surface =
-        plutovg_surface_create_for_data(pixels, width, height, stride);
-    // plutovg_surface_t* surface = plutovg_surface_create(width, height);
-    plutovg_canvas_t* canvas = plutovg_canvas_create(surface);
-    plutovg_canvas_save(canvas);
-    plutovg_canvas_set_rgb(canvas, 1, 1, 1);
-    plutovg_canvas_paint(canvas);
-    plutovg_canvas_set_rgb(canvas, 0, 0, 0);
-    plutovg_canvas_set_line_width(canvas, 0.5);
-    plutovg_canvas_set_miter_limit(canvas, 10.0);
-
-    plutovg_canvas_restore(canvas);
-
-    // Flip the Y-axis
-    plutovg_canvas_translate(canvas, 0, height);
-    plutovg_canvas_scale(canvas, dpi / 72.0, -(dpi / 72.0));
-    r->canvas = canvas;
-    r->deque = deque;
-    _init_state(r);
-    
-    r->surface = surface;
-    return r;
-}
-pdf_render* pdf_render_init(pdf_page_t* page, int dpi)
-{
-    if (page == NULL) return NULL;
-    double dpi_scale = dpi / 72.0;
-    int width = pdf_page_get_media_width(page) * dpi_scale;
-    int height = pdf_page_get_media_height(page) * dpi_scale;
-    int stride = width * 4;
-    return pdf_render_init_with_size(page, width, height, stride, dpi);
-}
-pdf_render* pdf_render_init_for_paper(pdf_page_t* page, 
-    int paperWidth, int paperHeight, int paperStride, 
-    int rotation, int dpi)
-{
-    if (page == NULL) return NULL;
-
-    int rotationDegree = 0;
-    if (rotation == 0) {
-        bool isCanvasLandscape = paperWidth > paperHeight;
-        bool isPageLandscape = pdf_page_get_media_width(page) > pdf_page_get_media_height(page);
-        rotationDegree = (isCanvasLandscape != isPageLandscape) ? 90 : 0;
-    } else {
-        rotationDegree = 90 * (rotation - 1);
-    }
-
-    int renderWidth = paperWidth;
-    int renderHeight = paperHeight;
-    int renderStride = paperStride;
-
-    pdf_render* r = new pdf_render();
-    r->page = page;
-    r->pdf = page->pdf;
-    r->current_obj = page->obj;
-
-    r->pixels = (unsigned char*)calloc(renderStride * renderHeight, 1);
-    memset(r->pixels, 0xFF, renderStride * renderHeight);
-
-    r->width = renderWidth;
-    r->height = renderHeight;
-    r->stride = renderStride;
-
     pdf_deque* deque = new pdf_deque();
     r->deque = deque;
-
-    plutovg_surface_t* surface = plutovg_surface_create_for_data(r->pixels, renderWidth, renderHeight, renderStride);
-    plutovg_canvas_t* canvas = plutovg_canvas_create(surface);
-
-    // clear background
-    plutovg_canvas_save(canvas);
-    plutovg_canvas_set_rgb(canvas, 1, 1, 1);
-    plutovg_canvas_paint(canvas);
-    plutovg_canvas_restore(canvas);
-
-    // get pdf page size (uint: pt)
-    double pageWidth = pdf_page_get_media_width(page);
-    double pageHeight = pdf_page_get_media_height(page);
-
-    // convert canvas' px size to pt size
-    double canvasWidthPt = renderWidth * 72.0 / dpi;
-    double canvasHeightPt = renderHeight * 72.0 / dpi;
-
-    // calc scale factor
-    double scaleX = canvasWidthPt / (rotationDegree % 180 == 90 ? pageHeight : pageWidth);
-    double scaleY = canvasHeightPt / (rotationDegree % 180 == 90 ? pageWidth : pageHeight);
-    double scale = fmin(scaleX, scaleY); // fit to page
-
-    // after scale, the actual content size
-    double scaledWidth = pageWidth * scale;
-    double scaledHeight = pageHeight * scale;
-
-    // calc offset (in pt)
-    double offsetX = (canvasWidthPt - scaledWidth) / 2.0;
-    double offsetY = (canvasHeightPt - scaledHeight) / 2.0;
-
-    // px -> pt -> rotate -> offset -> scale
-    plutovg_canvas_translate(canvas, 0, renderHeight); // flip y in px
-    plutovg_canvas_scale(canvas, dpi / 72.0, -(dpi / 72.0)); // px to pt
-
-    // move to center then rotate
-    plutovg_canvas_translate(canvas, canvasWidthPt / 2.0, canvasHeightPt / 2.0);
-    plutovg_canvas_rotate(canvas, rotationDegree * M_PI / 180.0);
-    plutovg_canvas_translate(canvas, -canvasWidthPt / 2.0, -canvasHeightPt / 2.0);
-
-    // move and scale
-    plutovg_canvas_translate(canvas, offsetX, offsetY);
-    plutovg_canvas_scale(canvas, scale, scale);
-
-    r->canvas = canvas;
-    r->surface = surface;
     _init_state(r);
 
     return r;
 }
+
 void pdf_render_free(pdf_render* context)
 {
     if (context == NULL) return;
@@ -221,13 +107,13 @@ void _pdf_process_stream(pdf_render* context, pdf_stream_t* stream)
         {
             break;
         }
-        _do_render_operation(stream, context, tk);
+        context->operations.push_back(_do_render_operation(stream, context, tk));
         delete tk;
     }
 
     pdf_stream_close(stream);
 }
-void pdf_render_do(pdf_render* context)
+void pdf_render_build(pdf_render* context)
 {
     int numStreams = pdf_page_get_streams(context->page);
     for (int j = 0; j < numStreams; j++)
@@ -276,7 +162,11 @@ void pdf_render_do(pdf_render* context)
                 pdf_array* rect_aar = anno_obj->value->val.dict->get_array("/Rect");
                 if (rect_aar != NULL)
                 {
-                    plutovg_canvas_translate(context->canvas, rect_aar->get(0)->val.number, rect_aar->get(1)->val.number);
+                    float tx = rect_aar->get(0)->val.number;
+                    float ty = rect_aar->get(1)->val.number;
+                    context->operations.push_back([context, tx, ty] {
+                        plutovg_canvas_translate(context->canvas, tx, ty);
+                    });
                 }
                 anno_obj->value->val.dict->get_string("/Contents");
                 anno_obj->value->val.dict->get_dict("/P");
@@ -323,7 +213,7 @@ void pdf_render_do(pdf_render* context)
                             {
                                 if (tk->type() == TOKEN_STREAM_END)
                                     break;
-                                _do_render_operation(obj->stream, context, tk);
+                                context->operations.push_back(_do_render_operation(obj->stream, context, tk));
                                 delete tk;
                             }
                             pdf_stream_close(obj->stream);
@@ -340,7 +230,7 @@ void pdf_render_do(pdf_render* context)
     }
 }
 
-void _do_render_operation(pdf_stream_t* stream, pdf_render* context, pdf_token* tk)
+std::function<void()> _do_render_operation(pdf_stream_t* stream, pdf_render* context, pdf_token* tk)
 {
     // if (tk != NULL)
     // {
@@ -364,24 +254,8 @@ void _do_render_operation(pdf_stream_t* stream, pdf_render* context, pdf_token* 
     {
         switch (tk->type())
         {
-            case TOKEN_OPERATOR_B:
-            case TOKEN_OPERATOR_F:
-            case TOKEN_OPERATOR_W:
-            case TOKEN_OPERATOR_b:
-            case TOKEN_OPERATOR_f:
-                plutovg_canvas_set_fill_rule(context->canvas,
-                    PLUTOVG_FILL_RULE_NON_ZERO);
-                break;
-            case TOKEN_OPERATOR_B_star:
-            case TOKEN_OPERATOR_W_star:
-            case TOKEN_OPERATOR_b_star:
-            case TOKEN_OPERATOR_f_star:
-                plutovg_canvas_set_fill_rule(context->canvas,
-                    PLUTOVG_FILL_RULE_EVEN_ODD);
-                break;
             case TOKEN_OPERATOR_BI:
             {
-                plutovg_canvas_save(context->canvas);
                 pdf_token* t = NULL;
                 int width = 0, height = 0;
                 int channels = 3;
@@ -561,22 +435,21 @@ void _do_render_operation(pdf_stream_t* stream, pdf_render* context, pdf_token* 
                 if (s == NULL)
                 {
                     printf("process BI-ID failed\n");
-                    return;
+                    return [] {};
                 }
-                float scale_x = 1.f / width;
-                float scale_y = 1.f / height;
-                // Transformation matrix to scale and flip the image vertically
-                plutovg_matrix_t m = { scale_x,  0,
-                                        0, -scale_y,
-                                        0, height * scale_y };
-
-                plutovg_canvas_set_texture(context->canvas, s, PLUTOVG_TEXTURE_TYPE_PLAIN,
-                    1.0f, &m);
-                plutovg_canvas_paint(context->canvas);
-                plutovg_surface_destroy(s);
-                free(buffer);
-
-                plutovg_canvas_restore(context->canvas);
+                std::shared_ptr<char> shared_buffer(buffer);
+                return [context, width, height, s, shared_buffer] {
+                    plutovg_canvas_save(context->canvas);
+                    float scale_x = 1.f / width;
+                    float scale_y = 1.f / height;
+                    plutovg_matrix_t m = { scale_x,  0,
+                                            0, -scale_y,
+                                            0, height * scale_y };
+                    plutovg_canvas_set_texture(context->canvas, s, PLUTOVG_TEXTURE_TYPE_PLAIN,
+                        1.0f, &m);
+                    plutovg_canvas_paint(context->canvas);
+                    plutovg_canvas_restore(context->canvas);
+                };
                 break;
             }
             default:
@@ -584,21 +457,124 @@ void _do_render_operation(pdf_stream_t* stream, pdf_render* context, pdf_token* 
         }
         if (handlers[tk->type() - TOKEN_OPERATOR])
         {
-            handlers[tk->type() - TOKEN_OPERATOR](context);
+            return handlers[tk->type() - TOKEN_OPERATOR](context);
         }
-        // if (tk->type() == TOKEN_OPERATOR_TJ || tk->type() == TOKEN_OPERATOR_Tj)
-        // {
-        //     plutovg_surface_write_to_png(context->surface, "test.png");
-        //     getchar();
-        // }
     }
     else
     {
         printf("unknow token %d\n", tk->type());
     }
+    return [] {};
 }
+void pdf_render_with_size(pdf_render* context, int width, int height, int stride, int dpi)
+{
+    unsigned char* pixels = (unsigned char*)malloc(stride * height);
+    memset(pixels, 0xFF, stride * height);
+    context->pixels = pixels;
+    context->width = width;
+    context->height = height;
+    context->stride = stride;
 
-void handle_BDC(pdf_render* context)
+    plutovg_surface_t* surface =
+        plutovg_surface_create_for_data(pixels, width, height, stride);
+    // plutovg_surface_t* surface = plutovg_surface_create(width, height);
+    plutovg_canvas_t* canvas = plutovg_canvas_create(surface);
+    plutovg_canvas_save(canvas);
+    plutovg_canvas_set_rgb(canvas, 1, 1, 1);
+    plutovg_canvas_paint(canvas);
+    plutovg_canvas_set_rgb(canvas, 0, 0, 0);
+    plutovg_canvas_set_line_width(canvas, 0.5);
+    plutovg_canvas_set_miter_limit(canvas, 10.0);
+
+    plutovg_canvas_restore(canvas);
+
+    // Flip the Y-axis
+    plutovg_canvas_translate(canvas, 0, height);
+    plutovg_canvas_scale(canvas, dpi / 72.0, -(dpi / 72.0));
+    context->canvas = canvas;
+    context->surface = surface;
+
+    std::for_each(context->operations.begin(), context->operations.end(), [] (auto& opt) {
+        opt();
+    });
+}
+void pdf_render_for_paper(pdf_render* context, 
+    int paperWidth, int paperHeight, int paperStride, 
+    int rotation, int dpi)
+{
+    if (context == NULL) return;
+
+    int rotationDegree = 0;
+    if (rotation == 0) {
+        bool isCanvasLandscape = paperWidth > paperHeight;
+        bool isPageLandscape = pdf_page_get_media_width(context->page) > pdf_page_get_media_height(context->page);
+        rotationDegree = (isCanvasLandscape != isPageLandscape) ? 90 : 0;
+    } else {
+        rotationDegree = 90 * (rotation - 1);
+    }
+
+    int renderWidth = paperWidth;
+    int renderHeight = paperHeight;
+    int renderStride = paperStride;
+
+    context->pixels = (unsigned char*)calloc(renderStride * renderHeight, 1);
+    memset(context->pixels, 0xFF, renderStride * renderHeight);
+
+    context->width = renderWidth;
+    context->height = renderHeight;
+    context->stride = renderStride;
+
+    plutovg_surface_t* surface = plutovg_surface_create_for_data(context->pixels, renderWidth, renderHeight, renderStride);
+    plutovg_canvas_t* canvas = plutovg_canvas_create(surface);
+
+    // clear background
+    plutovg_canvas_save(canvas);
+    plutovg_canvas_set_rgb(canvas, 1, 1, 1);
+    plutovg_canvas_paint(canvas);
+    plutovg_canvas_restore(canvas);
+
+    // get pdf page size (uint: pt)
+    double pageWidth = pdf_page_get_media_width(context->page);
+    double pageHeight = pdf_page_get_media_height(context->page);
+
+    // convert canvas' px size to pt size
+    double canvasWidthPt = renderWidth * 72.0 / dpi;
+    double canvasHeightPt = renderHeight * 72.0 / dpi;
+
+    // calc scale factor
+    double scaleX = canvasWidthPt / (rotationDegree % 180 == 90 ? pageHeight : pageWidth);
+    double scaleY = canvasHeightPt / (rotationDegree % 180 == 90 ? pageWidth : pageHeight);
+    double scale = fmin(scaleX, scaleY); // fit to page
+
+    // after scale, the actual content size
+    double scaledWidth = pageWidth * scale;
+    double scaledHeight = pageHeight * scale;
+
+    // calc offset (in pt)
+    double offsetX = (canvasWidthPt - scaledWidth) / 2.0;
+    double offsetY = (canvasHeightPt - scaledHeight) / 2.0;
+
+    // px -> pt -> rotate -> offset -> scale
+    plutovg_canvas_translate(canvas, 0, renderHeight); // flip y in px
+    plutovg_canvas_scale(canvas, dpi / 72.0, -(dpi / 72.0)); // px to pt
+
+    // move to center then rotate
+    plutovg_canvas_translate(canvas, canvasWidthPt / 2.0, canvasHeightPt / 2.0);
+    plutovg_canvas_rotate(canvas, rotationDegree * M_PI / 180.0);
+    plutovg_canvas_translate(canvas, -canvasWidthPt / 2.0, -canvasHeightPt / 2.0);
+
+    // move and scale
+    plutovg_canvas_translate(canvas, offsetX, offsetY);
+    plutovg_canvas_scale(canvas, scale, scale);
+
+    context->canvas = canvas;
+    context->surface = surface;
+
+    std::for_each(context->operations.begin(), context->operations.end(), [] (auto& opt) {
+        opt();
+    });
+}
+std::function<void()> handle_BDC(pdf_render* context)
 {
     // tag properties
     auto data = context->deque->pop_front();
@@ -613,21 +589,24 @@ void handle_BDC(pdf_render* context)
         context->deque->pop_front(); // name
     }
     context->deque->pop_front(); // tag
-    
+    return [context] {
+
+    };
 }
-// void handle_BI(pdf_render* context)
+// std::function<void()> handle_BI(pdf_render* context)
 // {
 //     // begin an inline image object
 // }
 
-void handle_BMC(pdf_render* context)
+std::function<void()> handle_BMC(pdf_render* context)
 {
     // tag
     context->deque->pop_front();
+    return [context] {};
 }
 
 
-void handle_cm(pdf_render* context)
+std::function<void()> handle_cm(pdf_render* context)
 {
     // change matrix CTM
     // a b c d e f
@@ -645,14 +624,16 @@ void handle_cm(pdf_render* context)
     auto data6 = context->deque->pop_front();
     float a = strtof(data6->data(), NULL);
 
-    plutovg_matrix_t ctm;
-    plutovg_matrix_init(&ctm, a, b, c, d, e, f);
-    plutovg_canvas_transform(context->canvas, &ctm);
+    return [context, a, b, c, d, e, f] {
+        plutovg_matrix_t ctm;
+        plutovg_matrix_init(&ctm, a, b, c, d, e, f);
+        plutovg_canvas_transform(context->canvas, &ctm);
+    };
 }
 
 
 
-void handle_d(pdf_render* context)
+std::function<void()> handle_d(pdf_render* context)
 {
     // set line dash pattern
     // dashArray dashPhase
@@ -679,12 +660,13 @@ void handle_d(pdf_render* context)
                 dashs[--index] = dash;
         }
     }
-
-    plutovg_canvas_set_dash_offset(context->canvas, offset);
-    plutovg_canvas_set_dash_array(context->canvas, dashs, 2);
+    return [context, offset, dashs] {
+        plutovg_canvas_set_dash_offset(context->canvas, offset);
+        plutovg_canvas_set_dash_array(context->canvas, dashs, 2);
+    };
 }
 
-void handle_d0(pdf_render* context)
+std::function<void()> handle_d0(pdf_render* context)
 {
     // wx wy
     auto data = context->deque->pop_front();
@@ -692,9 +674,12 @@ void handle_d0(pdf_render* context)
     auto data2 = context->deque->pop_front();
     float wx = strtof(data2->data(), NULL);
     // plutovg_canvas_translate(context->canvas, wx, wy);
+    return [context, wx, wy] {
+
+    };
 }
 
-void handle_d1(pdf_render* context)
+std::function<void()> handle_d1(pdf_render* context)
 {
     // wx wy llx lly urx ury
     auto data = context->deque->pop_front();
@@ -711,22 +696,32 @@ void handle_d1(pdf_render* context)
     float wx = strtof(data6->data(), NULL);
     // plutovg_canvas_translate(context->canvas, wx, wy);
     // plutovg_canvas_rect(context->canvas, llx, lly, urx - llx, ury - lly);
+    return [context, wx, wy, llx, lly, urx, ury] {
+
+    };
 }
 
-void handle_DP(pdf_render* context)
+std::function<void()> handle_DP(pdf_render* context)
 {
     // tag properties
     auto data = context->deque->pop_front();
     auto data2 = context->deque->pop_front();
+    return [context] {
+
+    };
 }
-// void handle_EI(pdf_render* context)
+// std::function<void()> handle_EI(pdf_render* context)
 // {
 //     // end an inline image object
 // }
 
-void handle_EMC(pdf_render* context) {}
+std::function<void()> handle_EMC(pdf_render* context) {
+    return [context] {
 
-void handle_gs(pdf_render* context)
+    };
+}
+
+std::function<void()> handle_gs(pdf_render* context)
 {
     // set specified parameters
     // dictName shall be the name of
@@ -734,98 +729,114 @@ void handle_gs(pdf_render* context)
     // in the ExtGState subdictionary of the current resource dictionary
     // dictName
     auto data = context->deque->pop_front();
+    return [context] {
+
+    };
     // pdf_page_get_ext_gstate(context->page, buf);
 }
 
-void handle_i(pdf_render* context)
+std::function<void()> handle_i(pdf_render* context)
 {
     // set flatness tolerance
     // flatness
     auto data = context->deque->pop_front();
+    return [context] {
+
+    };
     //float i = strtof(buf, NULL);
     // context->graphics_state.flatness = i;
 }
 
-// void handle_ID(pdf_render* context)
+// std::function<void()> handle_ID(pdf_render* context)
 // {
 //     // begin the image data for an inline image object
 // }
 
-void handle_j(pdf_render* context)
+std::function<void()> handle_j(pdf_render* context)
 {
     // set join style
     // lineJoin
 
     auto data = context->deque->pop_front();
     int j = atoi(data->data());
-
-    plutovg_canvas_set_line_join(context->canvas, (plutovg_line_join_t)j);
-    context->state->lineJoin = j;
+    return [context, j] {
+        plutovg_canvas_set_line_join(context->canvas, (plutovg_line_join_t)j);
+        context->state->lineJoin = j;
+    };
 }
 
-void handle_J(pdf_render* context)
+std::function<void()> handle_J(pdf_render* context)
 {
     // set cap style
     // lineCap
     auto data = context->deque->pop_front();
     int c = atoi(data->data());
-
-    plutovg_canvas_set_line_cap(context->canvas, (plutovg_line_cap_t)c);
-    context->state->lineCap = c;
+    return [context, c] {
+        plutovg_canvas_set_line_cap(context->canvas, (plutovg_line_cap_t)c);
+        context->state->lineCap = c;
+    };
 }
 
 
-void handle_M(pdf_render* context)
+std::function<void()> handle_M(pdf_render* context)
 {
     // set miter limit
     // miterLimit
     auto data = context->deque->pop_front();
     float m = strtof(data->data(), NULL);
-    plutovg_canvas_set_miter_limit(context->canvas, m);
-    context->state->miterLimit = m;
+    return [context, m] {
+        plutovg_canvas_set_miter_limit(context->canvas, m);
+        context->state->miterLimit = m;
+    };
 }
-
-void handle_MP(pdf_render* context)
+std::function<void()> handle_MP(pdf_render* context)
 {
     // tag
     auto data = context->deque->pop_front();
+    return [context] {};
 }
 
-void handle_q(pdf_render* context)
+std::function<void()> handle_q(pdf_render* context)
 {
     // store state
-    plutovg_canvas_save(context->canvas);
-    if (context->state == NULL) _init_state(context);
-    pdf_graphics_state_t* new_state = (pdf_graphics_state_t*)malloc(sizeof(pdf_graphics_state_t));
-    memcpy(new_state, context->state, sizeof(pdf_graphics_state_t));
-    new_state->next = context->state;
-    context->state = new_state;
+    return [context] {
+        plutovg_canvas_save(context->canvas);
+        if (context->state == NULL) _init_state(context);
+        pdf_graphics_state_t* new_state = (pdf_graphics_state_t*)malloc(sizeof(pdf_graphics_state_t));
+        memcpy(new_state, context->state, sizeof(pdf_graphics_state_t));
+        new_state->next = context->state;
+        context->state = new_state;
+    };
 }
 
-void handle_Q(pdf_render* context)
+std::function<void()> handle_Q(pdf_render* context)
 {
     // restore state
-    plutovg_canvas_restore(context->canvas);
-    pdf_graphics_state_t* old_state = context->state;
-    context->state = old_state->next;
-    free(old_state);
-    if (context->state == NULL) _init_state(context);
-    plutovg_canvas_set_line_width(context->canvas, context->state->lineWidth);
-    plutovg_canvas_set_line_cap(context->canvas, (plutovg_line_cap_t)context->state->lineCap);
-    plutovg_canvas_set_line_join(context->canvas, (plutovg_line_join_t)context->state->lineJoin);
-    plutovg_canvas_set_miter_limit(context->canvas, context->state->miterLimit);
+    return [context] {
+        plutovg_canvas_restore(context->canvas);
+        pdf_graphics_state_t* old_state = context->state;
+        context->state = old_state->next;
+        free(old_state);
+        if (context->state == NULL) _init_state(context);
+        plutovg_canvas_set_line_width(context->canvas, context->state->lineWidth);
+        plutovg_canvas_set_line_cap(context->canvas, (plutovg_line_cap_t)context->state->lineCap);
+        plutovg_canvas_set_line_join(context->canvas, (plutovg_line_join_t)context->state->lineJoin);
+        plutovg_canvas_set_miter_limit(context->canvas, context->state->miterLimit);
+    };
 }
 
 
-void handle_ri(pdf_render* context)
+std::function<void()> handle_ri(pdf_render* context)
 {
     // set color rendering intent
     // intent
     auto data = context->deque->pop_front();
+    return [context] {};
 }
 
-void handle_sh(pdf_render* context)
+std::function<void()> handle_sh(pdf_render* context)
 {
     // name
     auto data = context->deque->pop_front();
+    return [context] {};
 }

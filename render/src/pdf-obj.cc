@@ -157,6 +157,9 @@ pdf_font_descriptor_t* _load_font_descriptor(pdf_obj_t* obj, pdf_dict* font_dict
         {
             pdf_dict* fontfile_dict = fontfile_obj->value->val.dict;
             char* subtype = (char*)fontfile_dict->get_name("/Subtype");
+            int length1 = (int)fontfile_dict->get_number("/Length1");
+            int length2 = (int)fontfile_dict->get_number("/Length2");
+            int length3 = (int)fontfile_dict->get_number("/Length3");
             if (fontfile_obj->font_data != NULL && fontfile_obj->font_data_len != 0)
             {
                 font_descriptor->fontfile = fontfile_obj->font_data;

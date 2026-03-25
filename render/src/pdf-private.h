@@ -30,6 +30,7 @@ public:
     explicit pdf_token(pdf_token_type_t type);
     explicit pdf_token(const char* start, int len, pdf_token_type_t type);
     explicit pdf_token(const char* start, int len, pdf_token_type_t type, int steps);
+    ~pdf_token() = default;
     void append(pdf_token* other);
     void append(const char* data, int len);
     const char* data();
@@ -41,7 +42,6 @@ private:
     void decode_hex_string();
     void decode_name();
     void decode_string();
-
 };
 
 typedef enum pdf_value_type
@@ -282,7 +282,7 @@ struct pdf_page
     pdf_array* annots;
 };
 
-typedef enum
+typedef enum pdf_font_subtype
 {
     FONT_SUBTYPE_TYPE0 = 0,
     FONT_SUBTYPE_TYPE1,

@@ -1,7 +1,9 @@
 :warning::construction:Under construction!
 
 A simple pdf parser write in C++, implemented part of the PDF Specification 1.7. And the renderer is [plutovg](https://github.com/sammycage/plutovg), specifical thanks to [@sammycage](https://github.com/sammycage)'s work.
+
 Window: [MiniFB](https://github.com/emoon/minifb)
+
 ***NOT FOR PRODUCTION!!!***
 
 ## Features
@@ -23,8 +25,8 @@ cmake -S . -B build -G "Visual Studio 16 2019"
 cmake --build build --config Debug
 ./build/output/Debug/test.exe tiger.pdf
 ```
-MOUSE_LEFT: previous page
-MOUSE_RIGHT: next page
+
+Press  `A` for previous page, and `D` for next page.
 
 ## License
 ```
