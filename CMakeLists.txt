@@ -26,6 +26,6 @@ add_subdirectory(zlib)
 add_subdirectory(render)
 add_subdirectory(minifb)
 
-add_executable(test test.cpp)
+add_executable(test test.cc plutovg-renderer.cc)
 target_link_libraries(test pdf-render plutovg minifb)
-target_include_directories(test PRIVATE ./render/include ./plutovg/include ./minifb/include)
+target_include_directories(test PRIVATE ./render/include ./plutovg/include ./plutovg/source ./minifb/include)

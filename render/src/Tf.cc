@@ -1,122 +1,7 @@
 #include "pdf-render.h"
 #include "pdf-render-private.h"
 #define STB_TRUETYPE_IMPLEMENTATION
-#include "plutovg-stb-truetype.h"
-
-static int stbtt_InitFont_internal1(stbtt_fontinfo *info, unsigned char *data, int fontstart)
-{
-   stbtt_uint32 cmap, t;
-   stbtt_int32 i,numTables;
-
-   info->data = data;
-   info->fontstart = fontstart;
-   info->cff = stbtt__new_buf(NULL, 0);
-
-   cmap = stbtt__find_table(data, fontstart, "cmap");       // required
-   info->loca = stbtt__find_table(data, fontstart, "loca"); // required
-   info->head = stbtt__find_table(data, fontstart, "head"); // required
-   info->glyf = stbtt__find_table(data, fontstart, "glyf"); // required
-   info->hhea = stbtt__find_table(data, fontstart, "hhea"); // required
-   info->hmtx = stbtt__find_table(data, fontstart, "hmtx"); // required
-   info->kern = stbtt__find_table(data, fontstart, "kern"); // not required
-   info->gpos = stbtt__find_table(data, fontstart, "GPOS"); // not required
-
-   if (/*!cmap || */!info->head || !info->hhea || !info->hmtx)
-      return 0;
-   if (info->glyf) {
-      // required for truetype
-      if (!info->loca) return 0;
-   } else {
-      // initialization for CFF / Type2 fonts (OTF)
-      stbtt__buf b, topdict, topdictidx;
-      stbtt_uint32 cstype = 2, charstrings = 0, fdarrayoff = 0, fdselectoff = 0;
-      stbtt_uint32 cff;
-
-      cff = stbtt__find_table(data, fontstart, "CFF ");
-      if (!cff) return 0;
-
-      info->fontdicts = stbtt__new_buf(NULL, 0);
-      info->fdselect = stbtt__new_buf(NULL, 0);
-
-      // @TODO this should use size from table (not 512MB)
-      info->cff = stbtt__new_buf(data+cff, 512*1024*1024);
-      b = info->cff;
-
-      // read the header
-      stbtt__buf_skip(&b, 2);
-      stbtt__buf_seek(&b, stbtt__buf_get8(&b)); // hdrsize
-
-      // @TODO the name INDEX could list multiple fonts,
-      // but we just use the first one.
-      stbtt__cff_get_index(&b);  // name INDEX
-      topdictidx = stbtt__cff_get_index(&b);
-      topdict = stbtt__cff_index_get(topdictidx, 0);
-      stbtt__cff_get_index(&b);  // string INDEX
-      info->gsubrs = stbtt__cff_get_index(&b);
-
-      stbtt__dict_get_ints(&topdict, 17, 1, &charstrings);
-      stbtt__dict_get_ints(&topdict, 0x100 | 6, 1, &cstype);
-      stbtt__dict_get_ints(&topdict, 0x100 | 36, 1, &fdarrayoff);
-      stbtt__dict_get_ints(&topdict, 0x100 | 37, 1, &fdselectoff);
-      info->subrs = stbtt__get_subrs(b, topdict);
-
-      // we only support Type 2 charstrings
-      if (cstype != 2) return 0;
-      if (charstrings == 0) return 0;
-
-      if (fdarrayoff) {
-         // looks like a CID font
-         if (!fdselectoff) return 0;
-         stbtt__buf_seek(&b, fdarrayoff);
-         info->fontdicts = stbtt__cff_get_index(&b);
-         info->fdselect = stbtt__buf_range(&b, fdselectoff, b.size-fdselectoff);
-      }
-
-      stbtt__buf_seek(&b, charstrings);
-      info->charstrings = stbtt__cff_get_index(&b);
-   }
-
-   t = stbtt__find_table(data, fontstart, "maxp");
-   if (t)
-      info->numGlyphs = ttUSHORT(data+t+4);
-   else
-      info->numGlyphs = 0xffff;
-
-   info->svg = -1;
-
-   // find a cmap encoding table we understand *now* to avoid searching
-   // later. (todo: could make this installable)
-   // the same regardless of glyph.
-   if (cmap)
-   {
-        numTables = ttUSHORT(data + cmap + 2);
-        info->index_map = 0;
-        for (i=0; i < numTables; ++i) {
-            stbtt_uint32 encoding_record = cmap + 4 + 8 * i;
-            // find an encoding we understand:
-            switch(ttUSHORT(data+encoding_record)) {
-                case STBTT_PLATFORM_ID_MICROSOFT:
-                    switch (ttUSHORT(data+encoding_record+2)) {
-                    case STBTT_MS_EID_UNICODE_BMP:
-                    case STBTT_MS_EID_UNICODE_FULL:
-                        // MS/Unicode
-                        info->index_map = cmap + ttULONG(data+encoding_record+4);
-                        break;
-                    }
-                    break;
-                case STBTT_PLATFORM_ID_UNICODE:
-                    // Mac/iOS has these
-                    // all the encodingIDs are unicode, so we don't bother to check it
-                    info->index_map = cmap + ttULONG(data+encoding_record+4);
-                    break;
-            }
-        }
-        if (info->index_map == 0)
-            return 0;
-    }
-   info->indexToLocFormat = ttUSHORT(data+info->head + 50);
-   return 1;
-}
+#include "stb-truetype.h"
 
 pdf_font_face_t* pdf_font_face_load_from_data(const void* data, 
     unsigned int length, int ttcindex, 
@@ -124,7 +9,7 @@ pdf_font_face_t* pdf_font_face_load_from_data(const void* data,
 {
     stbtt_fontinfo info;
     int offset = stbtt_GetFontOffsetForIndex((unsigned char*)data, ttcindex);
-    if (offset == -1 || !stbtt_InitFont_internal1(&info, (unsigned char*)data, offset)) {
+    if (offset == -1 || !stbtt_InitFont_internal(&info, (unsigned char*)data, offset)) {
         if (destroy_func)
             destroy_func(closure);
         return NULL;
@@ -170,15 +55,19 @@ void pdf_font_face_destroy(pdf_font_face_t* face)
     }
 }
 
-void load_font_from_external(pdf_render* context, pdf_font_descriptor_t* font_descriptor)
+void load_font_from_external(pdf_render* context, const char* basefont, pdf_font_descriptor_t* font_descriptor)
 {
-    if (font_descriptor == nullptr)
+    char fontname[256] = { 0 };
+    if (basefont)
     {
-        context->state->textState.font = nullptr;
-        context->state->textState.fontface = nullptr;
+        if (!strcmp(basefont, "/Helvetica"))
+        {
+            sprintf(fontname, "fonts/NotoSansSC-Regular.ttf");
+            goto LOAD_FONT;
+        }
     }
     //TODO
-    char fontname[256] = { 0 };
+    
     bool isSerif = (font_descriptor->flags & 0x02) != 0;
     sprintf(fontname, "fonts/Noto%sSC-", isSerif ? "Serif" : "Sans");
     //\xCB\xCE\xCC\xE5 -> SimSun
@@ -222,6 +111,7 @@ void load_font_from_external(pdf_render* context, pdf_font_descriptor_t* font_de
     {
         strcat(fontname, "Black.ttf");
     }
+LOAD_FONT:
     FILE* f = fopen(fontname, "rb");
     if (f)
     {
@@ -268,16 +158,16 @@ void handle_Tf(pdf_render* context, pdf_render_command* cmd, bool dry_run)
                     if ((context->state->textState.fontface = pdf_font_face_load_from_data(
                         cidfont->font_descriptor->fontfile, cidfont->font_descriptor->fontfile_len, 0, NULL, NULL)) == NULL)
                     {
-
+                        load_font_from_external(context, font->basefont, cidfont->font_descriptor);
                     }
                     else
                     {
                         context->state->textState.font_face_loaded = true;
                     }
                 }
-                else if (cidfont)
+                else
                 {
-                    load_font_from_external(context, cidfont->font_descriptor);
+                    load_font_from_external(context,  font->basefont, cidfont->font_descriptor);
                 }
             }
             else if (font->subtype == FONT_SUBTYPE_TRUETYPE || font->subtype == FONT_SUBTYPE_TYPE1)
@@ -288,16 +178,16 @@ void handle_Tf(pdf_render* context, pdf_render_command* cmd, bool dry_run)
                     if ((context->state->textState.fontface = pdf_font_face_load_from_data(
                         type1_truetype->font_descriptor->fontfile, type1_truetype->font_descriptor->fontfile_len, 0, NULL, NULL)) == NULL)
                     {
-
+                        load_font_from_external(context, font->basefont, type1_truetype->font_descriptor);
                     }
                     else
                     {
                         context->state->textState.font_face_loaded = true;
                     }
                 }
-                else if (type1_truetype)
+                else
                 {
-                    load_font_from_external(context, type1_truetype->font_descriptor);
+                    load_font_from_external(context, font->basefont, type1_truetype->font_descriptor);
                 }
             }
             if (context->state->textState.fontface == NULL)

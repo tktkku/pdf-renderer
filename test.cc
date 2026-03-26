@@ -1,4 +1,5 @@
 #include "pdf-render.h"
+#include "plutovg.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,7 +18,7 @@
 #include "plutovg.h"
 #include <memory>
 #include "MiniFB.h"
-
+#include "test.h"
 static uint64_t get_wall_time(void)
 {
     return std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -67,25 +68,89 @@ int main(int argc, char* argv[])
     char* filebuffer = (char*)malloc(filesize);
     fread(filebuffer, 1, filesize, f);
     fclose(f);
+    
     pdf_file_t* pdf = pdf_file_read_buffer(filebuffer, filesize);
     int num_pages = pdf_file_get_pages(pdf);
     int window_width = 1200, window_height = 900;
     int dpi = 96;
     int window_stride = window_width * 4;
+    int rotation = 1;
     std::vector<std::shared_ptr<unsigned char[]>> page_pixels;
-    auto render = [pdf, &page_pixels, window_width, window_height, window_stride, dpi] (int i) {
+    auto render = [pdf, &page_pixels, window_width, window_height, window_stride, dpi, rotation] (int i) {
         pdf_page_t* page = pdf_file_get_page(pdf, i - 1);
         if (page == NULL)
             return;
         
         pdf_render* r = pdf_render_init(page);
         pdf_render_build(r);
-        pdf_render_for_paper(r, window_width, window_height, window_stride, 1, dpi);
         std::shared_ptr<unsigned char[]> pixels(new unsigned char[window_height * window_stride]);
         memset(pixels.get(), 0xFF, window_height * window_stride);
-        pdf_render_copy_to_buffer(r, pixels.get(), window_height * window_stride);
+        
+        pdf_renderer_t* renderer = (pdf_renderer_t*)malloc(sizeof(pdf_renderer_t));
+        renderer->vtable = &plutovg_vtable;
+
+        int rotationDegree = 0;
+        if (rotation == 0) {
+            bool isCanvasLandscape = window_width > window_height;
+            bool isPageLandscape = pdf_page_get_media_width(page) > pdf_page_get_media_height(page);
+            rotationDegree = (isCanvasLandscape != isPageLandscape) ? 90 : 0;
+        } else {
+            rotationDegree = 90 * (rotation - 1);
+        }
+        
+        int renderWidth = window_width;
+        int renderHeight = window_height;
+        int renderStride = window_stride;
+
+        plutovg_surface_t* surface =
+            plutovg_surface_create_for_data(pixels.get(), 
+            renderWidth, renderHeight, renderStride);
+        plutovg_canvas_t* canvas = plutovg_canvas_create(surface);
+        plutovg_canvas_save(canvas);
+        plutovg_canvas_set_rgb(canvas, 1, 1, 1);
+        plutovg_canvas_paint(canvas);
+        plutovg_canvas_set_rgb(canvas, 0, 0, 0);
+        plutovg_canvas_set_line_width(canvas, 0.5);
+        plutovg_canvas_set_miter_limit(canvas, 10.0);
+
+        plutovg_canvas_restore(canvas);
+        
+        double pageWidth = pdf_page_get_media_width(page);
+        double pageHeight = pdf_page_get_media_height(page);
+        // convert canvas' px size to pt size
+        double canvasWidthPt = renderWidth * 72.0 / dpi;
+        double canvasHeightPt = renderHeight * 72.0 / dpi;
+        // calc scale factor
+        double scaleX = canvasWidthPt / (rotationDegree % 180 == 90 ? pageHeight : pageWidth);
+        double scaleY = canvasHeightPt / (rotationDegree % 180 == 90 ? pageWidth : pageHeight);
+        double scale = fmin(scaleX, scaleY); // fit to page
+        // after scale, the actual content size
+        double scaledWidth = pageWidth * scale;
+        double scaledHeight = pageHeight * scale;
+        // calc offset (in pt)
+        double offsetX = (canvasWidthPt - scaledWidth) / 2.0;
+        double offsetY = (canvasHeightPt - scaledHeight) / 2.0;
+        // px -> pt -> rotate -> offset -> scale
+        plutovg_canvas_translate(canvas, 0, renderHeight); // flip y in px
+        plutovg_canvas_scale(canvas, dpi / 72.0, -(dpi / 72.0)); // px to pt
+        // move to center then rotate
+        plutovg_canvas_translate(canvas, canvasWidthPt / 2.0, canvasHeightPt / 2.0);
+        plutovg_canvas_rotate(canvas, rotationDegree * 3.14159 / 180.0);
+        plutovg_canvas_translate(canvas, -canvasWidthPt / 2.0, -canvasHeightPt / 2.0);
+
+        // move and scale
+        plutovg_canvas_translate(canvas, offsetX, offsetY);
+        plutovg_canvas_scale(canvas, scale, scale);
+
+        renderer->user_data = canvas;
+        
+        pdf_render_run(r, renderer);
         page_pixels.push_back(pixels);
-        // free(pixels);
+
+        free(renderer);
+        plutovg_canvas_destroy(canvas);
+        plutovg_surface_destroy(surface);
+
         pdf_render_free(r);
         pdf_page_free(page);
     };

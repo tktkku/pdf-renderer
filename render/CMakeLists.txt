@@ -23,7 +23,8 @@ set(PARSER_SOURCES
     src/text.cc
     src/text-render.cc
     src/path.cc
-    src/pdf-render-by-plutovg.cc
+    src/pdf-render.cc
+    src/pdf-matrix.cc
 )
 set(PARSER_DEP zlibstatic plutovg)
 if(NOT WIN32)

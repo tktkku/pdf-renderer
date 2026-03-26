@@ -1,0 +1,1 @@
+extern const pdf_renderer_vtable_t plutovg_vtable;

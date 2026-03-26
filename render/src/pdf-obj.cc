@@ -6,9 +6,9 @@
 #include <zlib.h>
 #include <stdio.h>
 #define STB_IMAGE_IMPLEMENTATION
-#include "plutovg-stb-image.h"
+#include "stb-image.h"  
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "plutovg-stb-image-write.h"
+#include "stb-image-write.h"
 pdf_obj_t* pdf_obj_init()
 {
     pdf_obj_t* obj = (pdf_obj_t*)malloc(sizeof(pdf_obj_t));

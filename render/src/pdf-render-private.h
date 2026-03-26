@@ -9,11 +9,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <wchar.h>
-#include <plutovg.h>
 #include <vector>
 #include <memory>
 #include <functional>
-#include "plutovg-stb-truetype.h"
+#include "stb-truetype.h"
 typedef struct {
     stbtt_vertex* vertices;
     int nvertices;
@@ -51,7 +50,7 @@ typedef struct pdf_cff_char_render
     pdf_array* charstrings;
     pdf_array* global_subr;
     uint16_t global_bias;
-    plutovg_canvas_t* canvas;
+    pdf_renderer_t* renderer;
     double fontSize;
     double curX;
     double curY;
@@ -62,9 +61,30 @@ typedef struct pdf_cff_char_render
     bool havewidth;
     double transient[32];
 } pdf_cff_char_render_t;
+typedef struct pdf_matrix {
+    float a; ///< The horizontal scaling factor.
+    float b; ///< The vertical shearing factor.
+    float c; ///< The horizontal shearing factor.
+    float d; ///< The vertical scaling factor.
+    float e; ///< The horizontal translation offset.
+    float f; ///< The vertical translation offset.
+} pdf_matrix_t;
+void pdf_matrix_init(pdf_matrix_t* matrix, float a, float b, float c, float d, float e, float f);
+void pdf_matrix_multiply(pdf_matrix_t* matrix, const pdf_matrix_t* left, const pdf_matrix_t* right);
+void pdf_matrix_init_scale(pdf_matrix_t* matrix, float sx, float sy);
+void pdf_matrix_init_translate(pdf_matrix_t* matrix, float tx, float ty);
+void pdf_matrix_init_identity(pdf_matrix_t* matrix);
+void pdf_matrix_translate(pdf_matrix_t* matrix, float tx, float ty);
+void pdf_matrix_scale(pdf_matrix_t* matrix, float sx, float sy);
+typedef struct pdf_point {
+    float x; ///< The x-coordinate of the point.
+    float y; ///< The y-coordinate of the point.
+} pdf_point_t;
+void pdf_matrix_map_points(const pdf_matrix_t* matrix, const pdf_point_t* src, pdf_point_t* dst, int count);
+
 typedef struct {
-    plutovg_matrix_t textMatrix;
-    plutovg_matrix_t textLineMatrix;
+    pdf_matrix_t textMatrix;
+    pdf_matrix_t textLineMatrix;
     double characterSpacing;
     double wordSpacing;
     double horizontalScaling;
@@ -152,8 +172,9 @@ struct pdf_render_command
         struct {
             xobject_type_t type;
             pdf_xobject_t* xobj;
-            int width, height;
-            plutovg_surface_t* surface;
+            int width, height, channels;
+            unsigned char* pixels;
+            int pixels_size;
             std::vector<std::unique_ptr<pdf_render_command>> opts;
         } Do;
     };
@@ -168,13 +189,8 @@ struct pdf_render_command
 };
 struct pdf_render
 {
-    unsigned char* pixels;
-    int width;
-    int height;
-    int stride;
-    plutovg_surface_t* surface;
     pdf_deque* deque;
-    plutovg_canvas_t* canvas;
+    pdf_renderer_t* renderer;
     pdf_file_t* pdf;
     pdf_page_t* page;
     pdf_obj_t* current_obj;

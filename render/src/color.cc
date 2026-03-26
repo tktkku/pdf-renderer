@@ -1,6 +1,5 @@
 #include "pdf-render.h"
 #include "pdf-render-private.h"
-#include <winscard.h>
 void handle_cs(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
     // for nonstroking
@@ -204,7 +203,6 @@ void handle_RG(pdf_render* context, pdf_render_command* cmd, bool dry_run)
         context->state->stroke.color[0] =  cmd->RG.r;
         context->state->stroke.color[1] =  cmd->RG.g;
         context->state->stroke.color[2] =  cmd->RG.b;
-        // plutovg_canvas_set_rgb(context->canvas, gray, gray, gray);
         strcpy(context->state->stroke.currentColorSpace, "/DeviceRGB");
     }
 }

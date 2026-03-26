@@ -17,7 +17,7 @@ void handle_apostrophe(pdf_render* context, pdf_render_command* cmd, bool dry_ru
     }
     else
     {
-        plutovg_matrix_translate(&context->state->textState.textMatrix, 0, -context->state->textState.textLeading);
+        pdf_matrix_translate(&context->state->textState.textMatrix, 0, -context->state->textState.textLeading);
         context->state->textState.textLineWidth = 0;
         if (context->state->textState.font == NULL)
             return;
@@ -33,12 +33,11 @@ void handle_BT(pdf_render* context, pdf_render_command* cmd, bool dry_run)
     }
     else
     {
-        plutovg_canvas_save(context->canvas);
-        //plutovg_canvas_move_to(context->canvas, 0, 0);
+        PDF_RENDERER_CALL(context->renderer, save);
         // context->fontface = NULL;
         // context->font = NULL;
         context->state->textState.textLineWidth = 0;
-        plutovg_matrix_init_identity(&context->state->textState.textMatrix);
+        pdf_matrix_init_identity(&context->state->textState.textMatrix);
     }
 }
 
@@ -51,7 +50,7 @@ void handle_ET(pdf_render* context, pdf_render_command* cmd, bool dry_run)
     }
     else
     {
-        plutovg_canvas_restore(context->canvas);
+        PDF_RENDERER_CALL(context->renderer, restore);
     };
 }
 
@@ -80,17 +79,14 @@ void handle_T_star(pdf_render* context, pdf_render_command* cmd, bool dry_run)
     // has the same effects as the code
     // 0 -[current leading matrix] Td
     // float x, y;
-    // plutovg_canvas_get_current_point(context->canvas, &x, &y);
-    // plutovg_canvas_move_to(context->canvas, x, y);
-    // plutovg_canvas_translate(context->canvas, 0, -context->state->textState.textLeading);
-    // plutovg_canvas_move_to(context->canvas, 0, 0);
+
     if (dry_run)
     {
         cmd->type = TOKEN_OPERATOR_T_star;
     }
     else
     {
-        plutovg_matrix_translate(&context->state->textState.textMatrix, 0, -context->state->textState.textLeading);
+        pdf_matrix_translate(&context->state->textState.textMatrix, 0, -context->state->textState.textLeading);
         context->state->textState.textLineWidth = 0;
     };
 }
@@ -129,7 +125,7 @@ void handle_Td(pdf_render* context, pdf_render_command* cmd, bool dry_run)
     }
     else
     {
-        plutovg_matrix_translate(&context->state->textState.textMatrix, cmd->Td.x, cmd->Td.y);
+        pdf_matrix_translate(&context->state->textState.textMatrix, cmd->Td.x, cmd->Td.y);
         context->state->textState.textLineWidth = 0;
     }
 }
@@ -151,7 +147,7 @@ void handle_TD(pdf_render* context, pdf_render_command* cmd, bool dry_run)
     }
     else
     {
-        plutovg_matrix_translate(&context->state->textState.textMatrix, cmd->TD.x, cmd->TD.y);
+        pdf_matrix_translate(&context->state->textState.textMatrix, cmd->TD.x, cmd->TD.y);
         context->state->textState.textLeading = -cmd->TD.y;
         context->state->textState.textLineWidth = 0;
     }
@@ -184,7 +180,7 @@ void handle_TJ(pdf_render* context, pdf_render_command* cmd, bool dry_run)
     // if the element is a number, adjust the position
     if (dry_run)
     {
-        auto tmp_deque = std::shared_ptr<pdf_deque>();
+        auto tmp_deque = std::make_shared<pdf_deque>();
         while (true)
         {
             auto data = context->deque->pop_front();
@@ -222,8 +218,6 @@ void handle_TJ(pdf_render* context, pdf_render_command* cmd, bool dry_run)
             else // a number
             {
                 float a = strtof(data.data(), NULL);
-                //plutovg_canvas_translate(context->canvas, -a, 0);
-                //plutovg_canvas_move_to(context->canvas, 0, 0);
                 context->state->textState.textLineWidth -= (a * (context->state->textState.fontSize / 1000.0));
             }
         }
@@ -277,13 +271,10 @@ void handle_Tm(pdf_render* context, pdf_render_command* cmd, bool dry_run)
     }
     else
     {
-        plutovg_matrix_t m;
-        plutovg_matrix_init(&m, cmd->Tm.x1, cmd->Tm.y1, cmd->Tm.x2, cmd->Tm.y2, cmd->Tm.x3, cmd->Tm.y3);
+        pdf_matrix_t m;
+        pdf_matrix_init(&m, cmd->Tm.x1, cmd->Tm.y1, cmd->Tm.x2, cmd->Tm.y2, cmd->Tm.x3, cmd->Tm.y3);
 
-        //plutovg_matrix_multiply(&m, &context->textState.fontMatrixPlutovg, &m);
         // set font matrix
-        // plutovg_canvas_transform(context->canvas, &m);
-        // plutovg_canvas_move_to(context->canvas, 0, 0);
         context->state->textState.textMatrix = m;
         context->state->textState.textLineWidth = 0;
     }

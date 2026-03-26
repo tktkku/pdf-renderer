@@ -47,7 +47,6 @@ void handle_vstem(pdf_cff_char_render_t* context, pdf_deque* deque)
 }
 void handle_vmoveto(pdf_cff_char_render_t* context, pdf_deque* deque)
 {
-    plutovg_canvas_t* canvas = context->canvas;
     if (deque->size() > 1 && !context->havewidth)
     {
         auto data = deque->pop_back();
@@ -62,22 +61,16 @@ void handle_vmoveto(pdf_cff_char_render_t* context, pdf_deque* deque)
     auto data = deque->pop_back();
     double dy1 = *((double*)data->data());
     float x = context->curX, y = context->curY;
-    //plutovg_canvas_get_current_point(canvas, &x, &y);
     y += dy1;
-    // if (context->open)
-    // {
-    //     plutovg_canvas_close_path(context->canvas);
-    // }
-    plutovg_canvas_move_to(canvas, x, y);
+    PDF_RENDERER_CALL(context->renderer, move_to, x, y);
     context->open = true;
     context->curX = x;
     context->curY = y;
 }
 void handle_rlineto(pdf_cff_char_render_t* context, pdf_deque* deque)
 {
-    plutovg_canvas_t* canvas = context->canvas;
     float cur_x = context->curX, cur_y = context->curY;
-    plutovg_canvas_get_current_point(canvas, &cur_x, &cur_y);
+    PDF_RENDERER_CALL(context->renderer, get_current_point, &cur_x, &cur_y);
     while (deque->size() >= 2)
     {
         auto data = deque->pop_back();
@@ -87,14 +80,13 @@ void handle_rlineto(pdf_cff_char_render_t* context, pdf_deque* deque)
 
         cur_x += dx1;
         cur_y += dy1;
-        plutovg_canvas_line_to(canvas, cur_x, cur_y);
+        PDF_RENDERER_CALL(context->renderer, line_to, cur_x, cur_y);
     }
     context->curX = cur_x;
     context->curY = cur_y;
 }
 void handle_hlineto(pdf_cff_char_render_t* context, pdf_deque* deque)
 {
-    plutovg_canvas_t* canvas = context->canvas;
     float curx = context->curX, cury = context->curY;
     bool horizontal = true;
     double d = 0;
@@ -110,7 +102,7 @@ void handle_hlineto(pdf_cff_char_render_t* context, pdf_deque* deque)
         {
             cury += d;
         }
-        plutovg_canvas_line_to(canvas, curx, cury);
+        PDF_RENDERER_CALL(context->renderer, line_to, curx, cury);
         horizontal = !horizontal;
     }
     
@@ -119,7 +111,6 @@ void handle_hlineto(pdf_cff_char_render_t* context, pdf_deque* deque)
 }
 void handle_vlineto(pdf_cff_char_render_t* context, pdf_deque* deque)
 {
-    plutovg_canvas_t* canvas = context->canvas;
     float curx = context->curX, cury = context->curY;
     bool vertical = true;
     double d = 0;
@@ -135,7 +126,7 @@ void handle_vlineto(pdf_cff_char_render_t* context, pdf_deque* deque)
         {
             curx += d;
         }
-        plutovg_canvas_line_to(canvas, curx, cury);
+        PDF_RENDERER_CALL(context->renderer, line_to, curx, cury);
         vertical = !vertical;
     }
 
@@ -144,9 +135,7 @@ void handle_vlineto(pdf_cff_char_render_t* context, pdf_deque* deque)
 }
 void handle_rrcurveto(pdf_cff_char_render_t* context, pdf_deque* deque)
 {
-    plutovg_canvas_t* canvas = context->canvas;
     float curx = context->curX, cury = context->curY;
-    //plutovg_canvas_get_current_point(canvas, &curx, &cury);
     while (deque->size() >= 6)
     {
         auto data = deque->pop_back();
@@ -166,7 +155,7 @@ void handle_rrcurveto(pdf_cff_char_render_t* context, pdf_deque* deque)
         double c2x = c1x + dxb; double c2y = c1y + dyb;
         double c3x = c2x + dxc; double c3y = c2y + dyc;
 
-        plutovg_canvas_cubic_to(canvas, c1x, c1y, c2x, c2y, c3x, c3y);
+        PDF_RENDERER_CALL(context->renderer, cubic_to, c1x, c1y, c2x, c2y, c3x, c3y);
         curx = c3x;
         cury = c3y;
     }
@@ -175,13 +164,11 @@ void handle_rrcurveto(pdf_cff_char_render_t* context, pdf_deque* deque)
 }
 void handle_callsubr(pdf_cff_char_render_t* context, pdf_deque* deque)
 {
-    plutovg_canvas_t* canvas = context->canvas;
     auto data = deque->pop_front();
     double g = *((double*)data->data());
 }
 void handle_hstemhm(pdf_cff_char_render_t* context, pdf_deque* deque)
 {
-    plutovg_canvas_t* canvas = context->canvas;
     if (deque->size() % 2 != 0 && !context->havewidth)
     {
         auto data = deque->pop_back();
@@ -204,19 +191,16 @@ void handle_hstemhm(pdf_cff_char_render_t* context, pdf_deque* deque)
 }
 void handle_hintmask(pdf_cff_char_render_t* context, pdf_deque* deque)
 {
-    plutovg_canvas_t* canvas = context->canvas;
     int count = 1 + floor((context->stemshm - 1) / 8);
     context->cur += count;
 }
 void handle_cntrmask(pdf_cff_char_render_t* context, pdf_deque* deque)
 {
-    plutovg_canvas_t* canvas = context->canvas;
     int count = 1 + floor((context->stems - 1) / 8);
     context->cur += count;
 }
 void handle_rmoveto(pdf_cff_char_render_t* context, pdf_deque* deque)
 {
-    plutovg_canvas_t* canvas = context->canvas;
     if (deque->size() % 2 != 0 && !context->havewidth)
     {
         auto data = deque->pop_back();
@@ -235,18 +219,13 @@ void handle_rmoveto(pdf_cff_char_render_t* context, pdf_deque* deque)
     float curx = context->curX, cury = context->curY;
     curx += dx1;
     cury += dy1;
-    // if (context->open)
-    // {
-    //     plutovg_canvas_close_path(context->canvas);
-    // }
-    plutovg_canvas_move_to(canvas, curx, cury);
+    PDF_RENDERER_CALL(context->renderer, move_to, curx, cury);
     context->open = true;
     context->curX = curx;
     context->curY = cury;
 }
 void handle_hmoveto(pdf_cff_char_render_t* context, pdf_deque* deque)
 {
-    plutovg_canvas_t* canvas = context->canvas;
     if (deque->size() > 1 && !context->havewidth)
     {
         auto data = deque->pop_back();
@@ -259,22 +238,16 @@ void handle_hmoveto(pdf_cff_char_render_t* context, pdf_deque* deque)
         
     }
     float x = context->curX, y = context->curY;
-    //plutovg_canvas_get_current_point(canvas, &x, &y);
     auto data = deque->pop_back();
     double dx1 = *((double*)data->data());
     x += dx1;
-    // if (context->open)
-    // {
-    //     plutovg_canvas_close_path(context->canvas);
-    // }
-    plutovg_canvas_move_to(canvas, x, y);
+    PDF_RENDERER_CALL(context->renderer, move_to, x, y);
     context->open = true;
     context->curX = x;
     context->curY = y;
 }
 void handle_vstemhm(pdf_cff_char_render_t* context, pdf_deque* deque)
 {
-    plutovg_canvas_t* canvas = context->canvas;
     if (deque->size() % 2 != 0 && !context->havewidth)
     {
         auto data = deque->pop_back();
@@ -294,9 +267,7 @@ void handle_vstemhm(pdf_cff_char_render_t* context, pdf_deque* deque)
 }
 void handle_rcurveline(pdf_cff_char_render_t* context, pdf_deque* deque)
 {
-    plutovg_canvas_t* canvas = context->canvas;
     float curx = context->curX, cury = context->curY;
-    // plutovg_canvas_get_current_point(canvas, &curx, &cury);
     while (deque->size() > 2)
     {
         auto data = deque->pop_back();
@@ -316,7 +287,7 @@ void handle_rcurveline(pdf_cff_char_render_t* context, pdf_deque* deque)
         double c2x = c1x + dxb; double c2y = c1y + dyb;
         double c3x = c2x + dxc; double c3y = c2y + dyc;
 
-        plutovg_canvas_cubic_to(canvas, c1x, c1y, c2x, c2y, c3x, c3y);
+        PDF_RENDERER_CALL(context->renderer, cubic_to, c1x, c1y, c2x, c2y, c3x, c3y);
         curx = c3x;
         cury = c3y;
     }
@@ -326,15 +297,13 @@ void handle_rcurveline(pdf_cff_char_render_t* context, pdf_deque* deque)
     double dyd = *((double*)data2->data());
     curx += dxd;
     cury += dyd;
-    plutovg_canvas_line_to(canvas, curx, cury);
+    PDF_RENDERER_CALL(context->renderer, line_to, curx, cury);
     context->curX = curx;
     context->curY = cury;
 }
 void handle_rlinecurve(pdf_cff_char_render_t* context, pdf_deque* deque)
 {
-    plutovg_canvas_t* canvas = context->canvas;
     float curx = context->curX, cury = context->curY;
-    // plutovg_canvas_get_current_point(canvas, &curx, &cury);
     while (deque->size() > 6)
     {
         auto data = deque->pop_back();
@@ -343,7 +312,7 @@ void handle_rlinecurve(pdf_cff_char_render_t* context, pdf_deque* deque)
         double dya = *((double*)data2->data());
         curx += dxa;
         cury += dya;
-        plutovg_canvas_line_to(canvas, curx, cury);
+        PDF_RENDERER_CALL(context->renderer, line_to, curx, cury);
     }
 
     auto data = deque->pop_back();
@@ -363,15 +332,13 @@ void handle_rlinecurve(pdf_cff_char_render_t* context, pdf_deque* deque)
     double c2x = c1x + dxc; double c2y = c1y + dyc;
     double c3x = c2x + dxd; double c3y = c2y + dyd;
 
-    plutovg_canvas_cubic_to(canvas, c1x, c1y, c2x, c2y, c3x, c3y);
+    PDF_RENDERER_CALL(context->renderer, cubic_to, c1x, c1y, c2x, c2y, c3x, c3y);
     context->curX = c3x;
     context->curY = c3y;
 }
 void handle_vvcurveto(pdf_cff_char_render_t* context, pdf_deque* deque)
 {
-    plutovg_canvas_t* canvas = context->canvas;
     float cur_x = context->curX, cur_y = context->curY;
-    // plutovg_canvas_get_current_point(canvas, &cur_x, &cur_y);
     double dx1;
     if (deque->size() % 2)
     {
@@ -398,7 +365,7 @@ void handle_vvcurveto(pdf_cff_char_render_t* context, pdf_deque* deque)
         double end_x = cp2_x;
         double end_y = cp2_y + dyc;
 
-        plutovg_canvas_cubic_to(canvas, cp1_x, cp1_y, cp2_x, cp2_y, end_x, end_y);
+        PDF_RENDERER_CALL(context->renderer, cubic_to, cp1_x, cp1_y, cp2_x, cp2_y, end_x, end_y);
         cur_x = end_x;
         cur_y = end_y;
     }
@@ -407,9 +374,7 @@ void handle_vvcurveto(pdf_cff_char_render_t* context, pdf_deque* deque)
 }
 void handle_hhcurveto(pdf_cff_char_render_t* context, pdf_deque* deque)
 {
-    plutovg_canvas_t* canvas = context->canvas;
     float cur_x = context->curX, cur_y = context->curY;
-    //plutovg_canvas_get_current_point(canvas, &cur_x, &cur_y);
     double dy1;
     if (deque->size() % 2)
     {
@@ -436,7 +401,7 @@ void handle_hhcurveto(pdf_cff_char_render_t* context, pdf_deque* deque)
         double end_x = cp2_x + dxc;
         double end_y = cp2_y;
 
-        plutovg_canvas_cubic_to(canvas, cp1_x, cp1_y, cp2_x, cp2_y, end_x, end_y);
+        PDF_RENDERER_CALL(context->renderer, cubic_to, cp1_x, cp1_y, cp2_x, cp2_y, end_x, end_y);
         cur_x = end_x;
         cur_y = end_y;
     }
@@ -445,7 +410,6 @@ void handle_hhcurveto(pdf_cff_char_render_t* context, pdf_deque* deque)
 }
 void handle_callgsubr(pdf_cff_char_render_t* context, pdf_deque* deque)
 {
-    plutovg_canvas_t* canvas = context->canvas;
     pdf_array* global_subr_index = context->global_subr;
     uint16_t global_bias = context->global_bias;
 
@@ -466,7 +430,6 @@ void handle_callgsubr(pdf_cff_char_render_t* context, pdf_deque* deque)
 }
 void handle_vhcurveto(pdf_cff_char_render_t* context, pdf_deque* deque)
 {
-    plutovg_canvas_t* canvas = context->canvas;
     // z = 4 + 8x + y (x = 0,1,2,3...,y= 0 or 1)
     // z = 8 + 8x + y (x = 0,1,2,3...,y= 0 or 1)
 
@@ -504,7 +467,7 @@ void handle_vhcurveto(pdf_cff_char_render_t* context, pdf_deque* deque)
             x3 = x2 + d; y3 = y2 + params[3];
         }
         vertical = !vertical;
-        plutovg_canvas_cubic_to(canvas, x1, y1, x2, y2, x3, y3);
+        PDF_RENDERER_CALL(context->renderer, cubic_to, x1, y1, x2, y2, x3, y3);
         cur_x = x3;
         cur_y = y3;
     }
@@ -514,7 +477,6 @@ void handle_vhcurveto(pdf_cff_char_render_t* context, pdf_deque* deque)
 }
 void handle_hvcurveto(pdf_cff_char_render_t* context, pdf_deque* deque)
 {
-    plutovg_canvas_t* canvas = context->canvas;
     // z = 4 + 8x + y (x = 0,1,2,3...,y= 0 or 1) 4,5,12,13...
     // z = 8 + 8x + y (x = 0,1,2,3...,y= 0 or 1) 8,9,16,17... 
     float cur_x = context->curX, cur_y = context->curY;
@@ -551,7 +513,7 @@ void handle_hvcurveto(pdf_cff_char_render_t* context, pdf_deque* deque)
             x3 = x2 + params[3]; y3 = y2 + d;
         }
         horizontal = !horizontal;
-        plutovg_canvas_cubic_to(canvas, x1, y1, x2, y2, x3, y3);
+        PDF_RENDERER_CALL(context->renderer, cubic_to, x1, y1, x2, y2, x3, y3);
         cur_x = x3;
         cur_y = y3;
     }
@@ -807,12 +769,12 @@ void handle_hflex(pdf_cff_char_render_t* context, pdf_deque* deque)
         double depth = fabs(A * c3x + B * c3y + C) / sqrt(A * A + B * B);
         if (depth < (fd / 100))
         {
-            plutovg_canvas_line_to(context->canvas, c6x, c6y);
+            PDF_RENDERER_CALL(context->renderer, line_to, c6x, c6y);
         }
         else
         {
-            plutovg_canvas_cubic_to(context->canvas, c1x, c1y, c2x, c2y, c3x, c3y);
-            plutovg_canvas_cubic_to(context->canvas, c4x, c4y, c5x, c5y, c6x, c6y);
+            PDF_RENDERER_CALL(context->renderer, cubic_to, c1x, c1y, c2x, c2y, c3x, c3y);
+            PDF_RENDERER_CALL(context->renderer, cubic_to, c4x, c4y, c5x, c5y, c6x, c6y);
         }
     }
     deque->clear();
@@ -870,12 +832,12 @@ void handle_flex(pdf_cff_char_render_t* context, pdf_deque* deque)
        double depth = fabs(A * c3x + B * c3y + C) / sqrt(A * A + B * B);
        if (depth < (fd / 100))
        {
-            plutovg_canvas_line_to(context->canvas, c6x, c6y);
+            PDF_RENDERER_CALL(context->renderer, line_to, c6x, c6y);
        }
        else
        {
-            plutovg_canvas_cubic_to(context->canvas, c1x, c1y, c2x, c2y, c3x, c3y);
-            plutovg_canvas_cubic_to(context->canvas, c4x, c4y, c5x, c5y, c6x, c6y);
+            PDF_RENDERER_CALL(context->renderer, cubic_to, c1x, c1y, c2x, c2y, c3x, c3y);
+            PDF_RENDERER_CALL(context->renderer, cubic_to, c4x, c4y, c5x, c5y, c6x, c6y);
        }
     }
     deque->clear();
@@ -929,12 +891,12 @@ void handle_hflex1(pdf_cff_char_render_t* context, pdf_deque* deque)
        double depth = fabs(A * c3x + B * c3y + C) / sqrt(A * A + B * B);
        if (depth < (fd / 100))
        {
-            plutovg_canvas_line_to(context->canvas, c6x, c6y);
+            PDF_RENDERER_CALL(context->renderer, line_to, c6x, c6y);
        }
        else
        {
-            plutovg_canvas_cubic_to(context->canvas, c1x, c1y, c2x, c2y, c3x, c3y);
-            plutovg_canvas_cubic_to(context->canvas, c4x, c4y, c5x, c5y, c6x, c6y);
+            PDF_RENDERER_CALL(context->renderer, cubic_to, c1x, c1y, c2x, c2y, c3x, c3y);
+            PDF_RENDERER_CALL(context->renderer, cubic_to, c4x, c4y, c5x, c5y, c6x, c6y);
        }
     }
     deque->clear();
@@ -988,12 +950,12 @@ void handle_flex1(pdf_cff_char_render_t* context, pdf_deque* deque)
         double depth = fabs(c6y - c3y);
         if (depth < (fd / 100))
         {
-            plutovg_canvas_line_to(context->canvas, c6x, c6y);
+            PDF_RENDERER_CALL(context->renderer, line_to, c6x, c6y);
         }
         else
         {
-            plutovg_canvas_cubic_to(context->canvas, c1x, c1y, c2x, c2y, c3x, c3y);
-            plutovg_canvas_cubic_to(context->canvas, c4x, c4y, c5x, c5y, c6x, c6y);
+            PDF_RENDERER_CALL(context->renderer, cubic_to, c1x, c1y, c2x, c2y, c3x, c3y);
+            PDF_RENDERER_CALL(context->renderer, cubic_to, c4x, c4y, c5x, c5y, c6x, c6y);
         }
     }
     deque->clear();
