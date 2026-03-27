@@ -16,14 +16,14 @@ pdf_dict::~pdf_dict()
     pairs.clear();
 }
 
-int pdf_dict::get_indirect(const char* key)
+pdf_indirect_t pdf_dict::get_indirect(const char* key)
 {
     auto it = pairs.find(key);
     if (it != pairs.end() && it->second->type == PDF_VALUE_INDIRECT)
     {
         return it->second->val.indirect;
     }
-    return -1;
+    return { -1, -1 };
 }
 
 bool pdf_dict::is_indirect(const char* key)
@@ -193,7 +193,7 @@ void pdf_dict::add(const char* key, pdf_value_type_t type, void* data)
             }
             break;
         case PDF_VALUE_INDIRECT:
-            value->val.indirect = *((int*)data);
+            value->val.indirect = *((pdf_indirect_t*)data);
             break;
         case PDF_VALUE_NUMBER:
             value->val.number = *((double*)data);

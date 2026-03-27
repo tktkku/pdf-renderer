@@ -1,6 +1,6 @@
 #include "pdf.h"
 #include "pdf-private.h"
-
+#include "rc4.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -179,6 +179,27 @@ int pdf_stream_get_data(pdf_stream_t* stream, unsigned char* buf, int size)
                     {
                         return 0;
                     }
+                    if (memcmp(stream->decomp.buf, "\x78\x9C", 2) != 0)
+                    {
+                        int n = stream->pdf->encrypt_key_len_bits / 8;
+                        uint8_t* data = new uint8_t[n + 5];
+                        int off = 0;
+                        memcpy(data, stream->pdf->encrypt_key, n);
+                        off += n;
+                        data[off++] = ((stream->obj->indirect.obj_num >> 0) & 0xFF);
+                        data[off++] = ((stream->obj->indirect.obj_num >> 8) & 0xFF);
+                        data[off++] = ((stream->obj->indirect.obj_num >> 16) & 0xFF);
+                        data[off++] = ((stream->obj->indirect.generation >> 0) & 0xFF);
+                        data[off++] = ((stream->obj->indirect.generation >> 8) & 0xFF);
+
+                        uint8_t hash[16];
+                        md5(data, off, hash);
+                        delete[] data;
+
+                        rc4_ctx ctx;
+                        rc4_ks(&ctx, hash, std::min(n + 5, 16));
+                        rc4_decrypt(&ctx, stream->decomp.buf, stream->decomp.buf, stream->decomp.len);
+                    }
                     stream->decomp.flate.next_in = stream->decomp.buf;
                     stream->decomp.cur_pos = 0;
                     stream->readin_len += stream->decomp.len;
@@ -190,6 +211,7 @@ int pdf_stream_get_data(pdf_stream_t* stream, unsigned char* buf, int size)
                     int zret = inflate(&(stream->decomp.flate), Z_NO_FLUSH);
                     if (zret == Z_STREAM_ERROR || zret == Z_DATA_ERROR || zret == Z_MEM_ERROR || zret == Z_BUF_ERROR)
                     {
+                        printf("inflate data error: %d\n", zret);
                         return 0;
                     }
                     stream->decomp.cur_pos += (stream->decomp.flate.total_in - stream->processed);

@@ -441,7 +441,7 @@ void pdf_token::decode_name()
                 break;
             }
             p++;
-            uint8_t c = _hex_str_to_8bit(p); p += 2;
+            uint8_t c = _hex_str_to_8bit(p, 2); p += 2;
             out[ol++] = c;
         }
         else
@@ -1173,7 +1173,9 @@ bool _set_common_value(pdf_parser_t* parser, pdf_token* tk, struct pdf_value* p)
         char ref[256] = { 0 };
         memcpy(ref, tk->data(), tk->size());
         char* token = strtok(ref, " ");
-        p->val.indirect = atoi(token);
+        p->val.indirect.obj_num = atoi(token);
+        token = strtok(NULL, " ");
+        p->val.indirect.generation = atoi(token);
     }
     else if (tk->type() == TOKEN_NUMBER)
     {
@@ -1231,9 +1233,9 @@ pdf_obj_t* pdf_parser_build_obj(pdf_parser_t* parser)
                     len = obj->value->val.dict->get_number("/Length");
                 }
                 else if (obj->value->val.dict->is_indirect("/Length"))
-                {
-                    int ref = obj->value->val.dict->get_indirect("/Length");
-                    if (ref != -1)
+                                {
+                    pdf_indirect_t ref = obj->value->val.dict->get_indirect("/Length");
+                    if (ref.obj_num != -1)
                     {
                         pdf_obj_t* l_obj = pdf_file_get_obj(parser->pdf, ref);
                         if (l_obj != NULL && l_obj->value->type == PDF_VALUE_NUMBER)

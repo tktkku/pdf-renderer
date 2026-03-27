@@ -55,14 +55,17 @@ typedef enum pdf_value_type
     PDF_VALUE_DICT,
     PDF_VALUE_STRING
 } pdf_value_type_t;
-
+struct pdf_indirect {
+    int obj_num;
+    int generation;
+}; 
 struct pdf_value
 {
     union {
         bool boolean;
         char* name;
         char* string;
-        int indirect;
+        pdf_indirect_t indirect;
         double number;
         pdf_dict* dict;
         pdf_array* array;
@@ -74,7 +77,8 @@ struct pdf_value
 
 struct pdf_obj
 {
-    int seq;
+    pdf_indirect_t indirect;
+    uint8_t obj_key[16];
     pdf_obj_value_t* value;
     pdf_stream_t* stream;
     struct
@@ -118,7 +122,7 @@ public:
     bool is_boolean(const char* key);
     int get_boolean(const char* key);
     bool is_indirect(const char* key);
-    int get_indirect(const char* key);
+    pdf_indirect_t get_indirect(const char* key);
 
     pdf_dict();
     ~pdf_dict();
@@ -129,9 +133,9 @@ class pdf_array
 private:
     std::vector<pdf_value_t*> elements;
 public:
-    size_t size();
+    size_t size() const;
     void add(pdf_value_t* value);
-    pdf_value_t* get(size_t index);
+    pdf_value_t* get(size_t index) const;
     pdf_value_t* operator[](size_t index);
     pdf_array();
     ~pdf_array();
@@ -240,14 +244,20 @@ typedef struct external_font {
     char* data;
     long data_len;
 } pdf_external_font_t;
+
 struct pdf_file
 {
     input_t* input;
     long data_len;
     long current_index;
     std::vector<pdf_obj_t*> read_objs;
-    int root_obj_ref;
-    int info_obj_ref;
+    pdf_indirect_t root_obj_ref;
+    pdf_indirect_t info_obj_ref;
+    pdf_indirect_t encrypt_obj_ref;
+    pdf_dict* trailer;
+    pdf_array* id_arr;
+    int encrypt_key_len_bits;
+    uint8_t encrypt_key[16];
     std::vector<xref_t*> xref_table;
     std::vector<pdf_obj_t*> pages;
 
@@ -540,8 +550,8 @@ bool _is_delimiter(char c);
 void _pdf_parser_read_input(pdf_parser_t* parser);
 uint32_t _str_to_32bit(char* str, int len);
 uint32_t _hex_str_to_32bit(const char* hexStr, int len);
-uint16_t _hex_str_to_16bit(char hexStr[4]);
-uint8_t _hex_str_to_8bit(char hexStr[2]);
+uint16_t _hex_str_to_16bit(const char* hexStr, int len);
+uint8_t _hex_str_to_8bit(const char *hexStr, int len);
 const char* _token_to_string(pdf_token_type_t type);
 class pdf_node
 {
@@ -617,3 +627,5 @@ void pdf_obj_get_colorspace(pdf_obj_t* obj, const char* name, char* value);
 pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj, const char* name);
 
 void pdf_value_free(struct pdf_value* value);
+
+void md5(const uint8_t *initial_msg, size_t initial_len, uint8_t *digest);

@@ -70,6 +70,9 @@ int main(int argc, char* argv[])
     fclose(f);
     
     pdf_file_t* pdf = pdf_file_read_buffer(filebuffer, filesize);
+    if (pdf == NULL)
+        return -1;
+    
     int num_pages = pdf_file_get_pages(pdf);
     int window_width = 1200, window_height = 900;
     int dpi = 96;

@@ -442,7 +442,7 @@ void _do_text_render(pdf_render* context, char* buf, int len)
     {
         for (int i = 1; i < len; i += 2)
         {
-            bytes.push_back(_hex_str_to_8bit(buf + i));
+            bytes.push_back(_hex_str_to_8bit(buf + i, 2));
         }
     }
     else
@@ -939,10 +939,10 @@ void _do_text_render(pdf_render* context, char* buf, int len)
                     if ((uint32_t)differences->get(j)->val.number == c) 
                     {
                         const char* name = differences->get(j + 1)->val.name;
-                        int ref = type3->charProcs->get_indirect(name);
-                        if (ref != -1) 
+                        pdf_indirect_t indirect = type3->charProcs->get_indirect(name);
+                        if (indirect.obj_num != -1) 
                         {
-                            pdf_obj_t* obj = pdf_file_get_obj(context->pdf, ref);
+                            pdf_obj_t* obj = pdf_file_get_obj(context->pdf, indirect);
                             if (obj != NULL && obj->stream != NULL) 
                             {
                                 pdf_obj_t* save_obj = context->current_obj;

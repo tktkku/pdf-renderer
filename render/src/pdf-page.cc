@@ -145,10 +145,12 @@ uint16_t _hex_str_to_16bit(char hexStr[4])
         );
 }
 
-uint8_t _hex_str_to_8bit(char hexStr[2])
+uint8_t _hex_str_to_8bit(const char* hexStr, int len)
 {
+    if (hexStr == NULL || len <= 0 || len > 2) return 0;
+    // convert every 8 bit to hex value
     uint8_t tmp[2];
-    for (int i = 0; i < 2; i++)
+    for (int i = 0; i < len; i++)
     {
         if (hexStr[i] >= '0' && hexStr[i] <= '9')
         {

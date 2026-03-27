@@ -175,7 +175,7 @@ void load_font_from_external(pdf_render* context, const char* basefont, pdf_font
     char fontname[256] = { 0 };
     if (basefont)
     {
-        if (!strcmp(basefont, "/Helvetica"))
+        if (!strncmp(basefont, "/Helvetica", 10) || !strncmp(basefont, "/Times", 6))
         {
             sprintf(fontname, "fonts/NotoSansSC-Regular.ttf");
             goto LOAD_FONT;

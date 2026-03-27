@@ -25,6 +25,8 @@ set(PARSER_SOURCES
     src/path.cc
     src/pdf-render.cc
     src/pdf-matrix.cc
+    src/md5.cc
+    src/rc4.cc
 )
 set(PARSER_DEP zlibstatic plutovg)
 if(NOT WIN32)

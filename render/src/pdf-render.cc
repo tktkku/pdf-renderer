@@ -186,7 +186,7 @@ void pdf_render_build(pdf_render* context)
                     pdf_dict* nomal_dict = AP->get_dict("/N"); // required
                     if (nomal_dict == NULL)
                     {
-                        int ref = AP->get_indirect("/N");
+                        pdf_indirect_t ref = AP->get_indirect("/N");
                         pdf_obj_t* obj = pdf_file_get_obj(context->page->pdf, ref);
                         if (obj->stream != NULL)
                         {
@@ -371,7 +371,7 @@ void pdf_render_run(pdf_render* render, pdf_renderer_t* renderer)
     {
         if (handlers[c->type - TOKEN_OPERATOR])
         {
-            // printf("run %s\n", _token_to_string(c->type));
+            printf("run %s\n", _token_to_string(c->type));
             handlers[c->type - TOKEN_OPERATOR](render, c.get(), false);
         }
     }

@@ -17,7 +17,7 @@ pdf_value_t* pdf_array::operator[](size_t index)
     return get(index);
 }
 
-pdf_value_t* pdf_array::get(size_t index)
+pdf_value_t* pdf_array::get(size_t index) const
 {
     if (index >= elements.size())
     {
@@ -30,7 +30,7 @@ void pdf_array::add(pdf_value_t* value)
     elements.push_back(value);
 }
 
-size_t pdf_array::size()
+size_t pdf_array::size() const
 {
     return elements.size();
 }
