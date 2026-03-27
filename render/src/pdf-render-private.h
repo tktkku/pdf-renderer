@@ -130,36 +130,15 @@ struct pdf_render_command
     pdf_token_type_t type;
     union 
     {
-        struct {
-            char color[64];
-        } cs, CS;
-        struct {
-            float g;
-        } g, G;
+        char colorSpace[64];
         struct {
             float r, g, b;
-        } k, K, rg, RG, sc, SC;
-        struct {
-            float x1, y1, x2, y2, x3, y3;
-        } c, v, y, Tm, cm;
-        struct {
-            float x, y;
-        } l, m, Td, TD;
-        struct {
-            float x, y, width, height;
-        } re;
-        struct {
-            float f;
-        } w, Tc, TL,Ts, Tw, Tz, M;
-        struct {
-            int i;
-        } Tr, j, J;
-        struct {
-            std::unique_ptr<pdf_node> data;
-        } apostrophe, Tj;
-        struct {
-            std::shared_ptr<pdf_deque> tmp_deque;
-        } TJ;
+        } color;
+        pdf_matrix_t matrix;
+        int intVal;
+        float floatVal;
+        std::unique_ptr<pdf_node> uniqueNode;
+        std::shared_ptr<pdf_deque> sharedDeque;
         struct {
             pdf_font_t* font;
             pdf_font_face_t* fontface;
@@ -178,13 +157,100 @@ struct pdf_render_command
             std::vector<std::unique_ptr<pdf_render_command>> opts;
         } Do;
     };
-    pdf_render_command()
+    pdf_render_command(pdf_token_type_t type)
+        : type(type)
     {
-
+        switch (type) {
+            case TOKEN_OPERATOR_g:
+            case TOKEN_OPERATOR_G:
+            case TOKEN_OPERATOR_k:
+            case TOKEN_OPERATOR_K:
+            case TOKEN_OPERATOR_rg:
+            case TOKEN_OPERATOR_RG:
+            case TOKEN_OPERATOR_sc:
+            case TOKEN_OPERATOR_SC:
+                new (&color) decltype(color){};
+                break;
+            case TOKEN_OPERATOR_c:
+            case TOKEN_OPERATOR_v:
+            case TOKEN_OPERATOR_y:
+            case TOKEN_OPERATOR_Tm:
+            case TOKEN_OPERATOR_cm:
+            case TOKEN_OPERATOR_l:
+            case TOKEN_OPERATOR_m:
+            case TOKEN_OPERATOR_Td:
+            case TOKEN_OPERATOR_TD:
+            case TOKEN_OPERATOR_re:
+                new (&matrix) decltype(matrix){};
+                break;
+            case TOKEN_OPERATOR_apostrophe:
+            case TOKEN_OPERATOR_Tj:
+                new (&uniqueNode) decltype(uniqueNode){};
+                break;
+            case TOKEN_OPERATOR_TJ:
+                new (&sharedDeque) decltype(sharedDeque){};
+                break;
+            case TOKEN_OPERATOR_Tf:
+                new (&Tf) decltype(Tf){};
+                break;
+            case TOKEN_OPERATOR_d:
+                new (&d) decltype(d){};
+                break;
+            case TOKEN_OPERATOR_Do:
+                new (&Do) decltype(Do){};
+                break;
+            default:
+                break;
+        }
     }
     ~pdf_render_command() 
     {
-        
+        switch (type) {
+            case TOKEN_OPERATOR_cs:
+            case TOKEN_OPERATOR_CS:
+                // colorSpace.~decltype(colorSpace)();
+                break;
+            case TOKEN_OPERATOR_g:
+            case TOKEN_OPERATOR_G:
+            case TOKEN_OPERATOR_k:
+            case TOKEN_OPERATOR_K:
+            case TOKEN_OPERATOR_rg:
+            case TOKEN_OPERATOR_RG:
+            case TOKEN_OPERATOR_sc:
+            case TOKEN_OPERATOR_SC:
+                color.~decltype(color)();
+                break;
+            case TOKEN_OPERATOR_c:
+            case TOKEN_OPERATOR_v:
+            case TOKEN_OPERATOR_y:
+            case TOKEN_OPERATOR_Tm:
+            case TOKEN_OPERATOR_cm:
+            case TOKEN_OPERATOR_l:
+            case TOKEN_OPERATOR_m:
+            case TOKEN_OPERATOR_Td:
+            case TOKEN_OPERATOR_TD:
+            case TOKEN_OPERATOR_re:
+                matrix.~decltype(matrix)();
+                break;
+            case TOKEN_OPERATOR_apostrophe:
+            case TOKEN_OPERATOR_Tj:
+                uniqueNode.~decltype(uniqueNode)();
+                break;
+            case TOKEN_OPERATOR_TJ:
+                sharedDeque.~decltype(sharedDeque)();
+                break;
+            case TOKEN_OPERATOR_Tf:
+                Tf.~decltype(Tf)();
+                break;
+            case TOKEN_OPERATOR_d:
+                d.~decltype(d)();
+                break;
+            case TOKEN_OPERATOR_Do:
+                Do.~decltype(Do)();
+                break;
+            default:
+                break;
+        }
     }
 };
 struct pdf_render

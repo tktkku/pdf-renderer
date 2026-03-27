@@ -146,10 +146,9 @@ void pdf_render_build(pdf_render* context)
                 {
                     float tx = rect_aar->get(0)->val.number;
                     float ty = rect_aar->get(1)->val.number;
-                    pdf_render_command* cmd = new pdf_render_command;
-                    cmd->type = TOKEN_OPERATOR_Td;
-                    cmd->Td.x = tx;
-                    cmd->Td.y = ty;
+                    pdf_render_command* cmd = new pdf_render_command(TOKEN_OPERATOR_Td);
+                    cmd->matrix.a = tx;
+                    cmd->matrix.b = ty;
                     std::unique_ptr<pdf_render_command> u(cmd);
                     context->operations.push_back(std::move(u));
                 }
@@ -354,7 +353,7 @@ pdf_render_command* _do_render_operation(pdf_stream_t* stream, pdf_render* conte
         }
         if (handlers[tk->type() - TOKEN_OPERATOR])
         {
-            pdf_render_command* cmd = new pdf_render_command;
+            pdf_render_command* cmd = new pdf_render_command(tk->type());
             handlers[tk->type() - TOKEN_OPERATOR](context, cmd, true);
             return cmd;
         }
@@ -370,7 +369,10 @@ void pdf_render_run(pdf_render* render, pdf_renderer_t* renderer)
     render->renderer = renderer;
     for (auto& c : render->operations)
     {
-        // printf("run %s\n", _token_to_string(c->type));
-        handlers[c->type - TOKEN_OPERATOR](render, c.get(), false);
+        if (handlers[c->type - TOKEN_OPERATOR])
+        {
+            // printf("run %s\n", _token_to_string(c->type));
+            handlers[c->type - TOKEN_OPERATOR](render, c.get(), false);
+        }
     }
 }

@@ -138,17 +138,19 @@ void handle_c(pdf_render* context, pdf_render_command* cmd, bool dry_run)
         auto data6 = context->deque->pop_front();
         float x1 = strtof(data6->data(), NULL);
         cmd->type = TOKEN_OPERATOR_c;
-        cmd->c.x1 = x1;
-        cmd->c.x2 = x2;
-        cmd->c.x3 = x3;
-        cmd->c.y1 = y1;
-        cmd->c.y2 = y2;
-        cmd->c.y3 = y3;
+        cmd->matrix.a = x1;
+        cmd->matrix.b = y1;
+        cmd->matrix.c = x2;
+        cmd->matrix.d = y2;
+        cmd->matrix.e = x3;
+        cmd->matrix.f = y3;
     }
     else
     {
         PDF_RENDERER_CALL(context->renderer, cubic_to, 
-            cmd->c.x1, cmd->c.y1, cmd->c.x2, cmd->c.y2, cmd->c.x3, cmd->c.y3);
+            cmd->matrix.a, cmd->matrix.b, 
+            cmd->matrix.c, cmd->matrix.d, 
+            cmd->matrix.e, cmd->matrix.f);
     }
 }
 
@@ -207,12 +209,12 @@ void handle_l(pdf_render* context, pdf_render_command* cmd, bool dry_run)
         auto data2 = context->deque->pop_front();
         float x = strtof(data2->data(), NULL);
         cmd->type = TOKEN_OPERATOR_l;
-        cmd->l.x = x;
-        cmd->l.y = y;
+        cmd->matrix.a = x;
+        cmd->matrix.b = y;
     }
     else
     {
-        PDF_RENDERER_CALL(context->renderer, line_to, cmd->l.x, cmd->l.y);
+        PDF_RENDERER_CALL(context->renderer, line_to, cmd->matrix.a, cmd->matrix.b);
     }
 }
 
@@ -227,12 +229,12 @@ void handle_m(pdf_render* context, pdf_render_command* cmd, bool dry_run)
         auto data2 = context->deque->pop_front();
         float x = strtof(data2->data(), NULL);
         cmd->type = TOKEN_OPERATOR_m;
-        cmd->m.x = x;
-        cmd->m.y = y;
+        cmd->matrix.a = x;
+        cmd->matrix.b = y;
     }
     else
     {
-        PDF_RENDERER_CALL(context->renderer, move_to, cmd->m.x, cmd->m.y);
+        PDF_RENDERER_CALL(context->renderer, move_to, cmd->matrix.a, cmd->matrix.b);
     }
 }
 
@@ -273,15 +275,15 @@ void handle_re(pdf_render* context, pdf_render_command* cmd, bool dry_run)
         auto data4 = context->deque->pop_front();
         float x = strtof(data4->data(), NULL);
         cmd->type = TOKEN_OPERATOR_re;
-        cmd->re.x = x;
-        cmd->re.y = y;
-        cmd->re.width = width;
-        cmd->re.height = height;
+        cmd->matrix.a = x;
+        cmd->matrix.b = y;
+        cmd->matrix.c = width;
+        cmd->matrix.d = height;
     }
     else
     {
         PDF_RENDERER_CALL(context->renderer, rect, 
-            cmd->re.x, cmd->re.y, cmd->re.width, cmd->re.height);
+            cmd->matrix.a, cmd->matrix.b, cmd->matrix.c, cmd->matrix.d);
     }
 }
 
@@ -330,17 +332,18 @@ void handle_v(pdf_render* context, pdf_render_command* cmd, bool dry_run)
         auto data4 = context->deque->pop_front();
         x2 = strtof(data4->data(), NULL);
         cmd->type = TOKEN_OPERATOR_v;
-        cmd->v.x2 = x2;
-        cmd->v.y2 = y2;
-        cmd->v.x3 = x3;
-        cmd->v.y3 = y3;
+        cmd->matrix.a = x2;
+        cmd->matrix.b = y2;
+        cmd->matrix.c = x3;
+        cmd->matrix.d = y3;
     }
     else
     {
         float x1, y1;
         PDF_RENDERER_CALL(context->renderer, get_current_point, &x1, &y1);
         PDF_RENDERER_CALL(context->renderer, cubic_to, 
-            x1, y1, cmd->v.x2, cmd->v.y2, cmd->v.x3, cmd->v.y3);
+            x1, y1, cmd->matrix.a, cmd->matrix.b, 
+            cmd->matrix.c, cmd->matrix.d);
     }
 }
 void handle_W_star(pdf_render* context, pdf_render_command* cmd, bool dry_run)
@@ -366,12 +369,12 @@ void handle_w(pdf_render* context, pdf_render_command* cmd, bool dry_run)
         auto data = context->deque->pop_front();
         float w = strtof(data->data(), NULL);
         cmd->type = TOKEN_OPERATOR_w;
-        cmd->w.f = w;
+        cmd->floatVal = w;
     }
     else
     {
-        PDF_RENDERER_CALL(context->renderer, set_line_width, cmd->w.f);
-        context->state->lineWidth = cmd->w.f;
+        PDF_RENDERER_CALL(context->renderer, set_line_width, cmd->floatVal);
+        context->state->lineWidth = cmd->floatVal;
     }
 }
 
@@ -408,15 +411,17 @@ void handle_y(pdf_render* context, pdf_render_command* cmd, bool dry_run)
         auto data4 = context->deque->pop_front();
         float x1 = strtof(data4->data(), NULL);
         cmd->type = TOKEN_OPERATOR_y;
-        cmd->y.x1 = x1;
-        cmd->y.y1 = y1;
-        cmd->y.x3 = x3;
-        cmd->y.y3 = y3;
+        cmd->matrix.a = x1;
+        cmd->matrix.b = y1;
+        cmd->matrix.c = x3;
+        cmd->matrix.d = y3;
     }
     else
     {
         PDF_RENDERER_CALL(context->renderer, cubic_to, 
-            cmd->y.x1, cmd->y.y1, cmd->y.x3, cmd->y.y3, cmd->y.x3, cmd->y.y3);
+            cmd->matrix.a, cmd->matrix.b, 
+            cmd->matrix.c, cmd->matrix.d,
+            cmd->matrix.c, cmd->matrix.d);
     }
 }
 
@@ -506,17 +511,18 @@ void handle_cm(pdf_render* context, pdf_render_command* cmd, bool dry_run)
         auto data6 = context->deque->pop_front();
         float a = strtof(data6->data(), NULL);
         cmd->type = TOKEN_OPERATOR_cm;
-        cmd->cm.x1 = a;
-        cmd->cm.y1 = b;
-        cmd->cm.x2 = c;
-        cmd->cm.y2 = d;
-        cmd->cm.x3 = e;
-        cmd->cm.y3 = f;
+        cmd->matrix.a = a;
+        cmd->matrix.b = b;
+        cmd->matrix.c = c;
+        cmd->matrix.d = d;
+        cmd->matrix.e = e;
+        cmd->matrix.f = f;
     }
     else
     {
         PDF_RENDERER_CALL(context->renderer, transform, 
-            cmd->cm.x1, cmd->cm.y1, cmd->cm.x2, cmd->cm.y2, cmd->cm.x3, cmd->cm.y3);
+            cmd->matrix.a, cmd->matrix.b, cmd->matrix.c,
+            cmd->matrix.d, cmd->matrix.e, cmd->matrix.f);
     }
 }
 
@@ -656,12 +662,12 @@ void handle_j(pdf_render* context, pdf_render_command* cmd, bool dry_run)
         auto data = context->deque->pop_front();
         int j = atoi(data->data());
         cmd->type = TOKEN_OPERATOR_j;
-        cmd->j.i = j;
+        cmd->intVal = j;
     }
     else
     {
-        PDF_RENDERER_CALL(context->renderer, set_line_join, cmd->j.i);
-        context->state->lineJoin = cmd->j.i;
+        PDF_RENDERER_CALL(context->renderer, set_line_join, cmd->intVal);
+        context->state->lineJoin = cmd->intVal;
     }
 }
 
@@ -674,12 +680,12 @@ void handle_J(pdf_render* context, pdf_render_command* cmd, bool dry_run)
         auto data = context->deque->pop_front();
         int c = atoi(data->data());
         cmd->type = TOKEN_OPERATOR_J;
-        cmd->J.i = c;
+        cmd->intVal = c;
     }
     else
     {
-        PDF_RENDERER_CALL(context->renderer, set_line_cap, cmd->J.i);
-        context->state->lineCap = cmd->J.i;
+        PDF_RENDERER_CALL(context->renderer, set_line_cap, cmd->intVal);
+        context->state->lineCap = cmd->intVal;
     }
 }
 
@@ -693,12 +699,12 @@ void handle_M(pdf_render* context, pdf_render_command* cmd, bool dry_run)
         auto data = context->deque->pop_front();
         float m = strtof(data->data(), NULL);
         cmd->type = TOKEN_OPERATOR_M;
-        cmd->M.f = m;
+        cmd->floatVal = m;
     }
     else
     {
-        PDF_RENDERER_CALL(context->renderer, set_miter_limit, cmd->M.f);
-        context->state->miterLimit = cmd->M.f;
+        PDF_RENDERER_CALL(context->renderer, set_miter_limit, cmd->floatVal);
+        context->state->miterLimit = cmd->floatVal;
     }
 }
 void handle_MP(pdf_render* context, pdf_render_command* cmd, bool dry_run)

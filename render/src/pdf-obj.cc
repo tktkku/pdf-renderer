@@ -178,7 +178,7 @@ pdf_font_descriptor_t* _load_font_descriptor(pdf_obj_t* obj, pdf_dict* font_dict
 
     return font_descriptor;
 }
-pdf_font_t* _load_cid_font(pdf_obj_t* obj, pdf_dict* font_dict)
+pdf_font_t* _load_cid_font(pdf_font_t* parent_font, pdf_obj_t* obj, pdf_dict* font_dict)
 {
     pdf_font_t* font = pdf_font_init();
     if (font == NULL)
@@ -301,6 +301,12 @@ pdf_font_t* _load_cid_font(pdf_obj_t* obj, pdf_dict* font_dict)
             }
         }
     }
+    else if (font->subtype == FONT_SUBTYPE_CIDFONTTPYE2 
+        && parent_font->type0->encoding 
+        && !strcmp(parent_font->type0->encoding->name, "Identity-H"))
+    {
+        font->cidfont->cid_to_gid_map = parent_font->type0->encoding;
+    }
 
     return font;
 }
@@ -405,7 +411,7 @@ pdf_font_t* _load_type0_font(pdf_obj_t* obj, pdf_dict* font_dict)
         }
         if (descendant_font_dict != NULL)
         {
-            font->type0->descendant = _load_cid_font(obj, descendant_font_dict);
+            font->type0->descendant = _load_cid_font(font, obj, descendant_font_dict);
         }
     }
     

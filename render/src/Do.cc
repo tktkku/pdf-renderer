@@ -42,7 +42,6 @@ void handle_Do(pdf_render* context, pdf_render_command* cmd, bool dry_run)
                 cmd->type = TOKEN_OPERATOR_Do;
                 cmd->Do.type = XOBJ_FORM;
                 cmd->Do.xobj = xobj;
-                new (&cmd->Do.opts) std::vector<std::unique_ptr<pdf_render_command>>();
                 while ((tk = pdf_parser_next_token(xobj->obj->stream->parser)) != NULL)
                 {
                     if (tk->type() == TOKEN_STREAM_END)

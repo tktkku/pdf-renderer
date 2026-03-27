@@ -13,7 +13,7 @@ void handle_apostrophe(pdf_render* context, pdf_render_command* cmd, bool dry_ru
         auto data = context->deque->pop_front();
         int len = data->size();
         cmd->type = TOKEN_OPERATOR_apostrophe;
-        new (&cmd->apostrophe.data) std::unique_ptr<pdf_node>(std::move(data));
+        cmd->uniqueNode = std::move(data);
     }
     else
     {
@@ -21,7 +21,7 @@ void handle_apostrophe(pdf_render* context, pdf_render_command* cmd, bool dry_ru
         context->state->textState.textLineWidth = 0;
         if (context->state->textState.font == NULL)
             return;
-        _do_text_render(context, (char*)cmd->apostrophe.data->data(), cmd->apostrophe.data->size());
+        _do_text_render(context, (char*)cmd->uniqueNode->data(), cmd->uniqueNode->size());
     }
 }
 
@@ -101,11 +101,11 @@ void handle_Tc(pdf_render* context, pdf_render_command* cmd, bool dry_run)
         auto data = context->deque->pop_front();
         float c = strtof(data->data(), NULL);
         cmd->type = TOKEN_OPERATOR_Tc;
-        cmd->Tc.f = c;
+        cmd->floatVal = c;
     }
     else
     {
-        context->state->textState.characterSpacing = cmd->Tc.f;
+        context->state->textState.characterSpacing = cmd->floatVal;
     }
 }
 
@@ -120,12 +120,13 @@ void handle_Td(pdf_render* context, pdf_render_command* cmd, bool dry_run)
         auto data2 = context->deque->pop_front();
         float tx = strtof(data2->data(), NULL);
         cmd->type = TOKEN_OPERATOR_Td;
-        cmd->Td.x = tx;
-        cmd->Td.y = ty;
+        cmd->matrix.a = tx;
+        cmd->matrix.b = ty;
     }
     else
     {
-        pdf_matrix_translate(&context->state->textState.textMatrix, cmd->Td.x, cmd->Td.y);
+        pdf_matrix_translate(&context->state->textState.textMatrix, 
+            cmd->matrix.a, cmd->matrix.b);
         context->state->textState.textLineWidth = 0;
     }
 }
@@ -142,13 +143,14 @@ void handle_TD(pdf_render* context, pdf_render_command* cmd, bool dry_run)
         auto data2 = context->deque->pop_front();
         float tx = strtof(data2->data(), NULL);
         cmd->type = TOKEN_OPERATOR_TD;
-        cmd->TD.x = tx;
-        cmd->TD.y = ty;
+        cmd->matrix.a = tx;
+        cmd->matrix.b = ty;
     }
     else
     {
-        pdf_matrix_translate(&context->state->textState.textMatrix, cmd->TD.x, cmd->TD.y);
-        context->state->textState.textLeading = -cmd->TD.y;
+        pdf_matrix_translate(&context->state->textState.textMatrix, 
+            cmd->matrix.a, cmd->matrix.b);
+        context->state->textState.textLeading = -cmd->matrix.b;
         context->state->textState.textLineWidth = 0;
     }
 }
@@ -162,13 +164,13 @@ void handle_Tj(pdf_render* context, pdf_render_command* cmd, bool dry_run)
         std::unique_ptr<pdf_node> data = context->deque->pop_front();
         int len = data->size();
         cmd->type = TOKEN_OPERATOR_Tj;
-        new (&cmd->Tj.data) std::unique_ptr<pdf_node>(std::move(data));
+        cmd->uniqueNode = std::move(data);
     }
     else
     {
         if (context->state->textState.font == NULL)
             return;
-        _do_text_render(context, (char*)cmd->Tj.data->data(), cmd->Tj.data->size());
+        _do_text_render(context, (char*)cmd->uniqueNode->data(), cmd->uniqueNode->size());
     }
 }
 
@@ -198,11 +200,11 @@ void handle_TJ(pdf_render* context, pdf_render_command* cmd, bool dry_run)
             }
         }
         cmd->type = TOKEN_OPERATOR_TJ;
-        new (&cmd->TJ.tmp_deque) std::shared_ptr<pdf_deque>(std::move(tmp_deque));
+        cmd->sharedDeque = std::move(tmp_deque);
     }
     else
     {
-        auto tmp_deque = cmd->TJ.tmp_deque;
+        auto tmp_deque = cmd->sharedDeque;
         if (context->state->textState.font == NULL)
         {
             return;
@@ -234,11 +236,11 @@ void handle_TL(pdf_render* context, pdf_render_command* cmd, bool dry_run)
         auto data = context->deque->pop_front();
         float t = strtof(data->data(), NULL);
         cmd->type = TOKEN_OPERATOR_TL;
-        cmd->TL.f = t;
+        cmd->floatVal = t;
     }
     else
     {
-        context->state->textState.textLeading = cmd->TL.f;
+        context->state->textState.textLeading = cmd->floatVal;
     }
 }
 
@@ -262,17 +264,20 @@ void handle_Tm(pdf_render* context, pdf_render_command* cmd, bool dry_run)
         auto data6 = context->deque->pop_front();
         a = strtof(data6->data(), NULL);
         cmd->type = TOKEN_OPERATOR_Tm;
-        cmd->Tm.x1 = a;
-        cmd->Tm.y1 = b;
-        cmd->Tm.x2 = c;
-        cmd->Tm.y2 = d;
-        cmd->Tm.x3 = e;
-        cmd->Tm.y3 = f;
+        cmd->matrix.a = a;
+        cmd->matrix.b = b;
+        cmd->matrix.c = c;
+        cmd->matrix.d = d;
+        cmd->matrix.e = e;
+        cmd->matrix.f = f;
     }
     else
     {
         pdf_matrix_t m;
-        pdf_matrix_init(&m, cmd->Tm.x1, cmd->Tm.y1, cmd->Tm.x2, cmd->Tm.y2, cmd->Tm.x3, cmd->Tm.y3);
+        pdf_matrix_init(&m, 
+            cmd->matrix.a, cmd->matrix.b, 
+            cmd->matrix.c, cmd->matrix.d, 
+            cmd->matrix.e, cmd->matrix.f);
 
         // set font matrix
         context->state->textState.textMatrix = m;
@@ -289,11 +294,11 @@ void handle_Tr(pdf_render* context, pdf_render_command* cmd, bool dry_run)
         auto data = context->deque->pop_front();
         int v = strtof(data->data(), NULL);
         cmd->type = TOKEN_OPERATOR_Tr;
-        cmd->Tr.i = v;
+        cmd->intVal = v;
     }
     else
     {
-        context->state->textState.textMode = cmd->Tr.i;
+        context->state->textState.textMode = cmd->intVal;
     }
 }
 
@@ -306,11 +311,11 @@ void handle_Ts(pdf_render* context, pdf_render_command* cmd, bool dry_run)
         auto data = context->deque->pop_front();   
         float r = strtof(data->data(), NULL);
         cmd->type = TOKEN_OPERATOR_Ts;
-        cmd->Ts.f = r;
+        cmd->floatVal = r;
     }
     else
     {
-        context->state->textState.textRise = cmd->Ts.f;
+        context->state->textState.textRise = cmd->floatVal;
     }
 }
 
@@ -324,11 +329,11 @@ void handle_Tw(pdf_render* context, pdf_render_command* cmd, bool dry_run)
         auto data = context->deque->pop_front();
         float w = strtof(data->data(), NULL);
         cmd->type = TOKEN_OPERATOR_Tw;
-        cmd->Tw.f = w;
+        cmd->floatVal = w;
     }
     else
     {
-        context->state->textState.wordSpacing = cmd->Tw.f;
+        context->state->textState.wordSpacing = cmd->floatVal;
     }
 }
 
@@ -341,10 +346,10 @@ void handle_Tz(pdf_render* context, pdf_render_command* cmd, bool dry_run)
         auto data = context->deque->pop_front();
         float h = strtof(data->data(), NULL);
         cmd->type = TOKEN_OPERATOR_Tz;
-        cmd->Tz.f = h;
+        cmd->floatVal = h;
     }
     else
     {
-        context->state->textState.horizontalScaling = cmd->Tz.f;
+        context->state->textState.horizontalScaling = cmd->floatVal;
     }
 }
