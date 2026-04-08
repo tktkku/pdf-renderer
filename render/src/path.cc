@@ -22,7 +22,7 @@ void fill(pdf_render* context)
     PDF_RENDERER_CALL(context->renderer, set_color, r, g, b);
 }
 
-void _do_path(pdf_render* context, int type)
+void do_path(pdf_render* context, int type)
 {
     if (type & PDF_OPERATION_PATH_EVEN_ODD)
     {
@@ -65,7 +65,7 @@ void handle_b_star(pdf_render* context, pdf_render_command* cmd, bool dry_run)
     }
     else
     {
-        _do_path(context, PDF_OPERATION_PATH_EVEN_ODD |
+        do_path(context, PDF_OPERATION_PATH_EVEN_ODD |
                 PDF_OPERATION_PATH_CLOSE | 
                 PDF_OPERATION_PATH_FILL | 
                 PDF_OPERATION_PATH_STROKE);
@@ -82,7 +82,7 @@ void handle_B_star(pdf_render* context, pdf_render_command* cmd, bool dry_run)
     }
     else
     {
-        _do_path(context, PDF_OPERATION_PATH_EVEN_ODD |
+        do_path(context, PDF_OPERATION_PATH_EVEN_ODD |
         PDF_OPERATION_PATH_FILL |
         PDF_OPERATION_PATH_STROKE);
     };
@@ -99,7 +99,7 @@ void handle_b(pdf_render* context, pdf_render_command* cmd, bool dry_run)
     }
     else
     {
-        _do_path(context, PDF_OPERATION_PATH_NON_ZERO |
+        do_path(context, PDF_OPERATION_PATH_NON_ZERO |
         PDF_OPERATION_PATH_CLOSE |
         PDF_OPERATION_PATH_FILL |
         PDF_OPERATION_PATH_STROKE);
@@ -115,7 +115,7 @@ void handle_B(pdf_render* context, pdf_render_command* cmd, bool dry_run)
     }
     else 
     {
-        _do_path(context, PDF_OPERATION_PATH_NON_ZERO |
+        do_path(context, PDF_OPERATION_PATH_NON_ZERO |
         PDF_OPERATION_PATH_FILL |
         PDF_OPERATION_PATH_STROKE);
     };
@@ -168,7 +168,7 @@ void handle_F_f(pdf_render* context, pdf_render_command* cmd, bool dry_run)
     }
     else
     {
-        _do_path(context, PDF_OPERATION_PATH_NON_ZERO |
+        do_path(context, PDF_OPERATION_PATH_NON_ZERO |
         PDF_OPERATION_PATH_FILL);
     };
 }
@@ -183,7 +183,7 @@ void handle_f_star(pdf_render* context, pdf_render_command* cmd, bool dry_run)
     }
     else
     {
-        _do_path(context, PDF_OPERATION_PATH_EVEN_ODD |
+        do_path(context, PDF_OPERATION_PATH_EVEN_ODD |
         PDF_OPERATION_PATH_FILL); 
     };
 }
@@ -199,7 +199,7 @@ void handle_h(pdf_render* context, pdf_render_command* cmd, bool dry_run)
         cmd->type = TOKEN_OPERATOR_h;
     }
     else 
-    { _do_path(context, PDF_OPERATION_PATH_CLOSE); };
+    { do_path(context, PDF_OPERATION_PATH_CLOSE); };
 }
 
 void handle_l(pdf_render* context, pdf_render_command* cmd, bool dry_run)
@@ -249,7 +249,7 @@ void handle_n(pdf_render* context, pdf_render_command* cmd, bool dry_run)
     {
         cmd->type = TOKEN_OPERATOR_n;
     }
-    else{ _do_path(context,  PDF_OPERATION_PATH_NEW_PATH); };
+    else{ do_path(context,  PDF_OPERATION_PATH_NEW_PATH); };
 }
 
 void handle_re(pdf_render* context, pdf_render_command* cmd, bool dry_run)
@@ -302,7 +302,7 @@ void handle_s(pdf_render* context, pdf_render_command* cmd, bool dry_run)
     }
     else
     {
-        _do_path(context, PDF_OPERATION_PATH_CLOSE |
+        do_path(context, PDF_OPERATION_PATH_CLOSE |
         PDF_OPERATION_PATH_STROKE); 
     };
 }
@@ -314,7 +314,7 @@ void handle_S(pdf_render* context, pdf_render_command* cmd, bool dry_run)
     {
         cmd->type = TOKEN_OPERATOR_S;
     }
-    else { _do_path(context, PDF_OPERATION_PATH_STROKE); };
+    else { do_path(context, PDF_OPERATION_PATH_STROKE); };
 }
 
 void handle_v(pdf_render* context, pdf_render_command* cmd, bool dry_run)
@@ -359,7 +359,7 @@ void handle_W_star(pdf_render* context, pdf_render_command* cmd, bool dry_run)
         cmd->type = TOKEN_OPERATOR_W_star;
     }
     else {
-        _do_path(context, PDF_OPERATION_PATH_EVEN_ODD |
+        do_path(context, PDF_OPERATION_PATH_EVEN_ODD |
         PDF_OPERATION_PATH_CLIP); 
     };
 }
@@ -392,7 +392,7 @@ void handle_W(pdf_render* context, pdf_render_command* cmd, bool dry_run)
     }
     else
     {
-        _do_path(context, PDF_OPERATION_PATH_NON_ZERO |
+        do_path(context, PDF_OPERATION_PATH_NON_ZERO |
         PDF_OPERATION_PATH_CLIP); 
     };
 }

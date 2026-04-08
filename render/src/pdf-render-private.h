@@ -474,3 +474,4 @@ void _cff_do_render_char(pdf_cff_char_render_t* context, pdf_deque* deque);
 #define PDF_OPERATION_PATH_CLOSE    0x10
 #define PDF_OPERATION_PATH_CLIP     0x20
 #define PDF_OPERATION_PATH_NEW_PATH 0x40
+void do_path(pdf_render* context, int type);

@@ -452,7 +452,7 @@ void _do_text_render(pdf_render* context, char* buf, int len)
     {
         bytes.insert(bytes.end(), (uint8_t*)buf + 1, (uint8_t*)buf + len);
     }
-    PDF_RENDERER_CALL(context->renderer, save);
+    
     int unicode_cnt = 0;
     unicode_text_t unicode[1024] = { 0 };
     unsigned char* pbuf = (unsigned char*)buf;
@@ -757,10 +757,9 @@ void _do_text_render(pdf_render* context, char* buf, int len)
 
     if (unicode_cnt == 0)
     {
-        PDF_RENDERER_CALL(context->renderer, restore);
         return;
     }
-
+    PDF_RENDERER_CALL(context->renderer, save);
     if (context->state->textState.font->subtype != FONT_SUBTYPE_TYPE3)
     {
         if (context->state->textState.fontface != NULL)
@@ -796,27 +795,16 @@ void _do_text_render(pdf_render* context, char* buf, int len)
             {
                 case 0:// fill
                 case 4:
-                    PDF_RENDERER_CALL(context->renderer, set_color, 
-                        context->state->fill.color[0],
-                        context->state->fill.color[1],
-                        context->state->fill.color[2]);
-                    PDF_RENDERER_CALL(context->renderer, fill);
+                    do_path(context, PDF_OPERATION_PATH_FILL);
                     break;
                 case 1: // stroke
                 case 5:
-                    PDF_RENDERER_CALL(context->renderer, set_color, 
-                        context->state->stroke.color[0],
-                        context->state->stroke.color[1],
-                        context->state->stroke.color[2]);
-                    PDF_RENDERER_CALL(context->renderer, stroke);
+                    do_path(context, PDF_OPERATION_PATH_STROKE);
                     break;
                 case 2: // fill and then stroke
                 case 6:
-                    PDF_RENDERER_CALL(context->renderer, set_color, 
-                        context->state->stroke.color[0],
-                        context->state->stroke.color[1],
-                        context->state->stroke.color[2]);
-                    PDF_RENDERER_CALL(context->renderer, fill);
+                    do_path(context, PDF_OPERATION_PATH_FILL 
+                        | PDF_OPERATION_PATH_STROKE);
                     break;
                 default:
                     break;

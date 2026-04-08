@@ -443,21 +443,29 @@ void handle_SC(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 
 void handle_scn(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
-    // char buf[1024] = { 0 };
-    // pdf_node_t node;
-    // node.data = buf;
-    // pdf_deque_pop_front(context->deque, &node);
-    // pdf_deque_pop_front(context->deque, &node);
-    // pdf_deque_pop_front(context->deque, &node);
     if (!strcmp(context->state->fill.currentColorSpace, "/DeviceGray") 
     || !strcmp(context->state->fill.currentColorSpace, "/DeviceRGB") 
     || !strcmp(context->state->fill.currentColorSpace, "/DeviceCMYK"))
     {
         return handle_sc(context, cmd, dry_run);
     }
-    auto data = context->deque->pop_front();
-    auto data2 = context->deque->pop_front();
-    auto data3 = context->deque->pop_front();
+    // For pattern color spaces or other custom color spaces, skip setting color
+    if (dry_run)
+    {
+        auto data = context->deque->pop_front();
+        cmd->type = TOKEN_OPERATOR_scn;
+        // Set color to white for pattern color spaces
+        cmd->color.r = 1.0;
+        cmd->color.g = 1.0;
+        cmd->color.b = 1.0;
+    }
+    else
+    {
+        // Set to white for pattern color spaces
+        context->state->fill.color[0] = 1.0;
+        context->state->fill.color[1] = 1.0;
+        context->state->fill.color[2] = 1.0;
+    }
 }
 
 void handle_SCN(pdf_render* context, pdf_render_command* cmd, bool dry_run)
@@ -468,8 +476,21 @@ void handle_SCN(pdf_render* context, pdf_render_command* cmd, bool dry_run)
     {
         return handle_SC(context, cmd, dry_run);
     }
-  
-    auto data = context->deque->pop_front();
-    auto data2 = context->deque->pop_front();
-    auto data3 = context->deque->pop_front();
+    // For pattern color spaces or other custom color spaces, skip setting color
+    if (dry_run)
+    {
+        auto data = context->deque->pop_front();
+        cmd->type = TOKEN_OPERATOR_SCN;
+        // Set color to white for pattern color spaces
+        cmd->color.r = 1.0;
+        cmd->color.g = 1.0;
+        cmd->color.b = 1.0;
+    }
+    else
+    {
+        // Set to white for pattern color spaces
+        context->state->stroke.color[0] = 1.0;
+        context->state->stroke.color[1] = 1.0;
+        context->state->stroke.color[2] = 1.0;
+    }
 }
