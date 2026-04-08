@@ -1,5 +1,34 @@
 #include "pdf-render.h"
 #include "pdf-render-private.h"
+void _get_color_space(pdf_render* context, char* name, char* value)
+{
+    if (context->current_obj->resources.colorspace_dict 
+        && context->current_obj->resources.colorspace_dict->has(name))
+    {
+        if (context->current_obj->resources.colorspace_dict->is_name(name))
+        {
+            char* color_space = context->current_obj->resources.colorspace_dict->get_name(name);
+            if (color_space != NULL)
+            {
+                strcpy(value, color_space);
+                return;
+            }
+        }
+        else if (context->current_obj->resources.colorspace_dict->is_indirect(name))
+        {
+            pdf_indirect_t ref = context->current_obj->resources.colorspace_dict->get_indirect(name);
+            pdf_obj_t* color_space_obj = pdf_file_get_obj(context->current_obj->pdf, ref);
+            if (color_space_obj != NULL)
+            {
+                if (color_space_obj->value->type == PDF_VALUE_NAME)
+                {
+                    strcpy(value, color_space_obj->value->val.name);
+                    return;
+                }
+            }
+        }
+    }
+}
 void handle_cs(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
     // for nonstroking
@@ -21,7 +50,7 @@ void handle_cs(pdf_render* context, pdf_render_command* cmd, bool dry_run)
         }
         else
         {
-            pdf_obj_get_colorspace(context->current_obj, cmd->colorSpace, context->state->fill.currentColorSpace);
+            _get_color_space(context, cmd->colorSpace, context->state->fill.currentColorSpace);
         }
     }
 }
@@ -50,7 +79,7 @@ void handle_CS(pdf_render* context, pdf_render_command* cmd, bool dry_run)
         }
         else
         {
-            pdf_obj_get_colorspace(context->current_obj, cmd->colorSpace, context->state->stroke.currentColorSpace);
+            _get_color_space(context, cmd->colorSpace, context->state->stroke.currentColorSpace);
         }
     }
 }
@@ -286,6 +315,29 @@ void handle_sc(pdf_render* context, pdf_render_command* cmd, bool dry_run)
             context->state->fill.color[2] = cmd->color.b;
         }
     }
+    else
+    {
+        // For other color spaces like ICCBased, assume RGB components
+        if (dry_run)
+        {
+            auto data = context->deque->pop_front();
+            float b = strtof(data->data(), NULL);
+            auto data2 = context->deque->pop_front();
+            float g = strtof(data2->data(), NULL);
+            auto data3 = context->deque->pop_front();
+            float r = strtof(data3->data(), NULL);
+            cmd->type = TOKEN_OPERATOR_sc;
+            cmd->color.r = r;
+            cmd->color.g = g;
+            cmd->color.b = b;
+        }
+        else
+        {
+            context->state->fill.color[0] = cmd->color.r;
+            context->state->fill.color[1] = cmd->color.g;
+            context->state->fill.color[2] = cmd->color.b;
+        }
+    }
 }
 
 
@@ -352,6 +404,29 @@ void handle_SC(pdf_render* context, pdf_render_command* cmd, bool dry_run)
             float r = (1.0 - c) * (1.0 - k);
             float g = (1.0 - m) * (1.0 - k);
             float b = (1.0 - y) * (1.0 - k);
+            cmd->type = TOKEN_OPERATOR_sc;
+            cmd->color.r = r;
+            cmd->color.g = g;
+            cmd->color.b = b;
+        }
+        else
+        {
+            context->state->stroke.color[0] = cmd->color.r;
+            context->state->stroke.color[1] = cmd->color.g;
+            context->state->stroke.color[2] = cmd->color.b;
+        }
+    }
+    else
+    {
+        // For other color spaces like ICCBased, assume RGB components
+        if (dry_run)
+        {
+            auto data = context->deque->pop_front();
+            float b = strtof(data->data(), NULL);
+            auto data2 = context->deque->pop_front();
+            float g = strtof(data2->data(), NULL);
+            auto data3 = context->deque->pop_front();
+            float r = strtof(data3->data(), NULL);
             cmd->type = TOKEN_OPERATOR_sc;
             cmd->color.r = r;
             cmd->color.g = g;

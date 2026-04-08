@@ -31,12 +31,6 @@ void pdf_stream_free(pdf_stream_t* stream)
         stream->filter = NULL;
     }
 
-    if (stream->decomp.buf)
-    {
-        free(stream->decomp.buf);
-        stream->decomp.buf = NULL;
-    }
-
     free(stream);
     stream = NULL;
 }
@@ -105,8 +99,6 @@ pdf_stream_t* pdf_stream_init(pdf_file_t* pdf, pdf_obj_t* obj, int len, int offs
     s->obj = obj;
     s->stream_len = len;
     s->stream_offset = offset;
-    s->processed = 0;
-    s->readin_len = 0;
     s->predictor = predictor;
     s->colors = colors;
     s->bitspercomponent = bitspercomponent;
@@ -128,6 +120,47 @@ pdf_stream_t* pdf_stream_init(pdf_file_t* pdf, pdf_obj_t* obj, int len, int offs
 
     return s;
 }
+bool _try_inflate(const unsigned char* data, size_t len)
+{
+    z_stream strm = {};
+    strm.next_in = (Bytef*)data;
+    strm.avail_in = len;
+    if (inflateInit(&strm) != Z_OK)
+    {
+        return false;
+    }
+
+    unsigned char out[1024];
+    strm.next_out = out;
+    strm.avail_out = sizeof(out);
+
+    int ret = inflate(&strm, Z_NO_FLUSH);
+
+    inflateEnd(&strm);
+
+    return (ret == Z_STREAM_END || ret == Z_OK);
+}
+bool _try_inflate_raw(const unsigned char* data, size_t len)
+{
+    z_stream strm = {};
+    strm.next_in = (Bytef*)data;
+    strm.avail_in = len;
+    if (inflateInit2(&strm, -MAX_WBITS) != Z_OK)
+    {
+        return false;
+    }
+
+    unsigned char out[1024];
+    strm.next_out = out;
+    strm.avail_out = sizeof(out);
+
+    int ret = inflate(&strm, Z_NO_FLUSH);
+
+    inflateEnd(&strm);
+
+    return (ret == Z_STREAM_END || ret == Z_OK);
+}
+
 void pdf_stream_open(pdf_stream_t* stream)
 {
     if (stream == NULL || stream->pdf == NULL)
@@ -136,20 +169,78 @@ void pdf_stream_open(pdf_stream_t* stream)
     input_stream(&input, stream);
     stream->input = input;
     stream->parser = pdf_parser_init(stream->pdf, input);
-    stream->processed = 0;
-    stream->readin_len = 0;
     stream->decomp.flate.avail_in = 0;
     stream->decomp.flate.next_in = NULL;
     stream->decomp.flate.zalloc = NULL;
     stream->decomp.flate.zfree = NULL;
     stream->decomp.flate.opaque = NULL;
-    inflateInit(&(stream->decomp.flate));
 
-    stream->decomp.buf = (unsigned char*)malloc(4096);
-    stream->decomp.buf_size = 4096;
+    stream->decomp.buf = std::make_unique<unsigned char[]>(stream->stream_len);
     stream->decomp.cur_pos = 0;
     stream->decomp.len = 0;
     input_seek(stream->pdf->input, stream->stream_offset, SEEK_SET);
+    stream->decomp.len = input_read(stream->pdf->input, stream->decomp.buf.get(), stream->stream_len);
+    if (stream->decomp.len != stream->stream_len)
+    {
+        printf("pdf_stream_open error, read %d bytes, expect %d bytes\n", stream->decomp.len, stream->stream_len);
+        return;
+    }
+    int off = stream->stream_len - 1;
+    while (stream->decomp.buf[off] == '\r' || stream->decomp.buf[off] == '\n')
+    {
+        stream->decomp.buf[off] = '\0';
+        stream->decomp.len--;
+        off--;
+    }
+    if (stream->filter && strcmp(stream->filter->val.name, "/FlateDecode") == 0)
+    {
+        if (_try_inflate(stream->decomp.buf.get(), stream->decomp.len))
+        {
+            inflateInit(&stream->decomp.flate);
+        }
+        else if (_try_inflate_raw(stream->decomp.buf.get(), stream->decomp.len))
+        {
+            inflateInit2(&stream->decomp.flate, -MAX_WBITS);
+        }
+        else
+        {
+            int n = stream->pdf->encrypt_key_len_bits / 8;
+            uint8_t* data = new uint8_t[n + 5];
+            int off = 0;
+            memcpy(data, stream->pdf->encrypt_key, n);
+            off += n;
+            data[off++] = ((stream->obj->indirect.obj_num >> 0) & 0xFF);
+            data[off++] = ((stream->obj->indirect.obj_num >> 8) & 0xFF);
+            data[off++] = ((stream->obj->indirect.obj_num >> 16) & 0xFF);
+            data[off++] = ((stream->obj->indirect.generation >> 0) & 0xFF);
+            data[off++] = ((stream->obj->indirect.generation >> 8) & 0xFF);
+
+            uint8_t hash[16];
+            md5(data, off, hash);
+            delete[] data;
+
+            rc4_ctx ctx;
+            rc4_ks(&ctx, hash, std::min(n + 5, 16));
+            rc4_decrypt(&ctx, stream->decomp.buf.get(), stream->decomp.buf.get(), stream->decomp.len);
+            if (_try_inflate(stream->decomp.buf.get(), stream->decomp.len))
+            {
+                inflateInit(&stream->decomp.flate);
+            }
+            else if (_try_inflate_raw(stream->decomp.buf.get(), stream->decomp.len))
+            {
+                inflateInit2(&stream->decomp.flate, -MAX_WBITS);
+            }
+            else
+            {
+                printf("object %d decompress error\n", stream->obj->indirect.obj_num);
+                return;
+            }
+        }
+    }
+
+    stream->decomp.flate.avail_in = stream->decomp.len;
+    stream->decomp.flate.next_in = stream->decomp.buf.get();
+    stream->decomp.cur_pos = 0;
 }
 /**
  * -1: error
@@ -167,44 +258,7 @@ int pdf_stream_get_data(pdf_stream_t* stream, unsigned char* buf, int size)
         {
             if (strcmp(stream->filter->val.name, "/FlateDecode") == 0)
             {
-                if (stream->decomp.cur_pos >= stream->decomp.len && stream->readin_len < stream->stream_len)
-                {
-                    memset(stream->decomp.buf, 0, stream->decomp.buf_size);
-                    int read_size = stream->stream_len - stream->processed;
-                    read_size = MIN(stream->decomp.buf_size, read_size);
-                    input_seek(stream->pdf->input, stream->stream_offset + stream->readin_len, SEEK_SET);
-                    stream->decomp.len = stream->decomp.flate.avail_in
-                        = input_read(stream->pdf->input, stream->decomp.buf, read_size);
-                    if (stream->decomp.flate.avail_in == 0)
-                    {
-                        return 0;
-                    }
-                    if (memcmp(stream->decomp.buf, "\x78\x9C", 2) != 0)
-                    {
-                        int n = stream->pdf->encrypt_key_len_bits / 8;
-                        uint8_t* data = new uint8_t[n + 5];
-                        int off = 0;
-                        memcpy(data, stream->pdf->encrypt_key, n);
-                        off += n;
-                        data[off++] = ((stream->obj->indirect.obj_num >> 0) & 0xFF);
-                        data[off++] = ((stream->obj->indirect.obj_num >> 8) & 0xFF);
-                        data[off++] = ((stream->obj->indirect.obj_num >> 16) & 0xFF);
-                        data[off++] = ((stream->obj->indirect.generation >> 0) & 0xFF);
-                        data[off++] = ((stream->obj->indirect.generation >> 8) & 0xFF);
-
-                        uint8_t hash[16];
-                        md5(data, off, hash);
-                        delete[] data;
-
-                        rc4_ctx ctx;
-                        rc4_ks(&ctx, hash, std::min(n + 5, 16));
-                        rc4_decrypt(&ctx, stream->decomp.buf, stream->decomp.buf, stream->decomp.len);
-                    }
-                    stream->decomp.flate.next_in = stream->decomp.buf;
-                    stream->decomp.cur_pos = 0;
-                    stream->readin_len += stream->decomp.len;
-                }
-                if (stream->processed < stream->stream_len)
+                if (stream->decomp.cur_pos < stream->decomp.len)
                 {
                     stream->decomp.flate.avail_out = size;
                     stream->decomp.flate.next_out = buf;
@@ -214,21 +268,22 @@ int pdf_stream_get_data(pdf_stream_t* stream, unsigned char* buf, int size)
                         printf("inflate data error: %d\n", zret);
                         return 0;
                     }
-                    stream->decomp.cur_pos += (stream->decomp.flate.total_in - stream->processed);
-                    stream->processed = stream->decomp.flate.total_in;
                     ret = size - stream->decomp.flate.avail_out;
+                    stream->decomp.cur_pos = stream->decomp.flate.total_in;
                 }
             }
         }
     }
     else
     {
-        ret = input_read(stream->pdf->input, buf, size);
-        if (ret < 0)
+        size_t remaining = stream->decomp.len - stream->decomp.cur_pos;
+        size_t read_size = (size < remaining) ? size : remaining;
+        if (read_size > 0)
         {
-            return -1;
+            memcpy(buf, stream->decomp.buf.get() + stream->decomp.cur_pos, read_size);
+            stream->decomp.cur_pos += read_size;
         }
-        stream->readin_len += ret;
+        ret = read_size;
     }
 
     return ret;

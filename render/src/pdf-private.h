@@ -214,7 +214,10 @@ struct pdf_cmap
 
     std::vector<pdf_cmap_char_range> not_def_range;
     std::vector<pdf_cmap_code_range> code_range_map;
-    pdf_cmap() {};
+    pdf_cmap() {
+        memset(name, 0, sizeof(name));
+        isGlobal = false;
+    };
     ~pdf_cmap() {};
 };
 typedef enum {
@@ -263,6 +266,20 @@ struct pdf_file
 
     std::vector<pdf_cmap*> cmaps;
     std::vector<pdf_external_font_t*> external_fonts;
+    pdf_file() {
+        input = NULL;
+        data_len = 0;
+        current_index = 0;
+        trailer = NULL;
+        id_arr = NULL;
+        encrypt_key_len_bits = 0;
+        memset(encrypt_key, 0, sizeof(encrypt_key));
+        xref_table.resize(0);
+        pages.resize(0);
+        cmaps.resize(0);
+        external_fonts.resize(0);
+    };
+    ~pdf_file() {};
 };
 
 // struct pdf_resources
@@ -523,16 +540,11 @@ struct pdf_stream
     struct
     {
         z_stream flate;
-        // temp buffer
-        unsigned char* buf;
-        // temp buffer size
-        int buf_size;
+        std::unique_ptr<unsigned char[]> buf;
         // read in data len
         int len;
         int cur_pos;
     } decomp;
-    int processed;
-    int readin_len;
     input_t* input;
     pdf_parser_t* parser;
     struct pdf_value* filter;

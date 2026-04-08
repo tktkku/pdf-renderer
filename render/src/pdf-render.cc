@@ -60,10 +60,12 @@ void pdf_render_free(pdf_render* context)
         if (fontcache->font != NULL)
         {
             pdf_font_free(fontcache->font);
+            fontcache->font = NULL;
         }
         if (fontcache->fontface != NULL)
         {
             pdf_font_face_destroy(fontcache->fontface);
+            fontcache->fontface = NULL;
         }
         delete fontcache;
     }
@@ -222,18 +224,20 @@ void pdf_render_build(pdf_render* context)
 
 pdf_render_command* _do_render_operation(pdf_stream_t* stream, pdf_render* context, pdf_token* tk)
 {
-    // if (tk != NULL)
-    // {
-    //     if (tk->size() > 0)
-    //     {
-    //         printf("%s\n", tk->data());
-    //     }
-    //     else
-    //     {
-    //         printf("%s\n", _token_to_string(tk->type()));
-    //     }
-    // }
-
+#define DEBUG_TOKEN 1
+#if DEBUG_TOKEN
+    if (tk != NULL)
+    {
+        if (tk->size() > 0)
+        {
+            printf("%s ", tk->data());
+        }
+        else
+        {
+            printf("%s ", _token_to_string(tk->type()));
+        }
+    }
+#endif
     if (tk->type() < TOKEN_OPERATOR && !tk->empty())
     {
         // did not match any operation
@@ -355,6 +359,9 @@ pdf_render_command* _do_render_operation(pdf_stream_t* stream, pdf_render* conte
         {
             pdf_render_command* cmd = new pdf_render_command(tk->type());
             handlers[tk->type() - TOKEN_OPERATOR](context, cmd, true);
+#if DEBUG_TOKEN
+            printf("\n");
+#endif
             return cmd;
         }
     }
@@ -371,7 +378,7 @@ void pdf_render_run(pdf_render* render, pdf_renderer_t* renderer)
     {
         if (handlers[c->type - TOKEN_OPERATOR])
         {
-            printf("run %s\n", _token_to_string(c->type));
+            // printf("run %s\n", _token_to_string(c->type));
             handlers[c->type - TOKEN_OPERATOR](render, c.get(), false);
         }
     }

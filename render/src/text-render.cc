@@ -1,3 +1,4 @@
+#include "pdf-private.h"
 #include "pdf-render.h"
 #include "pdf-render-private.h"
 #include <stdint.h>
@@ -5,6 +6,7 @@
 #include <iostream>
 #include <assert.h>
 #include "pdf-encoding.h"
+#include "pdf-glyph-list.h"
 
 uint32_t _convert_unicode_from_latin_encoding(uint16_t code, pdf_latin_encoding_type_t encoding)
 {
@@ -42,25 +44,25 @@ uint32_t _convert_unicode_from_latin_encoding(uint16_t code, pdf_latin_encoding_
         }
     }
     if (name == NULL) return 0;
-    FILE * f = fopen("agl-aglfn/glyphlist.txt", "r");
-    if (f == NULL) return 0;
-    char line[256] = {0};
-    uint32_t unicode = 0;
-    while (fgets(line, sizeof(line), f))
-    {   
-        if (line[0] == '#' || line[0] == '\n') continue;
-        char* token = strtok(line, ";");
-        if (token != NULL && strcmp(token, name) == 0)
-        {            
-            token = strtok(NULL, ";");
-            if (token != NULL)            {
-                unicode = strtoul(token, NULL, 16);
-                break;
-            }
+    
+    int left = 0, right = ARRAY_COUNT(glyphlist) - 1;
+    while (left <= right)
+    {
+        int mid = left + (right - left) / 2;
+        if (strcmp(glyphlist[mid].name, name) == 0)
+        {
+            return glyphlist[mid].unicode;
+        }
+        else if (strcmp(glyphlist[mid].name, name) < 0)
+        {
+            left = mid + 1;
+        }
+        else
+        {
+            right = mid - 1;
         }
     }
-    fclose(f);
-    return unicode;
+    return 0;
 }
 uint32_t _convert_code_from_cmap(pdf_cmap* cmap, uint32_t code)
 {
@@ -433,6 +435,7 @@ float pdf_add_text(pdf_render* context, const unicode_text_t* text, int length, 
 
 void _do_text_render(pdf_render* context, char* buf, int len)
 {
+#define DEBUG_TEXT 1
     if (context == NULL || context->state->textState.font == NULL || buf == NULL)
     {
         return;
@@ -484,7 +487,9 @@ void _do_text_render(pdf_render* context, char* buf, int len)
                     {
                         uint32_t tmp = _convert_unicode_from_cmap(to_unicode_map, code);
                         wchar_t wc = tmp;
-                        //printf("code = %d unicdoe = %d (%lc)\n", code, tmp, wc);
+                        #if DEBUG_TEXT
+                        printf("code = %d unicdoe = %d (%lc)\n", code, tmp, wc);
+                        #endif
                         break;
                     }
                 }
@@ -525,7 +530,9 @@ void _do_text_render(pdf_render* context, char* buf, int len)
                 unicode[unicode_cnt].isGid = false;
                 unicode_cnt++;
                 wchar_t wc = uni;
-                //printf("code = %d unicode = %d (%lc)\n", code, uni, wc);
+                #if DEBUG_TEXT
+                printf("code = %d unicode = %d (%lc)\n", code, uni, wc);
+                #endif
             }
         }
 
@@ -591,7 +598,9 @@ void _do_text_render(pdf_render* context, char* buf, int len)
                         if (code >= encoding->code_range_map[k].srcStart && code <= encoding->code_range_map[k].srcEnd)
                         {
                             cid = _convert_code_from_cmap(encoding, code);
-                            //printf("code = %5d cid = %5d gid = %5d ", code, cid, cid);
+                            #if DEBUG_TEXT
+                            printf("code = %5d cid = %5d gid = %5d ", code, cid, cid);
+                            #endif
                             i += j;
                             found = true;
                             break;
@@ -604,41 +613,50 @@ void _do_text_render(pdf_render* context, char* buf, int len)
                     if (found) break;
                 }
                 
-
-                unicode[unicode_cnt].utf32 = cid;
-                unicode[unicode_cnt].isGid = true;
-                unicode_cnt++;
-                
+                uint32_t uni = 0;
                 if (to_unicode_map != NULL)
                 {
                     for (size_t j = 0; j < to_unicode_map->code_range_map.size(); j++)
                     {
                         if (code >= to_unicode_map->code_range_map[j].srcStart && code <= to_unicode_map->code_range_map[j].srcEnd)
                         {
-                            uint32_t uni = _convert_unicode_from_cmap(to_unicode_map, code);
+                            uni = _convert_unicode_from_cmap(to_unicode_map, code);
                             wchar_t wc = uni;
-                            //printf("unicode = %5d (%lc)\n", uni, wc);
+                            #if DEBUG_TEXT
+                            printf("unicode = %5d (%lc)\n", uni, wc);
+                            #endif
                             break;
                         }
                     }
                 }
                 else if (encoding && encoding->name && !strncmp(encoding->name, "Uni", 3))
                 {
-                    wchar_t wc = code;
-                    //printf("unicode = %5d(%lc)\n", code, wc);
+                    uni = code;
+                    wchar_t wc = uni;
+                    #if DEBUG_TEXT
+                    printf("unicode = %5d(%lc)\n", uni, wc);
+                    #endif
                 }
                 else
                 {
-                    //printf("\n");
+                    #if DEBUG_TEXT
+                    printf("\n");
+                    #endif
                 }
+
+                unicode[unicode_cnt].utf32 = context->state->textState.font_face_loaded ? cid : uni;
+                unicode[unicode_cnt].isGid = context->state->textState.font_face_loaded;
+                unicode_cnt++;
             }
         }
-        else
+        else // if (descendant->subtype == FONT_SUBTYPE_CIDFONTTPYE2)
         {
             for (size_t i = 0; i < bytes.size(); )
             {
                 uint32_t code = 0;
                 uint32_t cid = 0;
+                uint32_t gid = 0;
+                uint32_t uni = 0;
                 for (int j = 4; j >= 1; j /= 2)
                 {
                     bool found = false;
@@ -658,7 +676,9 @@ void _do_text_render(pdf_render* context, char* buf, int len)
                         if (code >= encoding->code_range_map[k].srcStart && code <= encoding->code_range_map[k].srcEnd)
                         {
                             cid = _convert_code_from_cmap(encoding, code);
-                            //printf("code = %5d cid = %5d ", code, cid);
+                            #if DEBUG_TEXT
+                            printf("code = %5d cid = %5d ", code, cid);
+                            #endif
                             i += j;
                             found = true;
                             break;
@@ -676,11 +696,10 @@ void _do_text_render(pdf_render* context, char* buf, int len)
                     {
                         if (cid >= cid_to_gid_map->code_range_map[j].srcStart && cid <= cid_to_gid_map->code_range_map[j].srcEnd)
                         {
-                            uint32_t gid = _convert_code_from_cmap(cid_to_gid_map, cid);
-                            //printf("gid = %5d ", gid);
-                            unicode[unicode_cnt].utf32 = gid;
-                            unicode[unicode_cnt].isGid = true;
-                            unicode_cnt++;
+                            gid = _convert_code_from_cmap(cid_to_gid_map, cid);
+                            #if DEBUG_TEXT
+                            printf("gid = %5d ", gid);
+                            #endif
                             break;
                         }
                     }
@@ -696,29 +715,12 @@ void _do_text_render(pdf_render* context, char* buf, int len)
                         {
                             if (cid >= c->code_range_map[j].srcStart && cid <= c->code_range_map[j].srcEnd)
                             {
-                                uint32_t uni = _convert_unicode_from_cmap(c, cid);
+                                uni = _convert_unicode_from_cmap(c, cid);
                                 wchar_t wc = uni;
-                                //printf("unicode = %5d (%lc)", uni, wc);
-
-                                unicode[unicode_cnt].utf32 = uni;
-                                unicode[unicode_cnt].isGid = false;
-                                unicode_cnt++;
-                                break;
-                            }
-                        }
-                    }
-                    if (to_unicode_map != NULL)
-                    {
-                        for (size_t j = 0; j < to_unicode_map->code_range_map.size(); j++)
-                        {
-                            if (code >= to_unicode_map->code_range_map[j].srcStart && code <= to_unicode_map->code_range_map[j].srcEnd)
-                            {
-                                uint32_t uni = _convert_unicode_from_cmap(to_unicode_map, code);
-                                // wchar_t wc = uni;
-                                // printf("unicode = %5d (%lc)", uni, wc);
-                                unicode[unicode_cnt].utf32 = uni;
-                                unicode[unicode_cnt].isGid = false;
-                                unicode_cnt++;
+                                #if DEBUG_TEXT
+                                printf("unicode = %5d (%lc)", uni, wc);
+                                #endif
+                                
                                 break;
                             }
                         }
@@ -730,17 +732,25 @@ void _do_text_render(pdf_render* context, char* buf, int len)
                     {
                         if (code >= to_unicode_map->code_range_map[j].srcStart && code <= to_unicode_map->code_range_map[j].srcEnd)
                         {
-                            uint32_t uni = _convert_unicode_from_cmap(to_unicode_map, code);
+                            uni = _convert_unicode_from_cmap(to_unicode_map, code);
                             wchar_t wc = uni;
-                            //printf("unicode = %5d (%lc)\n", uni, wc);
+                            #if DEBUG_TEXT
+                            printf("unicode = %5d (%lc)\n", uni, wc);
+                            #endif
                             break;
                         }
                     }
                 }
                 else
                 {
-                    // printf("\n");
+                    #if DEBUG_TEXT
+                    printf("\n");
+                    #endif
                 }
+
+                unicode[unicode_cnt].utf32 = context->state->textState.font_face_loaded ? gid : uni;
+                unicode[unicode_cnt].isGid = context->state->textState.font_face_loaded;
+                unicode_cnt++;
             }
         }
     }

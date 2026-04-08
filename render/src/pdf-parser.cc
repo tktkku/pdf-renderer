@@ -833,6 +833,7 @@ void _pdf_parser_read_input(pdf_parser_t* parser)
             parser->end_pos = parser->buffer + off - 1;
             parser->splite_pos = parser->buffer + off;
             parser->eof = true;
+            return;
         }
     }
         
@@ -858,7 +859,7 @@ pdf_token* pdf_parser_next_token(pdf_parser_t* parser)
         {
             if (parser->input->type == INPUT_TYPE_STREAM)
             {
-                if (parser->input->stream->processed < parser->input->stream->stream_len)
+                if (parser->input->stream->decomp.cur_pos < parser->input->stream->decomp.len)
                 {
                     _pdf_parser_read_input(parser);
                     tk = _pdf_parser_next_one_token(parser, *start, end);

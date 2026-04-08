@@ -175,11 +175,27 @@ void load_font_from_external(pdf_render* context, const char* basefont, pdf_font
     char fontname[256] = { 0 };
     if (basefont)
     {
-        if (!strncmp(basefont, "/Helvetica", 10) || !strncmp(basefont, "/Times", 6))
+        if (!strncmp(basefont, "/Helvetica", 10) || !strncmp(basefont, "/Times", 6) || !strncmp(basefont, "/Symbol", 7))
         {
-            sprintf(fontname, "fonts/NotoSansSC-Regular.ttf");
+            sprintf(fontname, "fonts/NotoSansSC-");
+            if (!font_descriptor || font_descriptor->fontWeight <= 400)
+            {
+                strcat(fontname, "Regular.ttf");
+            }
+            else if (font_descriptor->fontWeight <= 600)
+            {
+                strcat(fontname, "SemiBold.ttf");
+            }
+            else
+            {
+                strcat(fontname, "Bold.ttf");
+            }
             goto LOAD_FONT;
         }
+    }
+    if (!font_descriptor)
+    {
+        return;
     }
     //TODO
     
@@ -274,6 +290,7 @@ void handle_Tf(pdf_render* context, pdf_render_command* cmd, bool dry_run)
                         cidfont->font_descriptor->fontfile, cidfont->font_descriptor->fontfile_len, 0, NULL, NULL)) == NULL)
                     {
                         load_font_from_external(context, font->basefont, cidfont->font_descriptor);
+                        context->state->textState.font_face_loaded = false;
                     }
                     else
                     {
@@ -282,7 +299,8 @@ void handle_Tf(pdf_render* context, pdf_render_command* cmd, bool dry_run)
                 }
                 else
                 {
-                    load_font_from_external(context,  font->basefont, cidfont->font_descriptor);
+                    load_font_from_external(context,  font->basefont, cidfont ? cidfont->font_descriptor : NULL);
+                    context->state->textState.font_face_loaded = false;
                 }
             }
             else if (font->subtype == FONT_SUBTYPE_TRUETYPE || font->subtype == FONT_SUBTYPE_TYPE1)
@@ -294,6 +312,7 @@ void handle_Tf(pdf_render* context, pdf_render_command* cmd, bool dry_run)
                         type1_truetype->font_descriptor->fontfile, type1_truetype->font_descriptor->fontfile_len, 0, NULL, NULL)) == NULL)
                     {
                         load_font_from_external(context, font->basefont, type1_truetype->font_descriptor);
+                        context->state->textState.font_face_loaded = false;
                     }
                     else
                     {
@@ -302,7 +321,8 @@ void handle_Tf(pdf_render* context, pdf_render_command* cmd, bool dry_run)
                 }
                 else
                 {
-                    load_font_from_external(context, font->basefont, type1_truetype->font_descriptor);
+                    load_font_from_external(context, font->basefont, type1_truetype ? type1_truetype->font_descriptor : NULL);
+                    context->state->textState.font_face_loaded = false;
                 }
             }
             if (context->state->textState.fontface == NULL)
@@ -317,22 +337,21 @@ void handle_Tf(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 
             cmd->type = TOKEN_OPERATOR_Tf;
             cmd->Tf.size = fontsize;
-            cmd->Tf.font = cache->font;
-            cmd->Tf.fontface = cache->fontface;
+            cmd->Tf.cache = cache;
         }
         else
         {
             pdf_font_cache_t* cache = context->fontcache[index];
             cmd->type = TOKEN_OPERATOR_Tf;
             cmd->Tf.size = fontsize;
-            cmd->Tf.font = cache->font;
-            cmd->Tf.fontface = cache->fontface;
+            cmd->Tf.cache = cache;
         }
     }
     else
     {
         context->state->textState.fontSize = cmd->Tf.size;
-        context->state->textState.font = cmd->Tf.font;
-        context->state->textState.fontface = cmd->Tf.fontface;
+        context->state->textState.font = cmd->Tf.cache->font;
+        context->state->textState.fontface = cmd->Tf.cache->fontface;
+        context->state->textState.font_face_loaded = cmd->Tf.cache->loaded;
     }
 }

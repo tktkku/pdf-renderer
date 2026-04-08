@@ -1256,7 +1256,11 @@ void pdf_file_free(pdf_file_t* file)
         input_close(file->input);
         file->input = NULL;
     }
-    delete file->trailer;
+    if (file->trailer)
+    {
+        delete file->trailer;
+        file->trailer = NULL;
+    }
     delete file;
     file = NULL;
 }

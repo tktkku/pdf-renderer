@@ -1,10 +1,7 @@
-:warning::construction:Under construction!
-
+***NOT FOR PRODUCTION!!!***
 A simple pdf parser write in C++, implemented part of the PDF Specification 1.7. And the renderer is [plutovg](https://github.com/sammycage/plutovg), specifical thanks to [@sammycage](https://github.com/sammycage)'s work.
 
 Window: [MiniFB](https://github.com/emoon/minifb)
-
-***NOT FOR PRODUCTION!!!***
 
 ## Features
 - [x] Object and Stream reading and parsing

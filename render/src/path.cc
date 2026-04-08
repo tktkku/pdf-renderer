@@ -40,6 +40,10 @@ void _do_path(pdf_render* context, int type)
     {
         PDF_RENDERER_CALL(context->renderer, new_path);
     }
+    if (type & PDF_OPERATION_PATH_CLIP)
+    {
+        PDF_RENDERER_CALL(context->renderer, clip);
+    }
     if (type & PDF_OPERATION_PATH_FILL)
     {
         fill(context);

@@ -98,6 +98,10 @@ static void set_miter_limit(pdf_renderer_t* renderer, float limit)
 {
     plutovg_canvas_set_miter_limit((plutovg_canvas_t*)renderer->user_data, limit);
 }
+static void clip(pdf_renderer_t* renderer)
+{
+    plutovg_canvas_clip((plutovg_canvas_t*)renderer->user_data);
+}
 static void restore(pdf_renderer_t* renderer)
 {
     plutovg_canvas_restore((plutovg_canvas_t*)renderer->user_data);
@@ -112,6 +116,10 @@ static void scale(pdf_renderer_t* renderer, float sx, float sy)
 }
 static void draw_image(pdf_renderer_t* renderer, int width, int height, int channels, unsigned char* pixles, int size)
 {
+    if (width <= 0 || height <= 0 || channels <= 0 || pixles == NULL || size <= 0)
+    {
+        return;
+    }
     plutovg_surface_t* s = NULL;
     if (memcmp(pixles, "\xFF\xD8", 2) == 0) // jpeg
     {
@@ -237,6 +245,7 @@ const pdf_renderer_vtable_t plutovg_vtable = {
     line_to,
     move_to,
     rect,
+    clip,
     transform,
 
     save,

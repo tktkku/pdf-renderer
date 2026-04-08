@@ -58,8 +58,7 @@ size_t input_read(input_t* input, void* ptr, size_t size)
         {
             int ret = 0;
             // input->stream->parser->current_pos;
-            if ((input->stream->decomp.cur_pos >= input->stream->decomp.len && input->stream->readin_len < input->stream->stream_len)
-                || input->stream->processed < input->stream->stream_len)
+            if (input->stream->decomp.cur_pos < input->stream->decomp.len)
             {
                 ret = pdf_stream_get_data(input->stream, (unsigned char*)ptr, size);
             }

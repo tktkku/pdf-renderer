@@ -42,6 +42,7 @@ typedef struct pdf_renderer_vtable
     void (*line_to)(pdf_renderer_t* renderer, float x, float y);
     void (*move_to)(pdf_renderer_t* renderer, float x, float y);
     void (*rect)(pdf_renderer_t* renderer, float x, float y, float width, float height);
+    void (*clip)(pdf_renderer_t* renderer);
     
     void (*transform)(pdf_renderer_t* renderer, float a, float b, float c, float d, float e, float f);
     

@@ -140,8 +140,7 @@ struct pdf_render_command
         std::unique_ptr<pdf_node> uniqueNode;
         std::shared_ptr<pdf_deque> sharedDeque;
         struct {
-            pdf_font_t* font;
-            pdf_font_face_t* fontface;
+            pdf_font_cache_t* cache;
             float size;
         } Tf;
         struct {
