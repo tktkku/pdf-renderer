@@ -17,7 +17,8 @@ void handle_apostrophe(pdf_render* context, pdf_render_command* cmd, bool dry_ru
     }
     else
     {
-        pdf_matrix_translate(&context->state->textState.textMatrix, 0, -context->state->textState.textLeading);
+        pdf_matrix_translate(&context->state->textState.textLineMatrix, 0, -context->state->textState.textLeading);
+        context->state->textState.textMatrix = context->state->textState.textLineMatrix;
         context->state->textState.textLineWidth = 0;
         if (context->state->textState.font == NULL)
             return;
@@ -34,10 +35,9 @@ void handle_BT(pdf_render* context, pdf_render_command* cmd, bool dry_run)
     else
     {
         PDF_RENDERER_CALL(context->renderer, save);
-        // context->fontface = NULL;
-        // context->font = NULL;
         context->state->textState.textLineWidth = 0;
         pdf_matrix_init_identity(&context->state->textState.textMatrix);
+        pdf_matrix_init_identity(&context->state->textState.textLineMatrix);
     }
 }
 
@@ -60,33 +60,40 @@ void handle_quotation(pdf_render* context, pdf_render_command* cmd, bool dry_run
     // aw as the word spacing
     // ac as the character spacing
     // aw ac string
+    // equivalent to: aw Tw ac Tc string '
     if (dry_run)
     {
-        context->deque->pop_front();
-        context->deque->pop_front();
-        context->deque->pop_front();
+        auto data_ac = context->deque->pop_front(); // ac (character spacing)
+        auto data_aw = context->deque->pop_front(); // aw (word spacing)
+        auto data_str = context->deque->pop_front(); // string
+        // ponytail: apply spacings immediately in dry_run to avoid union changes
+        context->state->textState.wordSpacing = strtof(data_aw->data(), NULL);
+        context->state->textState.characterSpacing = strtof(data_ac->data(), NULL);
         cmd->type = TOKEN_OPERATOR_quotation;
+        cmd->uniqueNode = std::move(data_str);
     }
     else
     {
+        // equivalent to: T* + show string
+        pdf_matrix_translate(&context->state->textState.textMatrix, 0, -context->state->textState.textLeading);
         context->state->textState.textLineWidth = 0;
+        if (context->state->textState.font != NULL)
+            _do_text_render(context, (char*)cmd->uniqueNode->data(), cmd->uniqueNode->size());
     }
 }
 
 void handle_T_star(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
     // move to the start of the next line
-    // has the same effects as the code
-    // 0 -[current leading matrix] Td
-    // float x, y;
-
+    // equivalent to: 0 -Tleading Td
     if (dry_run)
     {
         cmd->type = TOKEN_OPERATOR_T_star;
     }
     else
     {
-        pdf_matrix_translate(&context->state->textState.textMatrix, 0, -context->state->textState.textLeading);
+        pdf_matrix_translate(&context->state->textState.textLineMatrix, 0, -context->state->textState.textLeading);
+        context->state->textState.textMatrix = context->state->textState.textLineMatrix;
         context->state->textState.textLineWidth = 0;
     };
 }
@@ -111,7 +118,7 @@ void handle_Tc(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 
 void handle_Td(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
-    // set start position on the page
+    // move to the start of the next line, offset from the start of the current line
     // tx ty
     if (dry_run)
     {
@@ -125,17 +132,17 @@ void handle_Td(pdf_render* context, pdf_render_command* cmd, bool dry_run)
     }
     else
     {
-        pdf_matrix_translate(&context->state->textState.textMatrix, 
+        pdf_matrix_translate(&context->state->textState.textLineMatrix,
             cmd->matrix.a, cmd->matrix.b);
+        context->state->textState.textMatrix = context->state->textState.textLineMatrix;
         context->state->textState.textLineWidth = 0;
     }
 }
 
 void handle_TD(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
-    // move to the start of the next line
-    // offset form the start of the current line
-    // tx ty
+    // move to the start of the next line, offset from the start of the current line
+    // tx ty. Same as Td, plus sets textLeading = -ty
     if (dry_run)
     {
         auto data = context->deque->pop_front();
@@ -148,8 +155,9 @@ void handle_TD(pdf_render* context, pdf_render_command* cmd, bool dry_run)
     }
     else
     {
-        pdf_matrix_translate(&context->state->textState.textMatrix, 
+        pdf_matrix_translate(&context->state->textState.textLineMatrix,
             cmd->matrix.a, cmd->matrix.b);
+        context->state->textState.textMatrix = context->state->textState.textLineMatrix;
         context->state->textState.textLeading = -cmd->matrix.b;
         context->state->textState.textLineWidth = 0;
     }
@@ -279,8 +287,9 @@ void handle_Tm(pdf_render* context, pdf_render_command* cmd, bool dry_run)
             cmd->matrix.c, cmd->matrix.d, 
             cmd->matrix.e, cmd->matrix.f);
 
-        // set font matrix
+        // set text matrix AND text line matrix
         context->state->textState.textMatrix = m;
+        context->state->textState.textLineMatrix = m;
         context->state->textState.textLineWidth = 0;
     }
 }

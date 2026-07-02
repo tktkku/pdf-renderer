@@ -33,30 +33,37 @@ void handle_Do(pdf_render* context, pdf_render_command* cmd, bool dry_run)
             return;
         if (xobj->type == XOBJ_FORM)
         {
+            cmd->type = TOKEN_OPERATOR_Do;
+            cmd->Do.type = XOBJ_FORM;
+            cmd->Do.xobj = xobj;
             if (xobj->obj->stream != NULL)
             {
                 pdf_obj_t* save_obj = context->current_obj;
                 context->current_obj = xobj->obj;
-                pdf_stream_open(xobj->obj->stream);
-                pdf_token* tk = NULL;
-                cmd->type = TOKEN_OPERATOR_Do;
-                cmd->Do.type = XOBJ_FORM;
-                cmd->Do.xobj = xobj;
-                while ((tk = pdf_parser_next_token(xobj->obj->stream->parser)) != NULL)
+                // ponytail: cache decompressed stream data so repeated Do only re-parses
+                if (xobj->form->cached_stream_data == NULL)
                 {
-                    if (tk->type() == TOKEN_STREAM_END)
-                        break;
+                    pdf_stream_open(xobj->obj->stream);
+                    pdf_stream_get_all(xobj->obj->stream,
+                        &xobj->form->cached_stream_data, &xobj->form->cached_stream_len);
+                    pdf_stream_close(xobj->obj->stream);
+                }
+                // re-parse from cached data (fast, no decompression needed)
+                input_t* cached_input = NULL;
+                input_buffer(&cached_input, (char*)xobj->form->cached_stream_data, xobj->form->cached_stream_len);
+                pdf_parser_t* cached_parser = pdf_parser_init(context->pdf, cached_input);
+                xobj->obj->stream->parser = cached_parser;
+                pdf_token* tk = NULL;
+                while ((tk = pdf_parser_next_token(cached_parser)) != NULL)
+                {
+                    if (tk->type() == TOKEN_STREAM_END) { delete tk; break; }
                     pdf_render_command* new_cmd = _do_render_operation(xobj->obj->stream, context, tk);
                     if (new_cmd)
-                    {
-                        std::unique_ptr<pdf_render_command> u(new_cmd);
-                        cmd->Do.opts.push_back(std::move(u));
-                    }
-                    
+                        cmd->Do.opts.push_back(std::unique_ptr<pdf_render_command>(new_cmd));
                     delete tk;
                 }
-
-                pdf_stream_close(xobj->obj->stream);
+                xobj->obj->stream->parser = NULL;
+                pdf_parser_free(cached_parser);
                 context->current_obj = save_obj;
             }
         }

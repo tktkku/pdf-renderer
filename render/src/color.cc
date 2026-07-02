@@ -1,5 +1,27 @@
 #include "pdf-render.h"
 #include "pdf-render-private.h"
+// ponytail: pop helpers to eliminate ~150 lines of duplicate pop+strtof boilerplate
+static inline float pop_float(pdf_deque* deque) {
+    auto data = deque->pop_front();
+    return strtof(data->data(), NULL);
+}
+static inline void pop_gray_cmd(pdf_render_command* cmd, pdf_deque* deque, pdf_token_type_t type) {
+    float g = pop_float(deque);
+    cmd->type = type;
+    cmd->color.g = g; cmd->color.r = g; cmd->color.b = g;
+}
+static inline void pop_rgb_cmd(pdf_render_command* cmd, pdf_deque* deque, pdf_token_type_t type) {
+    float b = pop_float(deque), g = pop_float(deque), r = pop_float(deque);
+    cmd->type = type;
+    cmd->color.r = r; cmd->color.g = g; cmd->color.b = b;
+}
+static inline void pop_cmyk_cmd(pdf_render_command* cmd, pdf_deque* deque, pdf_token_type_t type) {
+    float k = pop_float(deque), y = pop_float(deque), m = pop_float(deque), c = pop_float(deque);
+    cmd->type = type;
+    cmd->color.r = (1.f - c) * (1.f - k);
+    cmd->color.g = (1.f - m) * (1.f - k);
+    cmd->color.b = (1.f - y) * (1.f - k);
+}
 void _get_color_space(pdf_render* context, char* name, char* value)
 {
     if (context->current_obj->resources.colorspace_dict 
@@ -31,71 +53,37 @@ void _get_color_space(pdf_render* context, char* name, char* value)
 }
 void handle_cs(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
-    // for nonstroking
-    // char buf[1024] = { 0 };
-    // deque_node_t node;
-    // node.data = buf;
-    // deque_pop(context->deque, &node);
-    if (dry_run)
-    {
+    if (dry_run) {
         auto data = context->deque->pop_front();
         cmd->type = TOKEN_OPERATOR_cs;
         memcpy(cmd->colorSpace, data->data(), data->size());
-    }
-    else
-    {
+    } else {
         if (!strcmp(cmd->colorSpace, "/DeviceGray") || !strcmp(cmd->colorSpace, "/DeviceRGB") || !strcmp(cmd->colorSpace, "/DeviceCMYK"))
-        {
             strcpy(context->state->fill.currentColorSpace, cmd->colorSpace);
-        }
         else
-        {
             _get_color_space(context, cmd->colorSpace, context->state->fill.currentColorSpace);
-        }
     }
 }
 
 void handle_CS(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
-    // set color space
-    // /DeviceGray
-    // initialize the corresponding current color to 0.0
-    /// DeviceRGB
-    // initialize the corresponding current color of red green blue to 0.0
-    // /DeviceCMYK
-    // initialize the corresponding current color of cyan magenta yellow to 0.0
-    // and the black to 1.0
-    if (dry_run)
-    {
+    if (dry_run) {
         auto data = context->deque->pop_front();
         cmd->type = TOKEN_OPERATOR_CS;
         memcpy(cmd->colorSpace, data->data(), data->size());
-    }
-    else
-    {
+    } else {
         if (!strcmp(cmd->colorSpace, "/DeviceGray") || !strcmp(cmd->colorSpace, "/DeviceRGB") || !strcmp(cmd->colorSpace, "/DeviceCMYK"))
-        {
             strcpy(context->state->stroke.currentColorSpace, cmd->colorSpace);
-        }
         else
-        {
             _get_color_space(context, cmd->colorSpace, context->state->stroke.currentColorSpace);
-        }
     }
 }
 
 void handle_g(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
-    // for nonstroking
-    if (dry_run)
-    {
-        auto data = context->deque->pop_front();
-        float g = strtof(data->data(), NULL);
-        cmd->type = TOKEN_OPERATOR_g;
-        cmd->color.g = g;
-    }
-    else
-    {
+    if (dry_run) {
+        pop_gray_cmd(cmd, context->deque, TOKEN_OPERATOR_g);
+    } else {
         context->state->fill.color[0] = cmd->color.g;
         context->state->fill.color[1] = cmd->color.g;
         context->state->fill.color[2] = cmd->color.g;
@@ -105,17 +93,9 @@ void handle_g(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 
 void handle_G(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
-    // set both in one operation
-    // gray
-    if (dry_run)
-    {
-        auto data = context->deque->pop_front();
-        float g = strtof(data->data(), NULL);
-        cmd->type = TOKEN_OPERATOR_G;
-        cmd->color.g = g;
-    }
-    else
-    {
+    if (dry_run) {
+        pop_gray_cmd(cmd, context->deque, TOKEN_OPERATOR_G);
+    } else {
         context->state->stroke.color[0] = cmd->color.g;
         context->state->stroke.color[1] = cmd->color.g;
         context->state->stroke.color[2] = cmd->color.g;
@@ -125,29 +105,9 @@ void handle_G(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 
 void handle_k(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
-    // for nonstroking
-
-    if (dry_run)
-    {
-        auto data = context->deque->pop_front();
-        float k = strtof(data->data(), NULL);
-        auto data2 = context->deque->pop_front();
-        float y = strtof(data2->data(), NULL);
-        auto data3 = context->deque->pop_front();
-        float m = strtof(data3->data(), NULL);
-        auto data4 = context->deque->pop_front();
-        float c = strtof(data4->data(), NULL);
-        // handle_K(context);
-        float r = (1.0 - c) * (1.0 - k);
-        float g = (1.0 - m) * (1.0 - k);
-        float b = (1.0 - y) * (1.0 - k);
-        cmd->type = TOKEN_OPERATOR_k;
-        cmd->color.r = r;
-        cmd->color.g = g;
-        cmd->color.b = b;
-    }
-    else
-    {
+    if (dry_run) {
+        pop_cmyk_cmd(cmd, context->deque, TOKEN_OPERATOR_k);
+    } else {
         context->state->fill.color[0] = cmd->color.r;
         context->state->fill.color[1] = cmd->color.g;
         context->state->fill.color[2] = cmd->color.b;
@@ -157,27 +117,9 @@ void handle_k(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 
 void handle_K(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
-    // combine CS and SC for DeviceCMYK
-    if (dry_run)
-    {
-        auto data = context->deque->pop_front();
-        float k = strtof(data->data(), NULL);
-        auto data2 = context->deque->pop_front();
-        float y = strtof(data2->data(), NULL);
-        auto data3 = context->deque->pop_front();
-        float m = strtof(data3->data(), NULL);
-        auto data4 = context->deque->pop_front();
-        float c = strtof(data4->data(), NULL);
-        float r = (1.0 - c) * (1.0 - k);
-        float g = (1.0 - m) * (1.0 - k);
-        float b = (1.0 - y) * (1.0 - k);
-        cmd->type = TOKEN_OPERATOR_K;
-        cmd->color.r = r;
-        cmd->color.g = g;
-        cmd->color.b = b;
-    }
-    else
-    {
+    if (dry_run) {
+        pop_cmyk_cmd(cmd, context->deque, TOKEN_OPERATOR_K);
+    } else {
         context->state->stroke.color[0] = cmd->color.r;
         context->state->stroke.color[1] = cmd->color.g;
         context->state->stroke.color[2] = cmd->color.b;
@@ -187,22 +129,9 @@ void handle_K(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 
 void handle_rg(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
-    // for nonstroking
-    if (dry_run)
-    {
-        auto data = context->deque->pop_front();
-        float b = strtof(data->data(), NULL);
-        auto data2 = context->deque->pop_front();
-        float g = strtof(data2->data(), NULL);
-        auto data3 = context->deque->pop_front();
-        float r = strtof(data3->data(), NULL);
-        cmd->type = TOKEN_OPERATOR_rg;
-        cmd->color.r = r;
-        cmd->color.g = g;
-        cmd->color.b = b;
-    }
-    else
-    {
+    if (dry_run) {
+        pop_rgb_cmd(cmd, context->deque, TOKEN_OPERATOR_rg);
+    } else {
         context->state->fill.color[0] = cmd->color.r;
         context->state->fill.color[1] = cmd->color.g;
         context->state->fill.color[2] = cmd->color.b;
@@ -210,106 +139,42 @@ void handle_rg(pdf_render* context, pdf_render_command* cmd, bool dry_run)
     }
 }
 
-
 void handle_RG(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
-    // combine CS and SC for DeviceRGB
-    if (dry_run)
-    {
-        auto data = context->deque->pop_front();
-        float b = strtof(data->data(), NULL);
-        auto data2 = context->deque->pop_front();
-        float g = strtof(data2->data(), NULL);
-        auto data3 = context->deque->pop_front();
-        float r = strtof(data3->data(), NULL);
-        cmd->type = TOKEN_OPERATOR_RG;
-        cmd->color.r = r;
-        cmd->color.g = g;
-        cmd->color.b = b;
-    }
-    else
-    {
-        context->state->stroke.color[0] =  cmd->color.r;
-        context->state->stroke.color[1] =  cmd->color.g;
-        context->state->stroke.color[2] =  cmd->color.b;
+    if (dry_run) {
+        pop_rgb_cmd(cmd, context->deque, TOKEN_OPERATOR_RG);
+    } else {
+        context->state->stroke.color[0] = cmd->color.r;
+        context->state->stroke.color[1] = cmd->color.g;
+        context->state->stroke.color[2] = cmd->color.b;
         strcpy(context->state->stroke.currentColorSpace, "/DeviceRGB");
     }
 }
 
 void handle_sc(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
-    // for nonstroking
-    // char buf[1024] = { 0 };
-    // deque_node_t node;
-    // node.data = buf;
-    // deque_pop(context->deque, &node);
-
     if (!strcmp(context->state->fill.currentColorSpace, "/DeviceGray"))
     {
-        // gray
-        if (dry_run)
-        {
-            auto data = context->deque->pop_front();
-            float g = strtof(data->data(), NULL);
-            cmd->type = TOKEN_OPERATOR_sc;
-            cmd->color.g = g;
-        }
-        else
-        {
+        if (dry_run) { pop_gray_cmd(cmd, context->deque, TOKEN_OPERATOR_sc); }
+        else {
             context->state->fill.color[0] = cmd->color.g;
             context->state->fill.color[1] = cmd->color.g;
             context->state->fill.color[2] = cmd->color.g;
         }
     }
-    else if (!strcmp(context->state->fill.currentColorSpace,
-        "/DeviceRGB"))
+    else if (!strcmp(context->state->fill.currentColorSpace, "/DeviceRGB"))
     {
-        // red green blue
-        if (dry_run)
-        {
-            auto data = context->deque->pop_front();
-            float b = strtof(data->data(), NULL);
-            auto data2 = context->deque->pop_front();
-            float g = strtof(data2->data(), NULL);
-            auto data3 = context->deque->pop_front();
-            float r = strtof(data3->data(), NULL);
-            cmd->type = TOKEN_OPERATOR_sc;
-            cmd->color.r = r;
-            cmd->color.g = g;
-            cmd->color.b = b;
-        }
-        else
-        {
+        if (dry_run) { pop_rgb_cmd(cmd, context->deque, TOKEN_OPERATOR_sc); }
+        else {
             context->state->fill.color[0] = cmd->color.r;
             context->state->fill.color[1] = cmd->color.g;
             context->state->fill.color[2] = cmd->color.b;
         }
     }
-    else if (!strcmp(context->state->fill.currentColorSpace,
-        "/DeviceCMYK"))
+    else if (!strcmp(context->state->fill.currentColorSpace, "/DeviceCMYK"))
     {
-        // cyan magenta yellow black
-        if (dry_run)
-        {
-            auto data = context->deque->pop_front();
-            float k = strtof(data->data(), NULL);
-            auto data2 = context->deque->pop_front();
-            float y = strtof(data2->data(), NULL);
-            auto data3 = context->deque->pop_front();
-            float m = strtof(data3->data(), NULL);
-            auto data4 = context->deque->pop_front();
-            float c = strtof(data4->data(), NULL);
-
-            float r = (1.0 - c) * (1.0 - k);
-            float g = (1.0 - m) * (1.0 - k);
-            float b = (1.0 - y) * (1.0 - k);
-            cmd->type = TOKEN_OPERATOR_sc;
-            cmd->color.r = r;
-            cmd->color.g = g;
-            cmd->color.b = b;
-        }
-        else
-        {
+        if (dry_run) { pop_cmyk_cmd(cmd, context->deque, TOKEN_OPERATOR_sc); }
+        else {
             context->state->fill.color[0] = cmd->color.r;
             context->state->fill.color[1] = cmd->color.g;
             context->state->fill.color[2] = cmd->color.b;
@@ -317,22 +182,8 @@ void handle_sc(pdf_render* context, pdf_render_command* cmd, bool dry_run)
     }
     else
     {
-        // For other color spaces like ICCBased, assume RGB components
-        if (dry_run)
-        {
-            auto data = context->deque->pop_front();
-            float b = strtof(data->data(), NULL);
-            auto data2 = context->deque->pop_front();
-            float g = strtof(data2->data(), NULL);
-            auto data3 = context->deque->pop_front();
-            float r = strtof(data3->data(), NULL);
-            cmd->type = TOKEN_OPERATOR_sc;
-            cmd->color.r = r;
-            cmd->color.g = g;
-            cmd->color.b = b;
-        }
-        else
-        {
+        if (dry_run) { pop_rgb_cmd(cmd, context->deque, TOKEN_OPERATOR_sc); }
+        else {
             context->state->fill.color[0] = cmd->color.r;
             context->state->fill.color[1] = cmd->color.g;
             context->state->fill.color[2] = cmd->color.b;
@@ -340,77 +191,30 @@ void handle_sc(pdf_render* context, pdf_render_command* cmd, bool dry_run)
     }
 }
 
-
 void handle_SC(pdf_render* context, pdf_render_command* cmd, bool dry_run)
 {
-    // set gray level, 0.0 to balck 1.0 to white
     if (!strcmp(context->state->stroke.currentColorSpace, "/DeviceGray"))
     {
-        // gray
-        if (dry_run)
-        {
-            auto data = context->deque->pop_front();
-            float g = strtof(data->data(), NULL);
-            cmd->type = TOKEN_OPERATOR_sc;
-            cmd->color.g = g;
-        }
-        else
-        {
+        if (dry_run) { pop_gray_cmd(cmd, context->deque, TOKEN_OPERATOR_SC); }
+        else {
             context->state->stroke.color[0] = cmd->color.g;
             context->state->stroke.color[1] = cmd->color.g;
             context->state->stroke.color[2] = cmd->color.g;
         }
     }
-    else if (!strcmp(context->state->stroke.currentColorSpace,
-        "/DeviceRGB"))
+    else if (!strcmp(context->state->stroke.currentColorSpace, "/DeviceRGB"))
     {
-        // red green blue
-
-        if (dry_run)
-        {
-            auto data = context->deque->pop_front();
-            float b = strtof(data->data(), NULL);
-            auto data2 = context->deque->pop_front();
-            float g = strtof(data2->data(), NULL);
-            auto data3 = context->deque->pop_front();
-            float r = strtof(data3->data(), NULL);
-            cmd->type = TOKEN_OPERATOR_sc;
-            cmd->color.r = r;
-            cmd->color.g = g;
-            cmd->color.b = b;
-        }
-        else
-        {
+        if (dry_run) { pop_rgb_cmd(cmd, context->deque, TOKEN_OPERATOR_SC); }
+        else {
             context->state->stroke.color[0] = cmd->color.r;
             context->state->stroke.color[1] = cmd->color.g;
             context->state->stroke.color[2] = cmd->color.b;
         }
     }
-    else if (!strcmp(context->state->stroke.currentColorSpace,
-        "/DeviceCMYK"))
+    else if (!strcmp(context->state->stroke.currentColorSpace, "/DeviceCMYK"))
     {
-        // cyan magenta yellow black
-        if (dry_run)
-        {
-            auto data = context->deque->pop_front();
-            float k = strtof(data->data(), NULL);
-            auto data2 = context->deque->pop_front();
-            float y = strtof(data2->data(), NULL);
-            auto data3 = context->deque->pop_front();
-            float m = strtof(data3->data(), NULL);
-            auto data4 = context->deque->pop_front();
-            float c = strtof(data4->data(), NULL);
-
-            float r = (1.0 - c) * (1.0 - k);
-            float g = (1.0 - m) * (1.0 - k);
-            float b = (1.0 - y) * (1.0 - k);
-            cmd->type = TOKEN_OPERATOR_sc;
-            cmd->color.r = r;
-            cmd->color.g = g;
-            cmd->color.b = b;
-        }
-        else
-        {
+        if (dry_run) { pop_cmyk_cmd(cmd, context->deque, TOKEN_OPERATOR_SC); }
+        else {
             context->state->stroke.color[0] = cmd->color.r;
             context->state->stroke.color[1] = cmd->color.g;
             context->state->stroke.color[2] = cmd->color.b;
@@ -418,22 +222,8 @@ void handle_SC(pdf_render* context, pdf_render_command* cmd, bool dry_run)
     }
     else
     {
-        // For other color spaces like ICCBased, assume RGB components
-        if (dry_run)
-        {
-            auto data = context->deque->pop_front();
-            float b = strtof(data->data(), NULL);
-            auto data2 = context->deque->pop_front();
-            float g = strtof(data2->data(), NULL);
-            auto data3 = context->deque->pop_front();
-            float r = strtof(data3->data(), NULL);
-            cmd->type = TOKEN_OPERATOR_sc;
-            cmd->color.r = r;
-            cmd->color.g = g;
-            cmd->color.b = b;
-        }
-        else
-        {
+        if (dry_run) { pop_rgb_cmd(cmd, context->deque, TOKEN_OPERATOR_SC); }
+        else {
             context->state->stroke.color[0] = cmd->color.r;
             context->state->stroke.color[1] = cmd->color.g;
             context->state->stroke.color[2] = cmd->color.b;
@@ -449,19 +239,11 @@ void handle_scn(pdf_render* context, pdf_render_command* cmd, bool dry_run)
     {
         return handle_sc(context, cmd, dry_run);
     }
-    // For pattern color spaces or other custom color spaces, skip setting color
-    if (dry_run)
-    {
-        auto data = context->deque->pop_front();
+    // For pattern color spaces, set to white
+    if (dry_run) {
         cmd->type = TOKEN_OPERATOR_scn;
-        // Set color to white for pattern color spaces
-        cmd->color.r = 1.0;
-        cmd->color.g = 1.0;
-        cmd->color.b = 1.0;
-    }
-    else
-    {
-        // Set to white for pattern color spaces
+        cmd->color.r = 1.0f; cmd->color.g = 1.0f; cmd->color.b = 1.0f;
+    } else {
         context->state->fill.color[0] = 1.0;
         context->state->fill.color[1] = 1.0;
         context->state->fill.color[2] = 1.0;
@@ -476,19 +258,11 @@ void handle_SCN(pdf_render* context, pdf_render_command* cmd, bool dry_run)
     {
         return handle_SC(context, cmd, dry_run);
     }
-    // For pattern color spaces or other custom color spaces, skip setting color
-    if (dry_run)
-    {
-        auto data = context->deque->pop_front();
+    // For pattern color spaces, set to white
+    if (dry_run) {
         cmd->type = TOKEN_OPERATOR_SCN;
-        // Set color to white for pattern color spaces
-        cmd->color.r = 1.0;
-        cmd->color.g = 1.0;
-        cmd->color.b = 1.0;
-    }
-    else
-    {
-        // Set to white for pattern color spaces
+        cmd->color.r = 1.0f; cmd->color.g = 1.0f; cmd->color.b = 1.0f;
+    } else {
         context->state->stroke.color[0] = 1.0;
         context->state->stroke.color[1] = 1.0;
         context->state->stroke.color[2] = 1.0;

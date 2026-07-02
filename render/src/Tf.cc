@@ -2,6 +2,10 @@
 #include "pdf-render-private.h"
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb-truetype.h"
+#include <unordered_map>
+#include <vector>
+// ponytail: global font file cache eliminates repeated disk I/O for same font
+static std::unordered_map<std::string, std::vector<unsigned char>> g_font_cache;
 static int stbtt_InitFont_internal1(stbtt_fontinfo *info, unsigned char *data, int fontstart)
 {
    stbtt_uint32 cmap, t;
@@ -129,7 +133,7 @@ pdf_font_face_t* pdf_font_face_load_from_data(const void* data,
             destroy_func(closure);
         return NULL;
     }
-    pdf_font_face_t* face = (pdf_font_face_t*)malloc(sizeof(pdf_font_face_t));
+    pdf_font_face_t* face = new pdf_font_face_t{};
     face->ref_count = 1;
     face->info = info;
     stbtt_GetFontVMetrics(&face->info, &face->ascent, &face->descent, &face->line_gap);
@@ -166,23 +170,45 @@ void pdf_font_face_destroy(pdf_font_face_t* face)
 
         if(face->destroy_func)
             face->destroy_func(face->closure);
-        free(face);
+        delete face;
     }
+}
+
+// Adjust fontWeight by inspecting the basefont name for weight hints.
+// Many PDFs use font names like "Helvetica-Bold" without setting FontWeight
+// in the FontDescriptor, which defaults to 400 (Regular).
+static double _resolve_font_weight(const char* basefont, double fontWeight)
+{
+    if (basefont == NULL) return fontWeight;
+    // If fontWeight is already set to a value that clearly indicates bold (>400), trust it
+    if (fontWeight > 400) return fontWeight;
+    // Otherwise check the font name for weight hints
+    if (strstr(basefont, "Bold") || strstr(basefont, "Heavy") || strstr(basefont, "Black"))
+        return 700;
+    if (strstr(basefont, "Medium"))
+        return 500;
+    if (strstr(basefont, "Light"))
+        return 300;
+    if (strstr(basefont, "Thin"))
+        return 100;
+    return fontWeight;
 }
 
 void load_font_from_external(pdf_render* context, const char* basefont, pdf_font_descriptor_t* font_descriptor)
 {
     char fontname[256] = { 0 };
+    double fontWeight = font_descriptor ? font_descriptor->fontWeight : 400;
+    fontWeight = _resolve_font_weight(basefont, fontWeight);
     if (basefont)
     {
         if (!strncmp(basefont, "/Helvetica", 10) || !strncmp(basefont, "/Times", 6) || !strncmp(basefont, "/Symbol", 7))
         {
             sprintf(fontname, "fonts/NotoSansSC-");
-            if (!font_descriptor || font_descriptor->fontWeight <= 400)
+            if (fontWeight <= 400)
             {
                 strcat(fontname, "Regular.ttf");
             }
-            else if (font_descriptor->fontWeight <= 600)
+            else if (fontWeight <= 600)
             {
                 strcat(fontname, "SemiBold.ttf");
             }
@@ -197,44 +223,42 @@ void load_font_from_external(pdf_render* context, const char* basefont, pdf_font
     {
         return;
     }
-    //TODO
     
     bool isSerif = (font_descriptor->flags & 0x02) != 0;
     sprintf(fontname, "fonts/Noto%sSC-", isSerif ? "Serif" : "Sans");
-    //\xCB\xCE\xCC\xE5 -> SimSun
-    if (font_descriptor->fontWeight <= 0)
+    if (fontWeight <= 0)
     {
         strcat(fontname, "Regular.ttf");
     }
-    else if (font_descriptor->fontWeight <= 100)
+    else if (fontWeight <= 100)
     {
         strcat(fontname, "Thin.ttf");
     }
-    else if (font_descriptor->fontWeight <= 200)
+    else if (fontWeight <= 200)
     {
         strcat(fontname, "ExtraLight.ttf");
     }
-    else if (font_descriptor->fontWeight <= 300)
+    else if (fontWeight <= 300)
     {
         strcat(fontname, "Light.ttf");
     }
-    else if (font_descriptor->fontWeight == 400)
+    else if (fontWeight == 400)
     {
         strcat(fontname, "Regular.ttf");
     }
-    else if (font_descriptor->fontWeight <= 500)
+    else if (fontWeight <= 500)
     {
         strcat(fontname, "Medium.ttf");
     }
-    else if (font_descriptor->fontWeight <= 600)
+    else if (fontWeight <= 600)
     {
         strcat(fontname, "SemiBold.ttf");
     }
-    else if (font_descriptor->fontWeight <= 700)
+    else if (fontWeight <= 700)
     {
         strcat(fontname, "Bold.ttf");
     }
-    else if (font_descriptor->fontWeight <= 800)
+    else if (fontWeight <= 800)
     {
         strcat(fontname, "ExtraBold.ttf");
     }
@@ -243,17 +267,32 @@ void load_font_from_external(pdf_render* context, const char* basefont, pdf_font
         strcat(fontname, "Black.ttf");
     }
 LOAD_FONT:
-    FILE* f = fopen(fontname, "rb");
-    if (f)
     {
-        fseek(f, 0, SEEK_END);
-        long len = ftell(f);
-        fseek(f, 0, SEEK_SET);
-        unsigned char* data = (unsigned char*)malloc(len);
-        fread(data, 1, len, f);
-        fclose(f);
-        context->state->textState.fontface = pdf_font_face_load_from_data(
-            data, len, 0, free, data);
+        // ponytail: global cache avoids repeated disk I/O for same font file
+        std::string key(fontname);
+        auto it = g_font_cache.find(key);
+        if (it == g_font_cache.end())
+        {
+            FILE* f = fopen(fontname, "rb");
+            if (f)
+            {
+                fseek(f, 0, SEEK_END);
+                long len = ftell(f);
+                fseek(f, 0, SEEK_SET);
+                std::vector<unsigned char> buf(len);
+                fread(buf.data(), 1, len, f);
+                fclose(f);
+                it = g_font_cache.emplace(key, std::move(buf)).first;
+            }
+        }
+        if (it != g_font_cache.end() && !it->second.empty())
+        {
+            size_t len = it->second.size();
+            unsigned char* data = (unsigned char*)malloc(len);
+            memcpy(data, it->second.data(), len);
+            context->state->textState.fontface = pdf_font_face_load_from_data(
+                data, (unsigned int)len, 0, free, data);
+        }
     }
     context->state->textState.font_face_loaded = true;
 }
@@ -270,16 +309,12 @@ void handle_Tf(pdf_render* context, pdf_render_command* cmd, bool dry_run)
         // printf("font name = %s fontsize = %f\n", data2->data(), fontsize);
         pdf_font_t* font = pdf_obj_get_font(context->current_obj, data2->data());
         strcpy(font->name, data2->data() + 1);
-        int index = -1;
-        for (size_t i = 0; i < context->fontcache.size(); i++)
-        {
-            pdf_font_cache_t* cache = context->fontcache[i];
-            if (cache->font == font)
-            {
-                index = i;
-            }
-        }
-        if (index == -1)
+        pdf_font_cache_t* cache = NULL;
+        // ponytail: O(1) unordered_map lookup instead of O(n) linear scan
+        auto it = context->fontcache_map.find(font);
+        if (it != context->fontcache_map.end())
+            cache = it->second;
+        if (cache == NULL)
         {
             if (font->subtype == FONT_SUBTYPE_TYPE0)
             {
@@ -329,23 +364,18 @@ void handle_Tf(pdf_render* context, pdf_render_command* cmd, bool dry_run)
             {
                 return;
             }
-            pdf_font_cache_t* cache = new pdf_font_cache_t();
-            cache->font = pdf_font_reference(font);
-            cache->fontface = context->state->textState.fontface;
-            cache->loaded = context->state->textState.font_face_loaded;
-            context->fontcache.push_back(cache);
+            pdf_font_cache_t* new_cache = new pdf_font_cache_t();
+            new_cache->font = pdf_font_reference(font);
+            new_cache->fontface = context->state->textState.fontface;
+            new_cache->loaded = context->state->textState.font_face_loaded;
+            context->fontcache.push_back(new_cache);
+            context->fontcache_map[font] = new_cache;
+            cache = new_cache;
 
-            cmd->type = TOKEN_OPERATOR_Tf;
-            cmd->Tf.size = fontsize;
-            cmd->Tf.cache = cache;
         }
-        else
-        {
-            pdf_font_cache_t* cache = context->fontcache[index];
-            cmd->type = TOKEN_OPERATOR_Tf;
-            cmd->Tf.size = fontsize;
-            cmd->Tf.cache = cache;
-        }
+        cmd->type = TOKEN_OPERATOR_Tf;
+        cmd->Tf.size = fontsize;
+        cmd->Tf.cache = cache;
     }
     else
     {

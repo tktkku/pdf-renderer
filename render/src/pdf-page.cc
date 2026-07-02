@@ -10,7 +10,7 @@
 
 pdf_page_t* pdf_page_init()
 {
-    pdf_page_t* page = (pdf_page_t*)malloc(sizeof(pdf_page_t));
+    pdf_page_t* page = new pdf_page_t{};
     if (page == NULL)
     {
         return NULL;
@@ -199,11 +199,11 @@ void pdf_page_free(pdf_page_t* page)
 
     if (page->contents)
     {
-        free(page->contents);
+        delete[] page->contents;
         page->contents = NULL;
     }
 
-    free(page);
+    delete page;
     page = NULL;
 }
 

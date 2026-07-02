@@ -10,81 +10,64 @@
 
 uint32_t _convert_unicode_from_latin_encoding(uint16_t code, pdf_latin_encoding_type_t encoding)
 {
-    const pdf_latin_encoding_map_t* map = NULL;
-    int len = 0;
+    // ponytail: pre-built 256-entry direct lookup tables, built once per encoding type
+    static uint32_t latin_table_std[256] = {};
+    static uint32_t latin_table_mac[256] = {};
+    static uint32_t latin_table_win[256] = {};
+    static uint32_t latin_table_pdf[256] = {};
+    static bool latin_tables_built = false;
+    if (!latin_tables_built)
+    {
+        latin_tables_built = true;
+        struct { const pdf_latin_encoding_map_t* map; int len; uint32_t* table; } configs[] = {
+            {macRomanEncoding, 207, latin_table_std},
+            {macRomanEncoding, 207, latin_table_mac},
+            {winAnsiEncoding,  217, latin_table_win},
+            {pdfDocEncoding,   229, latin_table_pdf},
+        };
+        for (auto& cfg : configs)
+        {
+            for (int i = 0; i < cfg.len; i++)
+            {
+                const char* name = cfg.map[i].name;
+                int left = 0, right = ARRAY_COUNT(glyphlist) - 1;
+                while (left <= right)
+                {
+                    int mid = left + (right - left) / 2;
+                    int cmp = strcmp(glyphlist[mid].name, name);
+                    if (cmp == 0) { cfg.table[cfg.map[i].code] = glyphlist[mid].unicode; break; }
+                    else if (cmp < 0) left = mid + 1;
+                    else right = mid - 1;
+                }
+            }
+        }
+    }
+    uint32_t* table = NULL;
     switch (encoding)
     {
-        case PDF_LATIN_ENCODING_STD:
-            map = macRomanEncoding;
-            len = 207;
-            break;
-        case PDF_LATIN_ENCODING_MAC:
-            map = macRomanEncoding;
-            len = 207;
-            break;
-        case PDF_LATIN_ENCODING_WIN:
-            map = winAnsiEncoding;
-            len = 217;
-            break;
-        case PDF_LATIN_ENCODING_PDF:
-            map = pdfDocEncoding;
-            len = 229;
-            break;
-        default:
-            return 0;
+        case PDF_LATIN_ENCODING_STD: table = latin_table_std; break;
+        case PDF_LATIN_ENCODING_MAC: table = latin_table_mac; break;
+        case PDF_LATIN_ENCODING_WIN: table = latin_table_win; break;
+        case PDF_LATIN_ENCODING_PDF: table = latin_table_pdf; break;
+        default: return 0;
     }
-    if (map == NULL) return 0;
-    const char* name = NULL;
-    for (int i = 0; i < len; i++)
-    {
-        if (map[i].code == code)
-        {
-            name = map[i].name;
-            break;
-        }
-    }
-    if (name == NULL) return 0;
-    
-    int left = 0, right = ARRAY_COUNT(glyphlist) - 1;
-    while (left <= right)
-    {
-        int mid = left + (right - left) / 2;
-        if (strcmp(glyphlist[mid].name, name) == 0)
-        {
-            return glyphlist[mid].unicode;
-        }
-        else if (strcmp(glyphlist[mid].name, name) < 0)
-        {
-            left = mid + 1;
-        }
-        else
-        {
-            right = mid - 1;
-        }
-    }
-    return 0;
+    return table[code];
 }
 uint32_t _convert_code_from_cmap(pdf_cmap* cmap, uint32_t code)
 {
     if (cmap != NULL)
     {
-        for (size_t k = 0; k < cmap->cid_map.size(); k++)
-        {
-            if (code == cmap->cid_map[k].code)
-            {
-                return cmap->cid_map[k].cid;
-            }
-        }
- 
-        for (size_t k = 0; k < cmap->cid_range_map.size(); k++)
-        {
-            if (code >= cmap->cid_range_map[k].srcStart &&
-                code <= cmap->cid_range_map[k].srcEnd)
-            {
-                return cmap->cid_range_map[k].dstStart +
-                    (code - cmap->cid_range_map[k].srcStart);
-            }
-        }
+        // ponytail: binary search on sorted point map
+        auto it = std::lower_bound(cmap->cid_map.begin(), cmap->cid_map.end(), code,
+            [](const pdf_cmap_cid_map& m, uint32_t v) { return m.code < v; });
+        if (it != cmap->cid_map.end() && it->code == code)
+            return it->cid;
+
+        // ponytail: binary search on sorted range map
+        auto rit = std::lower_bound(cmap->cid_range_map.begin(), cmap->cid_range_map.end(), code,
+            [](const pdf_cmap_char_range& r, uint32_t v) { return r.srcEnd < v; });
+        if (rit != cmap->cid_range_map.end() && code >= rit->srcStart && code <= rit->srcEnd)
+            return rit->dstStart + (code - rit->srcStart);
     }
     return code;
 }
@@ -124,23 +107,17 @@ uint32_t _convert_unicode_from_cmap(pdf_cmap* cmap, uint32_t code)
 {
     if (cmap != NULL)
     {
-        for (size_t k = 0; k < cmap->unicode_map.size(); k++)
-        {
-            if (code == cmap->unicode_map[k].code)
-            {
-                return cmap->unicode_map[k].unicode;
-            }
-        }
- 
-        for (size_t k = 0; k < cmap->unicode_range_map.size(); k++)
-        {
-            if (code >= cmap->unicode_range_map[k].srcStart &&
-                code <= cmap->unicode_range_map[k].srcEnd)
-            {
-                return cmap->unicode_range_map[k].dstStart +
-                    (code - cmap->unicode_range_map[k].srcStart);
-            }
-        }
+        // ponytail: binary search on sorted point map
+        auto it = std::lower_bound(cmap->unicode_map.begin(), cmap->unicode_map.end(), code,
+            [](const pdf_cmap_unicode_map& m, uint32_t v) { return m.code < v; });
+        if (it != cmap->unicode_map.end() && it->code == code)
+            return it->unicode;
+
+        // ponytail: binary search on sorted range map
+        auto rit = std::lower_bound(cmap->unicode_range_map.begin(), cmap->unicode_range_map.end(), code,
+            [](const pdf_cmap_char_range& r, uint32_t v) { return r.srcEnd < v; });
+        if (rit != cmap->unicode_range_map.end() && code >= rit->srcStart && code <= rit->srcEnd)
+            return rit->dstStart + (code - rit->srcStart);
     }
     return code;
 }
@@ -318,7 +295,8 @@ void _cff_do_render_char(pdf_cff_char_render_t* context, pdf_deque* deque)
                     case 36: // hflex1
                     case 37://flex1
                     {
-                        CFF_HANDLERS2[operator2](context, deque);
+                        if (CFF_HANDLERS2[operator2])
+                            CFF_HANDLERS2[operator2](context, deque);
                         context->cur += 2;
                         break;
                     }
@@ -359,7 +337,7 @@ float pdf_font_face_traverse_glyph_path(
 
     unsigned int lsb = codepoint & 0xFF;
     if(face->glyphs[msb][lsb] == NULL) {
-        glyph_t* glyph = (glyph_t*)malloc(sizeof(glyph_t));
+        glyph_t* glyph = new glyph_t{};
         if (isGid) 
             glyph->index = codepoint;
         else 
@@ -421,21 +399,30 @@ float pdf_font_face_traverse_glyph_path(
 float pdf_add_text(pdf_render* context, const unicode_text_t* text, int length, float x, float y)
 {
     float advance_width = 0.f;
+    double charSpace = context->state->textState.characterSpacing;
+    double wordSpace = context->state->textState.wordSpacing;
     for (int i = 0; i < length; i++)
     {
         uint32_t codepoint = text[i].utf32;
-        advance_width += pdf_font_face_traverse_glyph_path(
+        // ponytail: apply word spacing for space character (U+0020)
+        if (codepoint == 32)
+            advance_width += (float)wordSpace;
+        float glyph_adv = pdf_font_face_traverse_glyph_path(
             context,
             x + advance_width, y, 
             codepoint,
             text[i].isGid);
+        advance_width += glyph_adv;
+        // ponytail: apply character spacing between glyphs (except after last)
+        if (i < length - 1)
+            advance_width += (float)charSpace;
     }
     return advance_width;
 }
 
 void _do_text_render(pdf_render* context, char* buf, int len)
 {
-#define DEBUG_TEXT 1
+#define DEBUG_TEXT 0
     if (context == NULL || context->state->textState.font == NULL || buf == NULL)
     {
         return;
@@ -573,46 +560,38 @@ void _do_text_render(pdf_render* context, char* buf, int len)
         pdf_cmap* encoding = type0->encoding;
         pdf_cmap* to_unicode_map = type0->to_unicode_map;
         pdf_cmap* cid_to_gid_map = cidfont->cid_to_gid_map;
+        // ponytail: helper to decode multi-byte CMap codes, shared by both CIDFont types
+        auto decode_code = [&](size_t i, uint32_t& code, uint32_t& cid) -> size_t {
+            for (int j = 4; j >= 1; j /= 2)
+            {
+                for (size_t k = 0; k < encoding->code_range_map.size(); k++)
+                {
+                    if (encoding->code_range_map[k].byte_len != j) continue;
+                    uint32_t c = 0;
+                    for (int l = j - 1; l >= 0; l--)
+                    {
+                        size_t idx = i + (j - 1 - l);
+                        if (idx >= bytes.size()) break;
+                        c = c << 8 | bytes[idx];
+                    }
+                    if (c >= encoding->code_range_map[k].srcStart && c <= encoding->code_range_map[k].srcEnd)
+                    {
+                        code = c;
+                        cid = _convert_code_from_cmap(encoding, c);
+                        return j;
+                    }
+                }
+            }
+            code = 0; cid = 0; return 0;
+        };
         if (descendant->subtype == FONT_SUBTYPE_CIDFONTTPYE0)
         {
             for (size_t i = 0; i < bytes.size(); )
             {
-                uint32_t code = 0;
-                uint32_t cid = 0;
-                for (int j = 4; j >= 1; j /= 2)
-                {
-                    bool found = false;
-                    for (size_t k = 0; k < encoding->code_range_map.size(); k++)
-                    {
-                        if (encoding->code_range_map[k].byte_len != j)
-                            continue;
-                        for (int l = j - 1; l >= 0; l--)
-                        {
-                            size_t index = i + (j - 1 - l);
-                            if (index >= bytes.size())
-                            {
-                                break;
-                            }
-                            code = code << 8 | bytes[index];
-                        }
-                        if (code >= encoding->code_range_map[k].srcStart && code <= encoding->code_range_map[k].srcEnd)
-                        {
-                            cid = _convert_code_from_cmap(encoding, code);
-                            #if DEBUG_TEXT
-                            printf("code = %5d cid = %5d gid = %5d ", code, cid, cid);
-                            #endif
-                            i += j;
-                            found = true;
-                            break;
-                        }
-                        else
-                        {
-                            code = 0;
-                        }
-                    }
-                    if (found) break;
-                }
-                
+                uint32_t code = 0, cid = 0;
+                size_t advance = decode_code(i, code, cid);
+                if (advance == 0) break;
+                i += advance;
                 uint32_t uni = 0;
                 if (to_unicode_map != NULL)
                 {
@@ -653,43 +632,10 @@ void _do_text_render(pdf_render* context, char* buf, int len)
         {
             for (size_t i = 0; i < bytes.size(); )
             {
-                uint32_t code = 0;
-                uint32_t cid = 0;
-                uint32_t gid = 0;
-                uint32_t uni = 0;
-                for (int j = 4; j >= 1; j /= 2)
-                {
-                    bool found = false;
-                    for (size_t k = 0; k < encoding->code_range_map.size(); k++)
-                    {
-                        if (encoding->code_range_map[k].byte_len != j)
-                            continue;
-                        for (int l = j - 1; l >= 0; l--)
-                        {
-                            size_t index = i + (j - 1 - l);
-                            if (index >= bytes.size())
-                            {
-                                break;
-                            }
-                            code = code << 8 | bytes[index];
-                        }
-                        if (code >= encoding->code_range_map[k].srcStart && code <= encoding->code_range_map[k].srcEnd)
-                        {
-                            cid = _convert_code_from_cmap(encoding, code);
-                            #if DEBUG_TEXT
-                            printf("code = %5d cid = %5d ", code, cid);
-                            #endif
-                            i += j;
-                            found = true;
-                            break;
-                        }
-                        else
-                        {
-                            code = 0;
-                        }
-                    }
-                    if (found) break;
-                }
+                uint32_t code = 0, cid = 0, gid = 0, uni = 0;
+                size_t advance = decode_code(i, code, cid);
+                if (advance == 0) break;
+                i += advance;
                 if (cid_to_gid_map != NULL)
                 {
                     for (size_t j = 0; j < cid_to_gid_map->code_range_map.size(); j++)
@@ -790,8 +736,38 @@ void _do_text_render(pdf_render* context, char* buf, int len)
             advance_width = pdf_add_text(context, unicode, unicode_cnt, context->state->textState.textLineWidth, 0);
             context->state->textState.textLineWidth += advance_width;
 
-            // TODO: text rendering mode support
-            switch (context->state->textState.textMode)
+            // Check ForceBold flag in FontDescriptor (bit 19, 0x40000)
+            // When set, simulate bold by also stroking the glyph outlines
+            bool forceBold = false;
+            {
+                pdf_font_t* f = context->state->textState.font;
+                pdf_font_descriptor_t* fd = NULL;
+                if (f->subtype == FONT_SUBTYPE_TYPE0 && f->type0->descendant && f->type0->descendant->cidfont)
+                    fd = f->type0->descendant->cidfont->font_descriptor;
+                else if ((f->subtype == FONT_SUBTYPE_TYPE1 || f->subtype == FONT_SUBTYPE_TRUETYPE) && f->type1_truetype)
+                    fd = f->type1_truetype->font_descriptor;
+                else if (f->subtype == FONT_SUBTYPE_TYPE3 && f->type3)
+                    fd = f->type3->font_descriptor;
+                if (fd && (fd->flags & 0x40000))
+                    forceBold = true;
+            }
+
+            int textMode = context->state->textState.textMode;
+            if (forceBold && (textMode == 0 || textMode == 4))
+            {
+                // Simulate bold: fill + stroke with a small line width
+                double savedLineWidth = context->state->lineWidth;
+                double boldLineWidth = context->state->textState.fontSize * 0.025;
+                if (boldLineWidth < 0.5) boldLineWidth = 0.5;
+                PDF_RENDERER_CALL(context->renderer, set_line_width, boldLineWidth);
+                PDF_RENDERER_CALL(context->renderer, set_line_cap, 1);  // round cap
+                PDF_RENDERER_CALL(context->renderer, set_line_join, 1); // round join
+                do_path(context, PDF_OPERATION_PATH_FILL | PDF_OPERATION_PATH_STROKE);
+                PDF_RENDERER_CALL(context->renderer, set_line_width, savedLineWidth);
+                PDF_RENDERER_CALL(context->renderer, set_line_cap, context->state->lineCap);
+                PDF_RENDERER_CALL(context->renderer, set_line_join, context->state->lineJoin);
+            }
+            else switch (textMode)
             {
                 case 0:// fill
                 case 4:
@@ -863,8 +839,9 @@ void _do_text_render(pdf_render* context, char* buf, int len)
                     ctx.len = charstrings_index->get(unicode[i].utf32)->value_len;
                     ctx.renderer = context->renderer;
                     ctx.fontSize = context->state->textState.fontSize;
-                    ctx.global_bias = font_descriptor->global_subr_bias;
+                    ctx.charstrings = font_descriptor->charstrings;
                     ctx.global_subr = font_descriptor->global_subr;
+                    ctx.global_bias = font_descriptor->global_subr_bias;
                     ctx.open = false;
                     ctx.havewidth = false;
                     ctx.width = 0;
@@ -908,7 +885,26 @@ void _do_text_render(pdf_render* context, char* buf, int len)
 
                     context->state->textState.textLineWidth += advance;
                     pdf_matrix_translate(&context->state->textState.textMatrix, advance, 0);
-                    PDF_RENDERER_CALL(context->renderer, fill);
+                    // ForceBold simulation for CFF fonts
+                    if (font_descriptor && (font_descriptor->flags & 0x40000) 
+                        && (context->state->textState.textMode == 0 || context->state->textState.textMode == 4))
+                    {
+                        double savedLineWidth = context->state->lineWidth;
+                        double boldLineWidth = context->state->textState.fontSize * 0.025;
+                        if (boldLineWidth < 0.5) boldLineWidth = 0.5;
+                        PDF_RENDERER_CALL(context->renderer, set_line_width, boldLineWidth);
+                        PDF_RENDERER_CALL(context->renderer, set_line_cap, 1);
+                        PDF_RENDERER_CALL(context->renderer, set_line_join, 1);
+                        PDF_RENDERER_CALL(context->renderer, fill);
+                        PDF_RENDERER_CALL(context->renderer, stroke);
+                        PDF_RENDERER_CALL(context->renderer, set_line_width, savedLineWidth);
+                        PDF_RENDERER_CALL(context->renderer, set_line_cap, context->state->lineCap);
+                        PDF_RENDERER_CALL(context->renderer, set_line_join, context->state->lineJoin);
+                    }
+                    else
+                    {
+                        PDF_RENDERER_CALL(context->renderer, fill);
+                    }
                     PDF_RENDERER_CALL(context->renderer, restore); 
                     delete deque;
                 }
@@ -932,6 +928,14 @@ void _do_text_render(pdf_render* context, char* buf, int len)
             for (int i = 0; i < unicode_cnt; i++) 
             {
                 uint32_t c = unicode[i].utf32;
+                pdf_obj_t* obj = NULL;
+                // ponytail: O(1) glyph cache avoids re-searching differences + re-resolving obj
+                auto* cache = type3->glyph_cache;
+                if (cache)
+                {
+                    auto it = cache->find(c);
+                    if (it != cache->end()) { obj = it->second; goto RENDER_TYPE3_GLYPH; }
+                }
                 for (size_t j = 0; j < differences->size(); j += 2) 
                 {
                     if ((uint32_t)differences->get(j)->val.number == c) 
@@ -940,8 +944,14 @@ void _do_text_render(pdf_render* context, char* buf, int len)
                         pdf_indirect_t indirect = type3->charProcs->get_indirect(name);
                         if (indirect.obj_num != -1) 
                         {
-                            pdf_obj_t* obj = pdf_file_get_obj(context->pdf, indirect);
-                            if (obj != NULL && obj->stream != NULL) 
+                            obj = pdf_file_get_obj(context->pdf, indirect);
+                            if (cache) (*cache)[c] = obj;
+                        }
+                        break;
+                    }
+                }
+            RENDER_TYPE3_GLYPH:
+                if (obj != NULL && obj->stream != NULL) 
                             {
                                 pdf_obj_t* save_obj = context->current_obj;
                                 context->current_obj = obj;
@@ -992,10 +1002,6 @@ void _do_text_render(pdf_render* context, char* buf, int len)
                                 
                                 PDF_RENDERER_CALL(context->renderer, restore);
                             }
-                        }
-                        break;
-                    }
-                }
             }
             context->state->textState.textMatrix = original_matrix;
         }

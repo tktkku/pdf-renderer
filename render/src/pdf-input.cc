@@ -7,7 +7,7 @@ int input_file(input_t** input, const char* filename)
     if (input == NULL || filename == NULL) return -1;
     FILE* fp = fopen(filename, "rb");
     if (!fp) return -1;
-    *input = (input_t*)malloc(sizeof(input_t));
+    *input = new input_t{};
     (*input)->type = INPUT_TYPE_FILE;
     (*input)->file = fp;
     return 0;
@@ -17,7 +17,7 @@ int input_buffer(input_t** input, const char* data, size_t size)
 {
     if (input == NULL || data == NULL || size <= 0) 
         return -1;
-    *input = (input_t*)malloc(sizeof(input_t));
+    *input = new input_t{};
     (*input)->type = INPUT_TYPE_BUFFER;
     (*input)->buffer.data = data;
     (*input)->buffer.size = size;
@@ -29,7 +29,7 @@ int input_stream(input_t** input, pdf_stream_t* stream)
 {
     if (input == NULL || stream == NULL) 
         return -1;
-    *input = (input_t*)malloc(sizeof(input_t));
+    *input = new input_t{};
     (*input)->type = INPUT_TYPE_STREAM;
     (*input)->stream = stream;
     return 0;
@@ -124,5 +124,5 @@ void input_close(input_t* input)
     {
         fclose(input->file);
     }
-    free(input);
+    delete input;
 }

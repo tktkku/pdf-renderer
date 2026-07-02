@@ -177,7 +177,7 @@ pdf_value_t* pdf_dict::get(const char* key)
 
 void pdf_dict::add(const char* key, pdf_value_type_t type, void* data)
 {
-    pdf_value_t* value = (pdf_value_t*)malloc(sizeof(pdf_value_t));
+    pdf_value_t* value = pdf_value_init();
     value->type = type;
     switch (type)
     {

@@ -26,6 +26,11 @@ void pdf_value_free(struct pdf_value* value)
         delete value->val.array;
         value->val.array = NULL;
     }
-    free(value);
-    value = NULL;
+    delete value;
+}
+
+// ponytail: factory to ensure consistent new/delete with pdf_value_free
+pdf_value_t* pdf_value_init(void) {
+    pdf_value_t* v = new pdf_value_t{};
+    return v;
 }

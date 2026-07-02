@@ -27,12 +27,11 @@ void pdf_stream_free(pdf_stream_t* stream)
         return;
     if (stream->filter)
     {
-        free(stream->filter);
+        delete stream->filter;
         stream->filter = NULL;
     }
 
-    free(stream);
-    stream = NULL;
+    delete stream;
 }
 
 pdf_stream_t* pdf_stream_init(pdf_file_t* pdf, pdf_obj_t* obj, int len, int offset)
@@ -94,7 +93,7 @@ pdf_stream_t* pdf_stream_init(pdf_file_t* pdf, pdf_obj_t* obj, int len, int offs
         if (earlychange != 0 && earlychange != 1) earlychange = 1;
     }
 
-    pdf_stream_t* s = (pdf_stream_t*)calloc(1, sizeof(pdf_stream_t));
+    pdf_stream_t* s = new pdf_stream_t{};
     s->pdf = pdf;
     s->obj = obj;
     s->stream_len = len;
@@ -106,14 +105,14 @@ pdf_stream_t* pdf_stream_init(pdf_file_t* pdf, pdf_obj_t* obj, int len, int offs
     s->earlychange = earlychange;
     if (filter != NULL)
     {
-        s->filter = (struct pdf_value*)calloc(1, sizeof(struct pdf_value));
+        s->filter = new pdf_value_t{};
         s->filter->type = PDF_VALUE_NAME;
         s->filter->val.name = (char*)filter;
         s->filter->value_len = strlen(filter);
     }
     else if (filter_arr != NULL)
     {
-        s->filter = (struct pdf_value*)calloc(1, sizeof(struct pdf_value));
+        s->filter = new pdf_value_t{};
         s->filter->type = PDF_VALUE_ARRAY;
         s->filter->val.array = filter_arr;
     }

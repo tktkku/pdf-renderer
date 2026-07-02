@@ -6,39 +6,22 @@
 #include <string.h>
 #include <stdlib.h>
 #include <memory>
+#include <algorithm>
 const static char* TOKEN_NAMES[] = {
     #define TOKEN_DEF(v, t) v,
     #include "pdf-token.def"
     #undef TOKEN_DEF
 };
-const char space_tag[] = {
-    // 0 9 10 12 13 32
-    '\0', '\t', '\n', '\f', '\r', ' '
+// ponytail: 256-byte lookup tables beat binary search on 6-element array
+static constexpr bool is_space_table[256] = {
+    true,  false, false, false, false, false, false, false, false, true,  // 0-9: 0='\0' 9='\t
+    true,  false, true,  true,  false, false, false, false, false, false, // 10-19: 10='\n' 12='\f' 13='\r'
+    false, false, false, false, false, false, false, false, false, false, // 20-29
+    false, false, true,  false, false, false, false, false, false, false, // 30-39: 32=' '
 };
 bool _is_space(char c)
 {
-    int len = ARRAY_COUNT(space_tag);
-    int left = 0;
-    int right = len - 1;
-
-    while (left <= right)
-    {
-        int mid = left + (right - left) / 2;
-        if (c < space_tag[mid])
-        {
-            right = mid - 1;
-        }
-        else if (c > space_tag[mid])
-        {
-            left = mid + 1;
-        }
-        else
-        {
-            return true;
-        }
-    }
-
-    return false;
+    return is_space_table[(unsigned char)c];
 }
 inline bool _is_digit(char c)
 {
@@ -50,33 +33,24 @@ inline bool _is_hex(char c)
         _is_digit(c)
         || ((c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'));
 }
-const char delimiter_tag[] = {
-    // 37 40 41 47 60 62 91 93 123 125
-    '%', '(', ')', '/', '<', '>', '[', ']', '{', '}',
+static constexpr bool is_delimiter_table[256] = {
+    false, false, false, false, false, false, false, false, false, false, // 0-9
+    false, false, false, false, false, false, false, false, false, false, // 10-19
+    false, false, false, false, false, false, false, false, false, false, // 20-29
+    false, false, false, false, false, false, false, true,  false, false, // 30-39: 37='%'
+    true,  true,  false, false, false, false, false, true,  false, false, // 40-49: 40='(', 41=')', 47='/'
+    false, false, false, false, false, false, false, false, false, false, // 50-59
+    true,  false, true,  false, false, false, false, false, false, false, // 60-69: 60='<', 62='>'
+    false, false, false, false, false, false, false, false, false, false, // 70-79
+    false, false, false, false, false, false, false, false, false, false, // 80-89
+    false, true,  false, true,  false, false, false, false, false, false, // 90-99: 91='[', 93=']'
+    false, false, false, false, false, false, false, false, false, false, // 100-109
+    false, false, false, false, false, false, false, false, false, false, // 110-119
+    false, false, false, true,  false, true,  false, false, false, false, // 120-129: 123='{', 125='}'
 };
 bool _is_delimiter(char c)
 {
-    int len = ARRAY_COUNT(delimiter_tag);
-    int left = 0;
-    int right = len - 1;
-    while (left <= right)
-    {
-        int mid = left + (right - left) / 2;
-        if (c < delimiter_tag[mid])
-        {
-            right = mid - 1;
-        }
-        else if (c > delimiter_tag[mid])
-        {
-            left = mid + 1;
-        }
-        else
-        {
-            return true;
-        }
-    }
-
-    return false;
+    return is_delimiter_table[(unsigned char)c];
 }
 
 typedef struct
@@ -254,79 +228,67 @@ const char* _token_to_string(pdf_token_type_t type)
 
 pdf_token* _parse_number(pdf_parser_t* parser, const unsigned char* start, const unsigned char* end)
 {
-    int len = 1;
+    int len = 0;
     const unsigned char* p = start;
 
     char c = *p;
     bool has_dot = false;
-    if (_is_digit(c) || c == '.')
-    {
-    process_number:
-        if (c == '.')
-            has_dot = true;
 
-        while (p < end)
-        {
-            p++; len++;
-            c = *p;
-            if (_is_digit(c))
-            {
-                continue;
-            }
-            else if (c == '.')
-            {
-                if (!has_dot)
-                {
-                    has_dot = true;
-                }
-                else
-                {
-                    //pdf_parser_error("error number: %c", c);
-                    return NULL;
-                }
-            }
-            else
-            {
-                p--; len--;
-                break;
-            }
-        }
-        pdf_token* tk = new pdf_token((char*)start, len, TOKEN_NUMBER);
-
-        return tk;
-    }
-    else if (c == '-' || c == '+')
+    if (c == '-' || c == '+')
     {
-        if (p < end)
+        len = 1;
+        p++;
+        if (p >= end)
         {
-            p++; len++;
-            c = *p;
-            if (_is_digit(c) || c == '.')
-            {
-                goto process_number;
-            }
-            else
-            {
-                //pdf_parser_error("unknown token: %c(%#x)", c, c);
-                return NULL;
-            }
+            len = 0;
         }
         else
         {
-            return NULL;
+            c = *p;
+        }
+        
+    }
+
+    while (p < end)
+    {
+        if (_is_digit(c))
+        {
+            len++;
+            p++;
+            if (p < end)
+                c = *p;
+        }
+        else if (c == '.')
+        {
+            if (has_dot)
+            {
+                len = 0;
+                break;
+            }
+            has_dot = true;
+            len++;
+            p++;
+            if (p < end)
+                c = *p;
+        }
+        else
+        {
+            break;
         }
     }
-    else
-    {
-        //pdf_parser_error("unknown token: %c(%#x)", c, c);
+
+    if (len == 0 || (len == 1 && (start[0] == '-' || start[0] == '+' || start[0] == '.')))
         return NULL;
-    }
+
+    pdf_token* tk = new pdf_token((char*)start, len, TOKEN_NUMBER);
+
+    return tk;
 }
 
 pdf_parser_t* pdf_parser_init(pdf_file_t* pdf, input_t* input)
 {
     // if (pdf == NULL) return NULL;
-    pdf_parser_t* parser = (pdf_parser_t*)calloc(1, sizeof(pdf_parser_t));
+    pdf_parser_t* parser = new pdf_parser_t{};
     parser->pdf = pdf;
     parser->buffer = (unsigned char*)malloc(4096);
     parser->buffer_size = 4096;
@@ -366,8 +328,7 @@ void pdf_parser_free(pdf_parser_t* parser)
             parser->cached_tokens[i] = NULL;
         }
     }
-    free(parser);
-    parser = NULL;
+    delete parser;
 }
 
 
@@ -1063,7 +1024,8 @@ pdf_cmap* pdf_parser_build_cmap(pdf_parser_t* parser)
                         delete tk1;
                         delete tk2;
                         delete tk3;
-                        
+                        delete arr;
+
                         continue;
                     }
                 }
@@ -1126,6 +1088,17 @@ pdf_cmap* pdf_parser_build_cmap(pdf_parser_t* parser)
         }
         last_token = current_token;
     }
+    // ponytail: sort range maps for binary search lookups
+    std::sort(cmap->cid_map.begin(), cmap->cid_map.end(),
+        [](const pdf_cmap_cid_map& a, const pdf_cmap_cid_map& b) { return a.code < b.code; });
+    std::sort(cmap->cid_range_map.begin(), cmap->cid_range_map.end(),
+        [](const pdf_cmap_char_range& a, const pdf_cmap_char_range& b) { return a.srcStart < b.srcStart; });
+    std::sort(cmap->unicode_map.begin(), cmap->unicode_map.end(),
+        [](const pdf_cmap_unicode_map& a, const pdf_cmap_unicode_map& b) { return a.code < b.code; });
+    std::sort(cmap->unicode_range_map.begin(), cmap->unicode_range_map.end(),
+        [](const pdf_cmap_char_range& a, const pdf_cmap_char_range& b) { return a.srcStart < b.srcStart; });
+    std::sort(cmap->not_def_range.begin(), cmap->not_def_range.end(),
+        [](const pdf_cmap_char_range& a, const pdf_cmap_char_range& b) { return a.srcStart < b.srcStart; });
     return cmap;
 }
 bool _set_common_value(pdf_parser_t* parser, pdf_token* tk, struct pdf_value* p)
@@ -1202,7 +1175,7 @@ pdf_obj_t* pdf_parser_build_obj(pdf_parser_t* parser)
 
     pdf_token* tk;
     pdf_obj_t* obj = pdf_obj_init();
-    obj->value = (pdf_obj_value_t*)malloc(sizeof(pdf_obj_value_t));
+    obj->value = pdf_value_init();
 
     while ((tk = pdf_parser_next_token(parser)) != NULL)
     {
@@ -1257,7 +1230,7 @@ pdf_obj_t* pdf_parser_build_obj(pdf_parser_t* parser)
             obj->stream = pdf_stream_init(parser->pdf, obj, len, offset);
             input_seek(parser->input, len, SEEK_CUR);
             free(parser->remain.rem);
-            parser->remain.rem = 0;
+            parser->remain.rem = NULL;
             parser->remain.len = 0;
             parser->splite_pos = NULL;
             parser->current_pos = NULL;
@@ -1314,7 +1287,7 @@ pdf_dict* pdf_parser_build_dict(pdf_parser_t* parser)
             return NULL;
         }
        
-        pdf_value_t* value = (pdf_value_t*)malloc(sizeof(pdf_value_t));
+        pdf_value_t* value = pdf_value_init();
         if (!_set_common_value(parser, tk1, value))
         {
             delete tk;
@@ -1348,7 +1321,7 @@ pdf_array* pdf_parser_build_array(pdf_parser_t* parser)
         }
         else
         {
-            pdf_value_t* v = (pdf_value_t*)malloc(sizeof(pdf_value_t));
+            pdf_value_t* v = pdf_value_init();
 
             if (!_set_common_value(parser, tk, v))
             {

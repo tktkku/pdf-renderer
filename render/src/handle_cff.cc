@@ -1,4 +1,4 @@
-#include "pdf-render.h"
+﻿#include "pdf-render.h"
 #include "pdf-render-private.h"
 #include <math.h>
 #include <stdlib.h>
@@ -164,8 +164,32 @@ void handle_rrcurveto(pdf_cff_char_render_t* context, pdf_deque* deque)
 }
 void handle_callsubr(pdf_cff_char_render_t* context, pdf_deque* deque)
 {
+    // ponytail: implement local subroutine call (was stub — CFF Type1 subrs broken)
+    pdf_array* local_subr_index = context->charstrings;
+    if (local_subr_index == NULL) return;
+
+    // compute local bias (same formula as global, but based on local index size)
+    uint16_t local_bias = 0;
+    size_t count = local_subr_index->size();
+    if (count < 1240) local_bias = 0;
+    else if (count < 33900) local_bias = 1131;
+    else local_bias = 32768;
+
     auto data = deque->pop_front();
     double g = *((double*)data->data());
+    uint32_t off = (uint32_t)g + local_bias;
+    if (off >= count) return;
+
+    int savelen = context->len;
+    unsigned char* savebuf = context->buf;
+    unsigned char* savecur = context->cur;
+    context->buf = (unsigned char*)local_subr_index->get(off)->val.string;
+    context->cur = context->buf;
+    context->len = local_subr_index->get(off)->value_len;
+    _cff_do_render_char(context, deque);
+    context->buf = savebuf;
+    context->cur = savecur;
+    context->len = savelen;
 }
 void handle_hstemhm(pdf_cff_char_render_t* context, pdf_deque* deque)
 {
@@ -726,7 +750,43 @@ void handle_index(pdf_cff_char_render_t* context, pdf_deque* deque)
 }
 void handle_roll(pdf_cff_char_render_t* context, pdf_deque* deque)
 {
-    printf("roll not implemented\n");
+    // ponytail: implement roll operator — rotate top N elements by J
+    auto jdata = deque->pop_front();
+    auto ndata = deque->pop_front();
+    if (!jdata || !ndata) return;
+    int J = (int)(*((double*)jdata->data()));
+    int N = (int)(*((double*)ndata->data()));
+    if (N <= 0) return;
+    // modulo N so we only rotate within the N elements
+    J = J % N;
+    if (J == 0) return;
+    // pop N elements into temp array
+    double* tmp = (double*)alloca(N * sizeof(double));
+    for (int i = N - 1; i >= 0; i--)
+    {
+        auto d = deque->pop_front();
+        tmp[i] = *((double*)d->data());
+    }
+    // rotate and push back: after rotation by J, element at (i+J)%N moves to position i
+    for (int i = N - 1; i >= 0; i--)
+    {
+        double v = tmp[(i - J + N) % N];
+        deque->push_front(&v, sizeof(double));
+    }
+}
+// ponytail: shared flex curve renderer — eliminates 4x duplicated depth-check + line/curve code
+static void _render_flex_curve(pdf_cff_char_render_t* context,
+    double c1x, double c1y, double c2x, double c2y, double c3x, double c3y,
+    double c4x, double c4y, double c5x, double c5y, double c6x, double c6y, int fd)
+{
+    double depth = fabs((c6y - c1y) * c3x - (c6x - c1x) * c3y + c6x * c1y - c6y * c1x)
+        / sqrt((c6x - c1x) * (c6x - c1x) + (c6y - c1y) * (c6y - c1y));
+    if (depth < (fd / 100.0))
+        PDF_RENDERER_CALL(context->renderer, line_to, c6x, c6y);
+    else {
+        PDF_RENDERER_CALL(context->renderer, cubic_to, c1x, c1y, c2x, c2y, c3x, c3y);
+        PDF_RENDERER_CALL(context->renderer, cubic_to, c4x, c4y, c5x, c5y, c6x, c6y);
+    }
 }
 void handle_hflex(pdf_cff_char_render_t* context, pdf_deque* deque)
 {
@@ -734,229 +794,104 @@ void handle_hflex(pdf_cff_char_render_t* context, pdf_deque* deque)
     double cury = context->curY;
     if (deque->size() == 7)
     {
-        auto data = deque->pop_front();
-        double dx1 = *((double*)data->data());
-        double dy1 = cury;
-        auto data2 = deque->pop_front();
-        double dx2 = *((double*)data2->data());
-        auto data3 = deque->pop_front();
-        double dy2 = *((double*)data3->data());
-        auto data4 = deque->pop_front();
-        double dx3 = *((double*)data4->data());
-        double dy3 = dy2;
-        auto data5 = deque->pop_front();
-        double dx4 = *((double*)data5->data());
-        double dy4 = dy2;
-        auto data6 = deque->pop_front();
-        double dx5 = *((double*)data6->data());
-        double dy5 = cury;
-        auto data7 = deque->pop_front();
-        double dx6 = *((double*)data7->data());
-        double dy6 = cury;
-        double fd = 50;
-
-        double c1x = curx + dx1; double c1y = cury + dy1;
-        double c2x = c1x + dx2; double c2y = c1y + dy2;
-        double c3x = c2x + dx3; double c3y = c2y + dy3;
-        double c4x = c3x + dx4; double c4y = c3y + dy4;
-        double c5x = c4x + dx5; double c5y = c4y + dy5;
-        double c6x = c5x + dx6; double c6y = c5y + dy6;
+        double dx1 = *((double*)deque->pop_front()->data());
+        double dx2 = *((double*)deque->pop_front()->data());
+        double dy2 = *((double*)deque->pop_front()->data());
+        double dx3 = *((double*)deque->pop_front()->data());
+        double dx4 = *((double*)deque->pop_front()->data());
+        double dx5 = *((double*)deque->pop_front()->data());
+        double dx6 = *((double*)deque->pop_front()->data());
+        // ponytail: compact flex coordinate calculation
+        double c1x = curx + dx1, c1y = cury;
+        double c2x = c1x + dx2, c2y = c1y + dy2;
+        double c3x = c2x + dx3, c3y = c2y + dy2;
+        double c4x = c3x + dx4, c4y = c3y + dy2;
+        double c5x = c4x + dx5, c5y = c4y;
+        double c6x = c5x + dx6, c6y = c5y;
         context->curX = c6x; context->curY = c6y;
-
-        double A = c6y - c1y;
-        double B = c6x - c1x;
-        double C = c6x * c1y - c6y * c1x;
-        double depth = fabs(A * c3x + B * c3y + C) / sqrt(A * A + B * B);
-        if (depth < (fd / 100))
-        {
-            PDF_RENDERER_CALL(context->renderer, line_to, c6x, c6y);
-        }
-        else
-        {
-            PDF_RENDERER_CALL(context->renderer, cubic_to, c1x, c1y, c2x, c2y, c3x, c3y);
-            PDF_RENDERER_CALL(context->renderer, cubic_to, c4x, c4y, c5x, c5y, c6x, c6y);
-        }
+        _render_flex_curve(context, c1x, c1y, c2x, c2y, c3x, c3y, c4x, c4y, c5x, c5y, c6x, c6y, 50);
     }
     deque->clear();
 }
 void handle_flex(pdf_cff_char_render_t* context, pdf_deque* deque)
 {
-    double curx = context->curX;
-    double cury = context->curY;
+    double curx = context->curX, cury = context->curY;
     if (deque->size() == 13)
     {
-        auto data = deque->pop_front();
-        double dx1 = *((double*)data->data());
-        auto data2 = deque->pop_front();
-        double dy1 = *((double*)data2->data());
-        auto data3 = deque->pop_front();
-        double dx2 = *((double*)data3->data());
-        auto data4 = deque->pop_front();
-        double dy2 = *((double*)data4->data());
-        auto data5 = deque->pop_front();
-        double dx3 = *((double*)data5->data());
-        auto data6 = deque->pop_front();
-        double dy3 = *((double*)data6->data());
-        auto data7 = deque->pop_front();
-        double dx4 = *((double*)data7->data());
-        auto data8 = deque->pop_front();
-        double dy4 = *((double*)data8->data());
-        auto data9 = deque->pop_front();
-        double dx5 = *((double*)data9->data());
-        auto data10 = deque->pop_front();
-        double dy5 = *((double*)data10->data());
-        auto data11 = deque->pop_front();
-        double dx6 = *((double*)data11->data());
-        auto data12 = deque->pop_front();
-        double dy6 = *((double*)data12->data());
-        auto data13 = deque->pop_front();
-        double fd = *((double*)data13->data());
-
-        double c1x = curx + dx1; double c1y = cury + dy1;
-        double c2x = c1x + dx2; double c2y = c1y + dy2;
-        double c3x = c2x + dx3; double c3y = c2y + dy3;
-        double c4x = c3x + dx4; double c4y = c3y + dy4;
-        double c5x = c4x + dx5; double c5y = c4y + dy5;
-        double c6x = c5x + dx6; double c6y = c5y + dy6;
+        double dx1 = *((double*)deque->pop_front()->data());
+        double dy1 = *((double*)deque->pop_front()->data());
+        double dx2 = *((double*)deque->pop_front()->data());
+        double dy2 = *((double*)deque->pop_front()->data());
+        double dx3 = *((double*)deque->pop_front()->data());
+        double dy3 = *((double*)deque->pop_front()->data());
+        double dx4 = *((double*)deque->pop_front()->data());
+        double dy4 = *((double*)deque->pop_front()->data());
+        double dx5 = *((double*)deque->pop_front()->data());
+        double dy5 = *((double*)deque->pop_front()->data());
+        double dx6 = *((double*)deque->pop_front()->data());
+        double dy6 = *((double*)deque->pop_front()->data());
+        double fd = *((double*)deque->pop_front()->data());
+        double c1x = curx + dx1, c1y = cury + dy1;
+        double c2x = c1x + dx2, c2y = c1y + dy2;
+        double c3x = c2x + dx3, c3y = c2y + dy3;
+        double c4x = c3x + dx4, c4y = c3y + dy4;
+        double c5x = c4x + dx5, c5y = c4y + dy5;
+        double c6x = c5x + dx6, c6y = c5y + dy6;
         context->curX = c6x; context->curY = c6y;
-        /*
-        Ax+By+C=0
-        A=y2-y1
-        B=x2-x1
-        C=x2y1-x1y2
-        d = |Ax3+By3+C| / sqrt(A^2+B^2)
-        */
-       double A = c6y - c1y;
-       double B = c6x - c1x;
-       double C = c6x * c1y - c6y * c1x;
-       double depth = fabs(A * c3x + B * c3y + C) / sqrt(A * A + B * B);
-       if (depth < (fd / 100))
-       {
-            PDF_RENDERER_CALL(context->renderer, line_to, c6x, c6y);
-       }
-       else
-       {
-            PDF_RENDERER_CALL(context->renderer, cubic_to, c1x, c1y, c2x, c2y, c3x, c3y);
-            PDF_RENDERER_CALL(context->renderer, cubic_to, c4x, c4y, c5x, c5y, c6x, c6y);
-       }
+        _render_flex_curve(context, c1x, c1y, c2x, c2y, c3x, c3y, c4x, c4y, c5x, c5y, c6x, c6y, (int)fd);
     }
     deque->clear();
 }
 void handle_hflex1(pdf_cff_char_render_t* context, pdf_deque* deque)
 {
-    double curx = context->curX;
-    double cury = context->curY;
+    double curx = context->curX, cury = context->curY;
     if (deque->size() == 9)
     {
-        auto data = deque->pop_front();
-        double dx1 = *((double*)data->data());
-        auto data2 = deque->pop_front();
-        double dy1 = *((double*)data2->data());
-        auto data3 = deque->pop_front();
-        double dx2 = *((double*)data3->data());
-        auto data4 = deque->pop_front();
-        double dy2 = *((double*)data4->data());
-        auto data5 = deque->pop_front();
-        double dx3 = *((double*)data5->data());
-        double dy3 = dy2;
-        auto data6 = deque->pop_front();
-        double dx4 = *((double*)data6->data());
-        double dy4 = dy2;
-        auto data7 = deque->pop_front();
-        double dx5 = *((double*)data7->data());
-        auto data8 = deque->pop_front();
-        double dy5 = *((double*)data8->data());
-        auto data9 = deque->pop_front();
-        double dx6 = *((double*)data9->data());
-        double dy6 = cury;
-        double fd = 50;
-
-        double c1x = curx + dx1; double c1y = cury + dy1;
-        double c2x = c1x + dx2; double c2y = c1y + dy2;
-        double c3x = c2x + dx3; double c3y = c2y + dy3;
-        double c4x = c3x + dx4; double c4y = c3y + dy4;
-        double c5x = c4x + dx5; double c5y = c4y + dy5;
-        double c6x = c5x + dx6; double c6y = c5y + dy6;
+        double dx1 = *((double*)deque->pop_front()->data());
+        double dy1 = *((double*)deque->pop_front()->data());
+        double dx2 = *((double*)deque->pop_front()->data());
+        double dy2 = *((double*)deque->pop_front()->data());
+        double dx3 = *((double*)deque->pop_front()->data());
+        double dx4 = *((double*)deque->pop_front()->data());
+        double dx5 = *((double*)deque->pop_front()->data());
+        double dy5 = *((double*)deque->pop_front()->data());
+        double dx6 = *((double*)deque->pop_front()->data());
+        double c1x = curx + dx1, c1y = cury + dy1;
+        double c2x = c1x + dx2, c2y = c1y + dy2;
+        double c3x = c2x + dx3, c3y = c2y + dy2;
+        double c4x = c3x + dx4, c4y = c3y + dy2;
+        double c5x = c4x + dx5, c5y = c4y + dy5;
+        double c6x = c5x + dx6, c6y = cury;
         context->curX = c6x; context->curY = c6y;
-        /*
-        Ax+By+C=0
-        A=y2-y1
-        B=x2-x1
-        C=x2y1-x1y2
-        d = |Ax3+By3+C| / sqrt(A^2+B^2)
-        */
-       double A = c6y - c1y;
-       double B = c6x - c1x;
-       double C = c6x * c1y - c6y * c1x;
-       double depth = fabs(A * c3x + B * c3y + C) / sqrt(A * A + B * B);
-       if (depth < (fd / 100))
-       {
-            PDF_RENDERER_CALL(context->renderer, line_to, c6x, c6y);
-       }
-       else
-       {
-            PDF_RENDERER_CALL(context->renderer, cubic_to, c1x, c1y, c2x, c2y, c3x, c3y);
-            PDF_RENDERER_CALL(context->renderer, cubic_to, c4x, c4y, c5x, c5y, c6x, c6y);
-       }
+        _render_flex_curve(context, c1x, c1y, c2x, c2y, c3x, c3y, c4x, c4y, c5x, c5y, c6x, c6y, 50);
     }
     deque->clear();
 }
 void handle_flex1(pdf_cff_char_render_t* context, pdf_deque* deque)
 {
-    double curx = context->curX;
-    double cury = context->curY;
+    double curx = context->curX, cury = context->curY;
     if (deque->size() == 11)
     {
-        auto data = deque->pop_front();
-        double dx1 = *((double*)data->data());
-        auto data2 = deque->pop_front();
-        double dy1 = *((double*)data2->data());
-        auto data3 = deque->pop_front();
-        double dx2 = *((double*)data3->data());
-        auto data4 = deque->pop_front();
-        double dy2 = *((double*)data4->data());
-        auto data5 = deque->pop_front();
-        double dx3 = *((double*)data5->data());
-        auto data6 = deque->pop_front();
-        double dy3 = *((double*)data6->data());
-        auto data7 = deque->pop_front();
-        double dx4 = *((double*)data7->data());
-        auto data8 = deque->pop_front();
-        double dy4 = *((double*)data8->data());
-        auto data9 = deque->pop_front();
-        double dx5 = *((double*)data9->data());
-        auto data10 = deque->pop_front();
-        double dy5 = *((double*)data10->data());
-        auto data11 = deque->pop_front();
-        double d6 = *((double*)data11->data());
-        double fd = 50;
-
-        double c1x = curx + dx1; double c1y = cury + dy1;
-        double c2x = c1x + dx2; double c2y = c1y + dy2;
-        double c3x = c2x + dx3; double c3y = c2y + dy3;
-        double c4x = c3x + dx4; double c4y = c3y + dy4;
-        double c5x = c4x + dx5; double c5y = c4y + dy5;
-        double c6x = 0; double c6y = 0;
-        if (fabs(c5x) > fabs(c5y))
-        {
-            c6x = d6; c6y = cury;
-        }
-        else
-        {
-            c6x = curx; c6y = d6;
-        }
+        double dx1 = *((double*)deque->pop_front()->data());
+        double dy1 = *((double*)deque->pop_front()->data());
+        double dx2 = *((double*)deque->pop_front()->data());
+        double dy2 = *((double*)deque->pop_front()->data());
+        double dx3 = *((double*)deque->pop_front()->data());
+        double dy3 = *((double*)deque->pop_front()->data());
+        double dx4 = *((double*)deque->pop_front()->data());
+        double dy4 = *((double*)deque->pop_front()->data());
+        double dx5 = *((double*)deque->pop_front()->data());
+        double dy5 = *((double*)deque->pop_front()->data());
+        double d6 = *((double*)deque->pop_front()->data());
+        double c1x = curx + dx1, c1y = cury + dy1;
+        double c2x = c1x + dx2, c2y = c1y + dy2;
+        double c3x = c2x + dx3, c3y = c2y + dy3;
+        double c4x = c3x + dx4, c4y = c3y + dy4;
+        double c5x = c4x + dx5, c5y = c4y + dy5;
+        double c6x = (fabs(c5x) > fabs(c5y)) ? d6 : curx;
+        double c6y = (fabs(c5x) > fabs(c5y)) ? cury : d6;
         context->curX = c6x; context->curY = c6y;
-        
-        double depth = fabs(c6y - c3y);
-        if (depth < (fd / 100))
-        {
-            PDF_RENDERER_CALL(context->renderer, line_to, c6x, c6y);
-        }
-        else
-        {
-            PDF_RENDERER_CALL(context->renderer, cubic_to, c1x, c1y, c2x, c2y, c3x, c3y);
-            PDF_RENDERER_CALL(context->renderer, cubic_to, c4x, c4y, c5x, c5y, c6x, c6y);
-        }
+        _render_flex_curve(context, c1x, c1y, c2x, c2y, c3x, c3y, c4x, c4y, c5x, c5y, c6x, c6y, 50);
     }
     deque->clear();
 }

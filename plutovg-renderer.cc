@@ -148,58 +148,45 @@ static void draw_image(pdf_renderer_t* renderer, int width, int height, int chan
     }
     else
     {
-        // tje_encode_to_file("tje.jpg", width, height, channels,
-        // xobj->image->data);
-        //  add header
-        char header[128] = { 0 };
-        if (channels == 3)
+        // ponytail: skip PPM roundtrip, write raw pixels directly to RGBA surface
+        s = plutovg_surface_create(width, height);
+        if (s)
         {
-            sprintf(header, "P6 %d %d 255\n", width, height);
-        }
-        else if (channels == 1)
-        {
-            sprintf(header, "P5 %d %d 255\n", width, height);
-        }
-
-        int header_len = strlen(header);
-        int actual_line_bytes = size / height;
-        int actual_data_len = size;
-        int real_line_bytes = channels * width;
-        int real_data_len = real_line_bytes * height;
-        unsigned char* new_pixels = NULL;
-        if (channels == 3 && real_data_len != actual_data_len)
-        {
-            unsigned char* tmp =
-                (unsigned char*)malloc(real_data_len + header_len);
-            int off = 0;
-            memcpy(tmp, header, header_len);
-            off += header_len;
-            for (int i = 0; i < height; i++)
+            int surface_stride = plutovg_surface_get_stride(s);
+            unsigned char* surface_data = plutovg_surface_get_data(s);
+            int src_line_bytes = size / height;
+            if (channels == 3)
             {
-                memcpy(tmp + off, pixles + i * actual_line_bytes,
-                    real_line_bytes);
-                off += real_line_bytes;
+                for (int i = 0; i < height; i++)
+                {
+                    unsigned char* src = pixles + i * src_line_bytes;
+                    unsigned char* dst = surface_data + i * surface_stride;
+                    for (int j = 0; j < width; j++)
+                    {
+                        dst[j*4+0] = src[j*3+0];
+                        dst[j*4+1] = src[j*3+1];
+                        dst[j*4+2] = src[j*3+2];
+                        dst[j*4+3] = 255;
+                    }
+                }
             }
-            // free(pixles);
-            new_pixels = tmp;
-            size = off;
+            else // channels == 1
+            {
+                for (int i = 0; i < height; i++)
+                {
+                    unsigned char* src = pixles + i * src_line_bytes;
+                    unsigned char* dst = surface_data + i * surface_stride;
+                    for (int j = 0; j < width; j++)
+                    {
+                        unsigned char v = src[j];
+                        dst[j*4+0] = v;
+                        dst[j*4+1] = v;
+                        dst[j*4+2] = v;
+                        dst[j*4+3] = 255;
+                    }
+                }
+            }
         }
-        else
-        {
-            unsigned char* tmp =
-                (unsigned char*)malloc(size + header_len);
-            int off = 0;
-            memcpy(tmp, header, header_len);
-            off += header_len;
-            memcpy(tmp + off, pixles, size);
-            off += size;
-            // free(pixles);
-            new_pixels = tmp;
-            size = off;
-        }
-
-        s = plutovg_surface_load_from_image_data(new_pixels,
-            size);
     }
     if (channels == 3)
     {

@@ -1,10 +1,10 @@
-#include "pdf.h"
+﻿#include "pdf.h"
 #include "pdf-private.h"
 
 #include <stdlib.h>
 pdf_font_t* pdf_font_init()
 {
-    pdf_font_t* font = (pdf_font_t*)calloc(1, sizeof(pdf_font_t));
+    pdf_font_t* font = new pdf_font_t{};
     font->references = 1;
     return font;
 }
@@ -33,7 +33,7 @@ void pdf_font_free(pdf_font_t* font)
                 delete font->type0->to_unicode_map;
             }
             pdf_font_free(font->type0->descendant);
-            free(font->type0);
+            delete font->type0;
         }
         else if (font->subtype == FONT_SUBTYPE_TYPE1 || font->subtype == FONT_SUBTYPE_TRUETYPE)
         {
@@ -42,8 +42,8 @@ void pdf_font_free(pdf_font_t* font)
                 delete font->type1_truetype->to_unicode_map;
             }
             delete font->type1_truetype->differences;
-            free(font->type1_truetype->font_descriptor);
-            free(font->type1_truetype);
+            delete font->type1_truetype->font_descriptor;
+            delete font->type1_truetype;
         }
         else if (font->subtype == FONT_SUBTYPE_TYPE3)
         {
@@ -52,8 +52,9 @@ void pdf_font_free(pdf_font_t* font)
                 delete font->type3->to_unicode_map;
             }
             delete font->type3->differences;
-            free(font->type3->font_descriptor);
-            free(font->type3);
+            delete font->type3->glyph_cache;
+            delete font->type3->font_descriptor;
+            delete font->type3;
         }
         else if (font->subtype == FONT_SUBTYPE_CIDFONTTPYE0 || font->subtype == FONT_SUBTYPE_CIDFONTTPYE2)
         {
@@ -63,10 +64,10 @@ void pdf_font_free(pdf_font_t* font)
             {
                 delete font->cidfont->cid_to_gid_map;
             }
-            free(font->cidfont->font_descriptor);
-            free(font->cidfont);
+            delete font->cidfont->font_descriptor;
+            delete font->cidfont;
         }
-        free(font);
+        delete font;
         font = NULL;
     }
 }

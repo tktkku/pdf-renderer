@@ -1,4 +1,4 @@
-#include "pdf.h"
+﻿#include "pdf.h"
 #include "pdf-private.h"
 
 #include <stdlib.h>
@@ -11,9 +11,7 @@
 #include "stb-image-write.h"
 pdf_obj_t* pdf_obj_init()
 {
-    pdf_obj_t* obj = (pdf_obj_t*)malloc(sizeof(pdf_obj_t));
-    memset(obj, 0, sizeof(pdf_obj_t));
-
+    pdf_obj_t* obj = new pdf_obj_t{};
     return obj;
 }
 
@@ -39,7 +37,7 @@ void pdf_obj_free(pdf_obj_t* obj)
                     obj->xobject->image->data = NULL;
                 }
     
-                free(obj->xobject->image);
+                delete obj->xobject->image;
                 obj->xobject->image = NULL;
             }
     
@@ -48,11 +46,12 @@ void pdf_obj_free(pdf_obj_t* obj)
         {
             if (obj->xobject->form)
             {
-                free(obj->xobject->form);
+                free(obj->xobject->form->cached_stream_data);
+                delete obj->xobject->form;
                 obj->xobject->form = NULL;
             }
         }
-        free(obj->xobject);
+        delete obj->xobject;
     }
     if (obj->font != NULL)
     {
@@ -66,7 +65,7 @@ void pdf_obj_free(pdf_obj_t* obj)
     }
     pdf_value_free(obj->value);
     obj->value = NULL;
-    free(obj);
+    delete obj;
     obj = NULL;
 }
 void _write_png_callback(void* context, void* data, int size)
@@ -116,7 +115,7 @@ pdf_font_descriptor_t* _load_font_descriptor(pdf_obj_t* obj, pdf_dict* font_dict
         return NULL;
     }
 
-    pdf_font_descriptor_t* font_descriptor = (pdf_font_descriptor_t*)calloc(1, sizeof(pdf_font_descriptor_t));
+    pdf_font_descriptor_t* font_descriptor = new pdf_font_descriptor_t{};
     if (font_descriptor == NULL)
         return NULL;
     font_descriptor->fontName = (char*)font_descriptor_dict->get_name("/FontName");
@@ -178,6 +177,28 @@ pdf_font_descriptor_t* _load_font_descriptor(pdf_obj_t* obj, pdf_dict* font_dict
 
     return font_descriptor;
 }
+// ponytail: common ToUnicode CMap loading — was triplicated in 3 font loaders
+static pdf_cmap* _load_to_unicode_cmap(pdf_file_t* pdf, pdf_dict* font_dict)
+{
+    if (!font_dict->has("/ToUnicode")) return NULL;
+    pdf_indirect_t ref = font_dict->get_indirect("/ToUnicode");
+    pdf_obj_t* obj = pdf_file_get_obj(pdf, ref);
+    if (obj == NULL || obj->stream == NULL) return NULL;
+    unsigned char* data = NULL;
+    int len;
+    pdf_stream_get_all(obj->stream, &data, &len);
+    if (data == NULL) return NULL;
+    input_t* input = NULL;
+    input_buffer(&input, (char*)data, len);
+    unsigned char* origin = data;
+    pdf_parser_t* parser = pdf_parser_init(pdf, input);
+    pdf_cmap* cmap = pdf_parser_build_cmap(parser);
+    if (cmap) cmap->isGlobal = false;
+    pdf_parser_free(parser);
+    input_close(input);
+    free(origin);
+    return cmap;
+}
 pdf_font_t* _load_cid_font(pdf_font_t* parent_font, pdf_obj_t* obj, pdf_dict* font_dict)
 {
     pdf_font_t* font = pdf_font_init();
@@ -185,7 +206,7 @@ pdf_font_t* _load_cid_font(pdf_font_t* parent_font, pdf_obj_t* obj, pdf_dict* fo
         return NULL;
     
     char* subtype = (char*)font_dict->get_name("/Subtype"); // CIDFontType0 CIDFontType2
-    if (strcmp(subtype, "/CIDFontType0") == 0)
+    if (subtype == NULL || strcmp(subtype, "/CIDFontType0") == 0)
     {
         font->subtype = FONT_SUBTYPE_CIDFONTTPYE0;
     }
@@ -193,7 +214,7 @@ pdf_font_t* _load_cid_font(pdf_font_t* parent_font, pdf_obj_t* obj, pdf_dict* fo
     {
         font->subtype = FONT_SUBTYPE_CIDFONTTPYE2;
     }
-    font->cidfont = (pdf_font_cidfont_t*)calloc(1, sizeof(pdf_font_cidfont_t));
+    font->cidfont = new pdf_font_cidfont_t{};
     if (font->cidfont == NULL)
     {
         pdf_font_free(font);
@@ -318,7 +339,7 @@ pdf_font_t* _load_type0_font(pdf_obj_t* obj, pdf_dict* font_dict)
         return NULL;
     font->subtype = FONT_SUBTYPE_TYPE0;
     font->basefont = (char*)font_dict->get_name("/BaseFont");
-    font->type0 = (pdf_font_type0_t*)calloc(1, sizeof(pdf_font_type0_t));
+    font->type0 = new pdf_font_type0_t{};
     if (font->type0 == NULL)
     {
         pdf_font_free(font);
@@ -333,31 +354,13 @@ pdf_font_t* _load_type0_font(pdf_obj_t* obj, pdf_dict* font_dict)
 
     if (font_dict->has("/ToUnicode"))
     {
-        pdf_indirect_t to_unicode_ref = font_dict->get_indirect("/ToUnicode");
-        // PDF Specification 1.7, 9.10.3 ToUnicode CMaps
-        pdf_obj_t* obj1 = pdf_file_get_obj(obj->pdf, to_unicode_ref);
-        if (obj1 == NULL || obj1->stream == NULL)
+        pdf_cmap* cmap = _load_to_unicode_cmap(obj->pdf, font_dict);
+        if (cmap == NULL)
         {
             pdf_font_free(font);
             return NULL;
         }
-        unsigned char* data = NULL;
-        int len;
-        pdf_stream_get_all(obj1->stream, &data, &len);
-        if (data != NULL)
-        {
-            input_t* input = NULL;
-            input_buffer(&input, (char*)data, len);
-            unsigned char* origin = data;
-            pdf_parser_t* parser = pdf_parser_init(obj->pdf, input);
-
-            pdf_cmap* cmap = pdf_parser_build_cmap(parser);
-            cmap->isGlobal = false;
-            font->type0->to_unicode_map = cmap;
-            pdf_parser_free(parser);
-            input_close(input);
-            free(origin);
-        } 
+        font->type0->to_unicode_map = cmap;
     }
     // CIDFonts
     if (font_dict->has("/DescendantFonts"))
@@ -432,7 +435,7 @@ pdf_array* _load_differences(pdf_dict* font_dict)
             {
                 if (arr->get(i)->type == PDF_VALUE_NUMBER)
                 {
-                    pdf_value_t* value = (pdf_value_t*)malloc(sizeof(pdf_value_t));
+                    pdf_value_t* value = pdf_value_init();
                     value->type = PDF_VALUE_NUMBER;
                     value->val.number = arr->get(i)->val.number;
                     differences->add(value);
@@ -442,13 +445,13 @@ pdf_array* _load_differences(pdf_dict* font_dict)
                 {
                     if (cnt > 1 && differences->get(cnt - 1)->type == PDF_VALUE_NAME)
                     {
-                        pdf_value_t* value = (pdf_value_t*)malloc(sizeof(pdf_value_t));
+                        pdf_value_t* value = pdf_value_init();
                         value->type = PDF_VALUE_NUMBER;
                         value->val.number = differences->get(cnt - 2)->val.number + 1;
                         differences->add(value);
                         cnt++;
                     }
-                    pdf_value_t* value = (pdf_value_t*)malloc(sizeof(pdf_value_t));
+                    pdf_value_t* value = pdf_value_init();
                     value->type = PDF_VALUE_NAME;
                     value->val.name = strdup(arr->get(i)->val.name);
                     differences->add(value);
@@ -474,7 +477,7 @@ pdf_font_t* _load_type1_truetype_font(pdf_obj_t* obj, pdf_dict* font_dict)
         font->subtype = FONT_SUBTYPE_TRUETYPE;
     }
     font->basefont = (char*)font_dict->get_name("/BaseFont");
-    font->type1_truetype = (pdf_font_type1_t*)calloc(1, sizeof(pdf_font_type1_t));
+    font->type1_truetype = new pdf_font_type1_t{};
     font->type1_truetype->name = (char*)font_dict->get_name("/Name");
     font->type1_truetype->first_char = font_dict->get_number("/FirstChar");
     font->type1_truetype->last_char = font_dict->get_number("/LastChar");
@@ -490,26 +493,7 @@ pdf_font_t* _load_type1_truetype_font(pdf_obj_t* obj, pdf_dict* font_dict)
     }
     
     if (font_dict->has("/ToUnicode"))
-    {
-        pdf_indirect_t to_unicode_ref = font_dict->get_indirect("/ToUnicode");
-        pdf_obj_t* obj1 = pdf_file_get_obj(obj->pdf, to_unicode_ref);
-        unsigned char* data = NULL;
-        int len = 0;
-        pdf_stream_get_all(obj1->stream, &data, &len);
-        if (data != NULL)
-        {
-            input_t* input = NULL;
-            input_buffer(&input, (char*)data, len);
-            unsigned char* origin = data;
-            pdf_parser_t* parser = pdf_parser_init(obj->pdf, input);
-
-            pdf_cmap* cmap = pdf_parser_build_cmap(parser);
-            cmap->isGlobal = false;
-            font->type1_truetype->to_unicode_map = cmap;
-            input_close(input);
-            free(origin);
-        }
-    }
+        font->type1_truetype->to_unicode_map = _load_to_unicode_cmap(obj->pdf, font_dict);
     font->type1_truetype->font_descriptor = _load_font_descriptor(obj, font_dict);
     
     return font;
@@ -521,7 +505,8 @@ pdf_font_t* _load_type3_font(pdf_obj_t* obj, pdf_dict* font_dict)
         return NULL;
     font->subtype = FONT_SUBTYPE_TYPE3;
     font->basefont = (char*)font_dict->get_name("/BaseFont");
-    font->type3 = (pdf_font_type3_t*)calloc(1, sizeof(pdf_font_type3_t));
+    font->type3 = new pdf_font_type3_t{};
+    font->type3->glyph_cache = new std::unordered_map<uint32_t, pdf_obj_t*>();
     font->type3->first_char = font_dict->get_number("/FirstChar");
     font->type3->last_char = font_dict->get_number("/LastChar");
     if (font_dict->has("/Widths"))
@@ -573,26 +558,7 @@ pdf_font_t* _load_type3_font(pdf_obj_t* obj, pdf_dict* font_dict)
     }
     
     if (font_dict->has("/ToUnicode"))
-    {
-        pdf_indirect_t to_unicode_ref = font_dict->get_indirect("/ToUnicode");
-        pdf_obj_t* obj1 = pdf_file_get_obj(obj->pdf, to_unicode_ref);
-        unsigned char* data = NULL;
-        int len;
-        pdf_stream_get_all(obj1->stream, &data, &len);
-        if (data != NULL)
-        {
-            input_t* input = NULL;
-            input_buffer(&input, (char*)data, len);
-            unsigned char* origin = data;
-            pdf_parser_t* parser = pdf_parser_init(obj->pdf, input);
-    
-            pdf_cmap* cmap = pdf_parser_build_cmap(parser);
-            cmap->isGlobal = false;
-            font->type3->to_unicode_map = cmap;
-            input_close(input);
-            free(origin);
-        }
-    }
+        font->type3->to_unicode_map = _load_to_unicode_cmap(obj->pdf, font_dict);
     font->type3->font_descriptor = _load_font_descriptor(obj, font_dict);
 
     return font;
@@ -913,7 +879,7 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj, const char* name)
         }
         if (strcmp(filter, "/FlateDecode") == 0)
         {
-            pdf_image_t* img = (pdf_image_t*)calloc(1, sizeof(pdf_image_t));
+            pdf_image_t* img = new pdf_image_t{};
             img->width = width;
             img->height = height;
             img->bits_per_color = bits_per_component;
@@ -993,7 +959,7 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj, const char* name)
                 img->data_len = tmp_len;
                 img->bits_per_color = 8;
             }
-            pdf_xobject_t* xobj = (pdf_xobject_t*)malloc(sizeof(pdf_xobject_t));
+            pdf_xobject_t* xobj = new pdf_xobject_t{};
             xobj->obj = xobject;
             xobj->type = XOBJ_IMAGE;
             xobj->image = img;
@@ -1003,7 +969,7 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj, const char* name)
         }
         else if (strcmp(filter, "/DCTDecode") == 0)
         {
-            pdf_image_t* img = (pdf_image_t*)calloc(1, sizeof(pdf_image_t));
+            pdf_image_t* img = new pdf_image_t{};
             img->width = width;
             img->height = height;
             img->bits_per_color = bits_per_component;
@@ -1045,7 +1011,7 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj, const char* name)
                     }
                 }
             }
-            pdf_xobject_t* xobj = (pdf_xobject_t*)malloc(sizeof(pdf_xobject_t));
+            pdf_xobject_t* xobj = new pdf_xobject_t{};
             xobj->obj = xobject;
             xobj->type = XOBJ_IMAGE;
             xobj->image = img;
@@ -1061,10 +1027,12 @@ pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj, const char* name)
     }
     else if (strcmp(subtype, "/Form") == 0)
     {
-        pdf_xobject_t* xobj = (pdf_xobject_t*)malloc(sizeof(pdf_xobject_t));
+        pdf_xobject_t* xobj = new pdf_xobject_t{};
         xobj->obj = xobject;
         xobj->type = XOBJ_FORM;
-        xobj->form = (pdf_form_t*)malloc(sizeof(pdf_form_t));
+        xobj->form = new pdf_form_t{};
+        xobj->form->cached_stream_data = NULL;
+        xobj->form->cached_stream_len = 0;
         xobj->form->matrix[0] = 1;
         xobj->form->matrix[1] = 0;
         xobj->form->matrix[2] = 0;

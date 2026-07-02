@@ -10,7 +10,9 @@
 #endif
 void _init_state(pdf_render* context)
 {
-    context->state = (pdf_graphics_state_t*)malloc(sizeof(pdf_graphics_state_t));
+    // ponytail: use pre-allocated state stack (PDF max q/Q nesting is 28)
+    context->state_stack_depth = 0;
+    context->state = &context->state_stack[0];
     memset(context->state, 0, sizeof(pdf_graphics_state_t));
     strcpy(context->state->fill.currentColorSpace, "DeviceGray");
     strcpy(context->state->stroke.currentColorSpace, "DeviceGray");
@@ -70,7 +72,7 @@ void pdf_render_free(pdf_render* context)
         delete fontcache;
     }
     context->fontcache.clear();
-    free(context->state);
+    // ponytail: state is now on pre-allocated state_stack, no free needed
     delete context;
 }
 
@@ -224,7 +226,7 @@ void pdf_render_build(pdf_render* context)
 
 pdf_render_command* _do_render_operation(pdf_stream_t* stream, pdf_render* context, pdf_token* tk)
 {
-#define DEBUG_TOKEN 1
+#define DEBUG_TOKEN 0
 #if DEBUG_TOKEN
     if (tk != NULL)
     {

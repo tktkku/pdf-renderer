@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "pdf.h"
 #include <stdbool.h>
 #include <stddef.h>
@@ -8,7 +8,7 @@
 #include "zlib.h"
 #include <string>
 #include <vector>
-#include <map>
+#include <unordered_map>
 #include <memory>
 #define ARRAY_COUNT(a) (sizeof(a) / sizeof(a[0]))
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -102,7 +102,7 @@ struct pdf_obj
 class pdf_dict
 {
 private:
-    std::map<std::string, pdf_value_t*> pairs;
+    std::unordered_map<std::string, pdf_value_t*> pairs;
 public:
     void add(const char* key, pdf_value_t* value);
     void add(const char* key, pdf_value_type_t type, void* data);
@@ -396,6 +396,8 @@ typedef struct
     pdf_dict* resources;
     pdf_cmap* to_unicode_map;
     pdf_array* differences;
+    // ponytail: O(1) glyph cache — Type3 re-parses content stream per char without this
+    std::unordered_map<uint32_t, pdf_obj_t*>* glyph_cache;
 } pdf_font_type3_t;
 typedef struct 
 {
@@ -491,6 +493,9 @@ struct pdf_form
 {
     double matrix[6];
     double bbox[4];
+    // ponytail: cached decompressed stream data — avoids re-parsing on repeated Do
+    unsigned char* cached_stream_data;
+    int cached_stream_len;
 };
 
 struct pdf_xobject
@@ -568,7 +573,12 @@ const char* _token_to_string(pdf_token_type_t type);
 class pdf_node
 {
 private:
-    std::vector<char> _data;
+    // ponytail: small buffer avoids heap alloc for common short operands (≤31 bytes)
+    static constexpr size_t SMALL_BUF_SIZE = 32;
+    char _small_buf[SMALL_BUF_SIZE];
+    char* _data_ptr;
+    size_t _size;
+    bool _is_small;
     pdf_node* prev;
     pdf_node* next;
 public:
@@ -587,9 +597,7 @@ public:
 class pdf_deque
 {
 private:
-    pdf_node* front;
-    pdf_node* rear;
-    size_t _size;
+    std::vector<std::unique_ptr<pdf_node>> _vec;
 public:
     explicit pdf_deque();
     ~pdf_deque();
@@ -639,5 +647,6 @@ void pdf_obj_get_colorspace(pdf_obj_t* obj, const char* name, char* value);
 pdf_xobject_t* pdf_obj_get_xobject(pdf_obj_t* obj, const char* name);
 
 void pdf_value_free(struct pdf_value* value);
+pdf_value_t* pdf_value_init(void);
 
 void md5(const uint8_t *initial_msg, size_t initial_len, uint8_t *digest);

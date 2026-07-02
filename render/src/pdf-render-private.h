@@ -184,6 +184,7 @@ struct pdf_render_command
                 break;
             case TOKEN_OPERATOR_apostrophe:
             case TOKEN_OPERATOR_Tj:
+            case TOKEN_OPERATOR_quotation:
                 new (&uniqueNode) decltype(uniqueNode){};
                 break;
             case TOKEN_OPERATOR_TJ:
@@ -233,6 +234,7 @@ struct pdf_render_command
                 break;
             case TOKEN_OPERATOR_apostrophe:
             case TOKEN_OPERATOR_Tj:
+            case TOKEN_OPERATOR_quotation:
                 uniqueNode.~decltype(uniqueNode)();
                 break;
             case TOKEN_OPERATOR_TJ:
@@ -260,7 +262,11 @@ struct pdf_render
     pdf_page_t* page;
     pdf_obj_t* current_obj;
     pdf_graphics_state_t* state;
+    // ponytail: pre-allocated state stack avoids malloc/free per q/Q pair (PDF max depth 28)
+    pdf_graphics_state_t state_stack[32];
+    int state_stack_depth;
     std::vector<pdf_font_cache_t*> fontcache;
+    std::unordered_map<pdf_font_t*, pdf_font_cache_t*> fontcache_map;
     std::vector<std::unique_ptr<pdf_render_command>> operations;
 };
 typedef void (*OPERATION_HANDLER)(pdf_render* context, pdf_render_command* cmd, bool dry_run);

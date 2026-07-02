@@ -1,4 +1,4 @@
-#include "pdf.h"
+﻿#include "pdf.h"
 #include "pdf-private.h"
 
 #include <stdint.h>
@@ -73,7 +73,7 @@ bool _read_xref_table(pdf_file_t* pdf)
     int seq = start_index;
     for (int i = 0; i < num; i++, seq++)
     {
-        xref_t* xref = (xref_t*)malloc(sizeof(xref_t));
+        xref_t* xref = new xref_t;
         if (xref == NULL)
             return false;
         xref->sequence = seq;
@@ -348,12 +348,12 @@ FIND_XRef:
         {
             index_arr = new pdf_array();
 
-            pdf_value_t* value0 = (pdf_value_t*)malloc(sizeof(pdf_value_t));
+            pdf_value_t* value0 = pdf_value_init();
             value0->type = PDF_VALUE_NUMBER;
             value0->val.number = 0;
             index_arr->add(value0);
 
-            pdf_value_t* value1 = (pdf_value_t*)malloc(sizeof(pdf_value_t));
+            pdf_value_t* value1 = pdf_value_init();
             value1->type = PDF_VALUE_NUMBER;
             value1->val.number = size;
             index_arr->add(value1);
@@ -406,7 +406,7 @@ FIND_XRef:
                         part3 = part3 | *start;
                         start += 1;
                     }
-                    xref_t* xref = (xref_t*)malloc(sizeof(xref_t));
+                    xref_t* xref = new xref_t;
                     if (xref == NULL)
                         return false;
                     xref->sequence = seq;
@@ -1075,11 +1075,13 @@ pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, pdf_indirect_t ref)
                 for (int j = 0; j < num_pairs; j++)
                 {
                     tk = pdf_parser_next_token(parser);
+                    if (tk == NULL) { pdf_parser_free(parser); return NULL; }
                     int seq = atoi(tk->data());
                     delete tk;
                     tk = NULL;
 
                     tk = pdf_parser_next_token(parser);
+                    if (tk == NULL) { pdf_parser_free(parser); return NULL; }
                     int offset = atoi(tk->data());
                     delete tk;
                     tk = NULL;
@@ -1099,12 +1101,13 @@ pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, pdf_indirect_t ref)
                     obj->indirect.obj_num = seq;
                     obj->indirect.generation = 0;
                     
-                    obj->value = (pdf_obj_value_t*)malloc(sizeof(pdf_obj_value_t));
+                    obj->value = pdf_value_init();
                     if (tk1->type() == TOKEN_DICT_BEG)
                     {
                         pdf_dict* obj_dict = pdf_parser_build_dict(val_parser);
                         if (obj_dict == NULL)
                         {
+                            pdf_obj_free(obj);
                             pdf_parser_free(val_parser);
                             delete tk1;
                             return NULL;
@@ -1118,6 +1121,7 @@ pdf_obj_t* pdf_file_get_obj(pdf_file_t* pdf, pdf_indirect_t ref)
                         pdf_array* array = pdf_parser_build_array(val_parser);
                         if (array == NULL)
                         {
+                            pdf_obj_free(obj);
                             pdf_parser_free(val_parser);
                             delete tk1;
                             return NULL;
@@ -1150,7 +1154,7 @@ void pdf_file_load_font(pdf_file_t* file, const char* name, const char* data, lo
 {
     if (file == NULL || name == NULL || data == NULL || len <= 0)
         return;
-    pdf_external_font_t* font = (pdf_external_font_t*)malloc(sizeof(pdf_external_font_t));
+    pdf_external_font_t* font = new pdf_external_font_t{};
     font->name_len = strlen(name);
     font->name = (char*)malloc(font->name_len + 1);
     memcpy(font->name, name, font->name_len);
